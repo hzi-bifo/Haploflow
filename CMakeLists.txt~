@@ -1,0 +1,19 @@
+project(ADBA)
+
+cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+set(COMPILER_FLAGS
+	"-ggdb -Wall -L/usr/include -I/usr/include -std=c++0x -pipe -Wno-deprecated -pedantic"
+)
+
+add_executable(adba
+	deBruijnGraph.h
+	deBruijnGraph.cpp
+)
+
+set_target_properties(adba PROPERTIES
+	COMPILE_FLAGS ${COMPILER_FLAGS}
+)
+
