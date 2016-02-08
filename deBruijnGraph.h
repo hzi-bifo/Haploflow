@@ -12,7 +12,7 @@ public:
 private:
 	void split_read(std::string); // given the read, inserts its kmers in the graph
 
-	std::unordered_map<std::string,std::array<unsigned int,5> > graph_; // ACGT and occurences of kmer
+	std::unordered_map<std::string,std::array<unsigned int,4> > graph_; // ACGT
 	unsigned int k_;
 };
 

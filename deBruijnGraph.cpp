@@ -40,12 +40,11 @@ void deBruijnGraph::printGraph()
 
 void deBruijnGraph::split_read(std::string line)
 {
-	std::array<unsigned int,5> init_array = {0,0,0,0,1};
+	std::array<unsigned int,4> init_array = {0,0,0,0};
 	for (unsigned int i = k_; i < line.length(); i++)
 	{
 		std::string kmer = line.substr(i - k_,k_); // extract kmer
-		if (!graph_.emplace(kmer,init_array).second) // if not in list, add kmer
-			graph_[kmer][4] += 1; // add another occurence
+		graph_.emplace(kmer,init_array); // if not in list, add kmer
 		switch (line[i]) // depending on the next char add an "edge count"
 		{
 			case 'A': graph_[kmer][0] += 1; break;
@@ -56,6 +55,5 @@ void deBruijnGraph::split_read(std::string line)
 		}
 	}
 	// this for-loop does not add the final kmer of the read, add manually:
-	if (!graph_.emplace(line.substr(line.length() - k_, k_),init_array).second) //the last node does not have neighbours, if it already is in the graph, then nothing will change
-		graph_[line.substr(line.length() - k_, k_)][4] += 1;
+	graph_.emplace(line.substr(line.length() - k_, k_),init_array); //the last node does not have neighbours, if it already is in the graph, then nothing will change
 }
