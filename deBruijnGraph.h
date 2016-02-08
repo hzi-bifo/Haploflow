@@ -1,16 +1,18 @@
 #include <unordered_map>
 #include <fstream>
+#include <iostream>
 
 class deBruijnGraph
 {
 public:
-	deBruijnGraph(int k); // creates empty graph
-	deBruijnGraph(std::string filename, int k); // builds the deBruijn graph from file
+	deBruijnGraph(unsigned int k); // creates empty graph
+	deBruijnGraph(std::string filename, unsigned int k); // builds the deBruijn graph from file
+	void printGraph(); //debug
 	
 private:
 	void split_read(std::string); // given the read, inserts its kmers in the graph
 
-	std::unordered_map<std::string,std::array<int,4> > graph_;
-	int k_;
+	std::unordered_map<std::string,std::array<unsigned int,5> > graph_; // ACGT and occurences of kmer
+	unsigned int k_;
 };
 
