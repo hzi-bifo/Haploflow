@@ -40,7 +40,7 @@ void deBruijnGraph::printGraph()
 
 void deBruijnGraph::split_read(std::string line)
 {
-	std::array<unsigned int,4> init_array = {0,0,0,0,1};
+	std::array<unsigned int,5> init_array = {0,0,0,0,1};
 	for (unsigned int i = k_; i < line.length(); i++)
 	{
 		std::string kmer = line.substr(i - k_,k_); // extract kmer
