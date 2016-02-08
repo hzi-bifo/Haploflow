@@ -10,9 +10,10 @@ public:
 	void printGraph(); //debug
 	
 private:
-	void split_read(std::string); // given the read, inserts its kmers in the graph
+	void add_as_neighbour(const std::string& kmer, const char& letter, bool succ); // add letter as predecessor or successor
+	void split_read(const std::string&); // given the read, inserts its kmers in the graph
 
-	std::unordered_map<std::string,std::array<unsigned int,4> > graph_; // ACGT
+	std::unordered_map<std::string,std::array<unsigned int,8> > graph_; // successors and predecessors (ACGT)
 	unsigned int k_;
 };
 
