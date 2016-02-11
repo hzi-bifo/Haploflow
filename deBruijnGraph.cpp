@@ -53,7 +53,7 @@ void deBruijnGraph::add_as_neighbour(const std::string& kmer, const char& letter
 
 void deBruijnGraph::split_read(const std::string& line)
 {
-	std::array<unsigned int,8> init_array = {0,0,0,0,0,0,0,0};
+	std::array<unsigned int,9> init_array = {0,0,0,0,0,0,0,0,0};
 	// the first kmer does not have predecessors, init manually
 	std::string kmer = line.substr(0,k_);
 	graph_.emplace(kmer,init_array);
@@ -71,4 +71,60 @@ void deBruijnGraph::split_read(const std::string& line)
 	kmer = line.substr(line.length() - k_, k_);
 	graph_.emplace(kmer,init_array); //the last node does not have neighbours, if it already is in the graph, then nothing will change
 	add_as_neighbour(kmer, line[line.length() - k_ - 1], false);
+}
+
+std::vector<std::string> deBruijnGraph::get_terminals(bool sink = false)
+{
+	std::vector<std::string> terminals;
+	for (const auto& v : graph_)
+	{
+		auto& neigh = v.second;
+		int i = (sink ? 4 : 0); // sinks do not have edges in [0] to [3], sources in [4] to [7]
+		if (neigh[i] + neigh[i + 1] + neigh[i + 2] + neigh[i + 3] == 0)
+		{
+			terminals.push_back(v.first);
+			std::cout << v.first << ": ";
+			for (const auto& u : v.second)
+				std::cout << u << " ";
+			std::cout << std::endl;
+		}
+	}
+	return terminals;
+}
+
+void deBruijnGraph::bfs(const std::string& source, int state)
+{
+	std::queue<std::string> q;
+	q.push(source);
+	while (q.size() > 0)
+	{
+		auto& curr = q.front();
+		if (graph_[curr][8] != 0)
+		{
+			backtracking(curr); // backtracking
+			return;
+		}
+		else
+			graph_[curr][8] = state;
+		q.pop();
+		for (int i = 4; i < 8; i++)
+		{
+			const auto& n = graph_[curr][i];
+			if (n != 0 and i == 4)
+				q.push(curr.substr(1) + 'A');
+			else if (n != 0 and i == 5)
+				q.push(curr.substr(1) + 'C');
+			else if (n != 0 and i == 6)
+				q.push(curr.substr(1) + 'G');
+			else if (n != 0 and i == 7)
+				q.push(curr.substr(1) + 'T');
+			else
+				std::cerr << "Unknown character." << std::endl;
+		}
+	}
+}
+
+void deBruijnGraph::backtracking(const std::string&)
+{
+	return; // TODO
 }
