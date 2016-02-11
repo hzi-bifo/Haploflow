@@ -27,6 +27,7 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 
 void deBruijnGraph::printGraph()
 {
+	std::cout << graph_.size() << std::endl;
 	for (const auto& v: graph_)
 	{
 		std::cout << v.first << ": ";
@@ -47,7 +48,7 @@ void deBruijnGraph::add_as_neighbour(const std::string& kmer, const char& letter
 		case 'C': graph_[kmer][i + 1] += 1; break;
 		case 'G': graph_[kmer][i + 2] += 1; break;
 		case 'T': graph_[kmer][i + 3] += 1; break;
-		default: break; //TODO
+		default: graph_[kmer][i] += 1; break; //TODO (currently: add 'A')
 	}
 }
 
@@ -79,52 +80,71 @@ std::vector<std::string> deBruijnGraph::get_terminals(bool sink = false)
 	for (const auto& v : graph_)
 	{
 		auto& neigh = v.second;
-		int i = (sink ? 4 : 0); // sinks do not have edges in [0] to [3], sources in [4] to [7]
+		int i = (sink ? 0 : 4); // sinks do not have edges in [0] to [3], sources in [4] to [7]
 		if (neigh[i] + neigh[i + 1] + neigh[i + 2] + neigh[i + 3] == 0)
-		{
 			terminals.push_back(v.first);
-			std::cout << v.first << ": ";
-			for (const auto& u : v.second)
-				std::cout << u << " ";
-			std::cout << std::endl;
-		}
 	}
 	return terminals;
 }
 
-void deBruijnGraph::bfs(const std::string& source, int state)
+bool deBruijnGraph::bfs(const std::string& source, unsigned int state, bool forward = true)
 {
 	std::queue<std::string> q;
 	q.push(source);
 	while (q.size() > 0)
 	{
-		auto& curr = q.front();
-		if (graph_[curr][8] != 0)
+		auto curr = q.front();
+		q.pop();
+		if (graph_[curr][8] != 0 and forward)
 		{
-			backtracking(curr); // backtracking
-			return;
+			bfs(curr, graph_[curr][8], false); // backtracking
+			return false;
 		}
+		else if (graph_[curr][8] == state)
+			return false;
 		else
 			graph_[curr][8] = state;
-		q.pop();
-		for (int i = 4; i < 8; i++)
+		std::string next;
+		if (forward)
 		{
-			const auto& n = graph_[curr][i];
-			if (n != 0 and i == 4)
-				q.push(curr.substr(1) + 'A');
-			else if (n != 0 and i == 5)
-				q.push(curr.substr(1) + 'C');
-			else if (n != 0 and i == 6)
-				q.push(curr.substr(1) + 'G');
-			else if (n != 0 and i == 7)
-				q.push(curr.substr(1) + 'T');
-			else
-				std::cerr << "Unknown character." << std::endl;
+			for (int i = 0; i < 4; i++)
+			{
+				const auto& n = graph_[curr][i];
+				next = curr.substr(1);
+				if (n != 0 and i == 0)
+					next.append("A");
+				else if (n != 0 and i == 1)
+					next.append("C");
+				else if (n != 0 and i == 2)
+					next.append("G");
+				else if (n != 0 and i == 3)
+					next.append("T");
+				else
+					next = "#NULL";
+				if (next != "#NULL")
+					q.push(next);
+			}
+		}
+		else
+		{
+			for (int i = 4; i < 8; i++)
+			{
+				const auto& n = graph_[curr][i];
+				next = curr.substr(0,curr.length() - 1);
+				if (n != 0 and i == 4)
+					next = "A" + next;
+				else if (n != 0 and i == 5)
+					next = "C" + next;
+				else if (n != 0 and i == 6)
+					next = "G" + next;
+				else if (n != 0 and i == 7)
+					next = "T" + next;
+				else
+					next = "#NULL";
+				if (next != "#NULL")
+					q.push(next);
+			}
 		}
 	}
-}
-
-void deBruijnGraph::backtracking(const std::string&)
-{
-	return; // TODO
+	return true;
 }
