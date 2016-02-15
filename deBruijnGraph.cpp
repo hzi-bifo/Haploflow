@@ -148,3 +148,45 @@ bool deBruijnGraph::bfs(const std::string& source, unsigned int state, bool forw
 	}
 	return true;
 }
+
+std::string deBruijnGraph::extractSequence(const std::string& source)
+{
+	std::string seq(source);
+	std::string next = source;
+	bool added = true;
+	while(added)
+	{
+		added = false;
+		for (int i = 0; i < 4; i++)
+		{
+			const auto& n = graph_[next][i];
+			if (n == 0)
+				continue;
+			if (n != 0 and i == 0)
+			{
+				seq += "A";
+				next = next.substr(1,next.size() - 1) + "A";
+			}
+			else if (n != 0 and i == 1)
+			{
+				seq += "C";
+				next = next.substr(1,next.size() - 1) + "C";
+			}
+			else if (n != 0 and i == 2)
+			{
+				seq += "G";
+				next = next.substr(1,next.size() - 1) + "G";
+			}
+			else if (n != 0 and i == 3)
+			{
+				seq += "T";
+				next = next.substr(1,next.size() - 1) + "T";
+			}
+			added = true;
+			break; // just add one possiblity
+		}
+		if (next == source)
+			break; // we're in a cycle
+	}
+	return seq;
+}

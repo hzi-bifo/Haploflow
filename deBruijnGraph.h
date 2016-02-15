@@ -3,6 +3,7 @@
 #include <queue>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 class deBruijnGraph
 {
@@ -12,6 +13,8 @@ public:
 	std::vector<std::string> get_terminals(bool); // returns all the sinks and/or sources
 	bool bfs(const std::string&, unsigned int, bool); // calculates pathes from vertex (source) to sinks, returns whether path belongs to a new cc
 	void printGraph(); //debug
+	std::string extractSequence(const std::string&); // given a cc
+	
 	
 	std::unordered_map<std::string,std::array<unsigned int,9> > graph_; // this HAS to be private later on!!!
 	
