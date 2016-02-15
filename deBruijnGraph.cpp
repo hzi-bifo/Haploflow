@@ -226,12 +226,11 @@ std::string deBruijnGraph::extractSequence(const std::string& source, int i = 0)
 	}
 }
 
-void deBruijnGraph::edmonds_karp_single(const std::string& source, const std::string& sink)
+std::string deBruijnGraph::edmonds_karp_single(const std::string& source, const std::string& sink)
 {
 	std::queue<std::string> q;
-	std::string v = source;
 	std::string path = source;
-	q.push(v);
+	q.push(source);
 	while (!q.empty())
 	{
 		std::string curr = q.front();
@@ -242,7 +241,7 @@ void deBruijnGraph::edmonds_karp_single(const std::string& source, const std::st
 			{
 				std::string next = curr.substr(1);
 				add_back(i,next);
-				if (!graph_[next][9] and next != v and graph_[curr][10] < graph_[curr][11])
+				if (!graph_[next][9] and next != source and graph_[curr][10] < graph_[curr][11])
 				{
 					add_back(i,path);
 					graph_[next][9] = 1;
@@ -253,8 +252,22 @@ void deBruijnGraph::edmonds_karp_single(const std::string& source, const std::st
 	}
 	if (graph_[sink][9] == 0)
 		return; // no path from source to sink
-	int send_flow = std::numeric_limits<int>::max(); //inf
+	unsigned int send_flow = std::numeric_limits<unsigned int>::max(); //inf
 	
+	int j = 0;
+	for (std::string s = sink; s != source;) // find the "augmenting path"
+	{
+		send_flow = std::min(send_flow, graph_[s][11] - graph_[s][10]);
+		s = path.substr(path.length() - s.length() - j - 1, s.length());
+		j++;
+	}
+	for (std::string s = sink; s != source;) // let it floooooow
+	{
+		graph_[s][10] += send_flow;
+		s = path.substr(path.length() - s.length() - j - 1, s.length());
+		j++;
+	}
+	return path;
 }
 
 void deBruijnGraph::resetVisits()
