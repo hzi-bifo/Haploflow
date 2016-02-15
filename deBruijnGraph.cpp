@@ -54,7 +54,7 @@ void deBruijnGraph::add_as_neighbour(const std::string& kmer, const char& letter
 
 void deBruijnGraph::split_read(const std::string& line)
 {
-	std::array<unsigned int,9> init_array = {0,0,0,0,0,0,0,0,0};
+	std::array<unsigned int,12> init_array = {0,0,0,0,0,0,0,0,0,0,0,0};
 	// the first kmer does not have predecessors, init manually
 	std::string kmer = line.substr(0,k_);
 	graph_.emplace(kmer,init_array);
@@ -87,7 +87,31 @@ std::vector<std::string> deBruijnGraph::get_terminals(bool sink = false)
 	return terminals;
 }
 
-bool deBruijnGraph::bfs(const std::string& source, unsigned int state, bool forward = true)
+void deBruijnGraph::add_back(int i, std::string& next)
+{
+	if (i == 0)
+		next.append("A");
+	else if (i == 1)
+		next.append("C");
+	else if (i == 2)
+		next.append("G");
+	else if (i == 3)
+		next.append("T");
+}
+
+void deBruijnGraph::add_front(int i, std::string& next)
+{
+	if (i == 4)
+		next = "A" + next;
+	else if (i == 5)
+		next = "C" + next;
+	else if (i == 6)
+		next = "G" + next;
+	else if (i == 7)
+		next = "T" + next;
+}
+
+bool deBruijnGraph::mark_ccs(const std::string& source, unsigned int state, bool forward = true)
 {
 	std::queue<std::string> q;
 	q.push(source);
@@ -97,7 +121,7 @@ bool deBruijnGraph::bfs(const std::string& source, unsigned int state, bool forw
 		q.pop();
 		if (graph_[curr][8] != 0 and forward)
 		{
-			bfs(curr, graph_[curr][8], false); // backtracking
+			mark_ccs(curr, graph_[curr][8], false); // backtracking
 			return false;
 		}
 		else if (graph_[curr][8] == state)
@@ -110,19 +134,14 @@ bool deBruijnGraph::bfs(const std::string& source, unsigned int state, bool forw
 			for (int i = 0; i < 4; i++)
 			{
 				const auto& n = graph_[curr][i];
-				next = curr.substr(1);
-				if (n != 0 and i == 0)
-					next.append("A");
-				else if (n != 0 and i == 1)
-					next.append("C");
-				else if (n != 0 and i == 2)
-					next.append("G");
-				else if (n != 0 and i == 3)
-					next.append("T");
+				if (n == 0)
+					continue;
 				else
-					next = "#NULL";
-				if (next != "#NULL")
-					q.push(next);
+				{
+					next = curr.substr(1);
+					add_back(i,next);
+				}
+				q.push(next);
 			}
 		}
 		else
@@ -130,63 +149,116 @@ bool deBruijnGraph::bfs(const std::string& source, unsigned int state, bool forw
 			for (int i = 4; i < 8; i++)
 			{
 				const auto& n = graph_[curr][i];
-				next = curr.substr(0,curr.length() - 1);
-				if (n != 0 and i == 4)
-					next = "A" + next;
-				else if (n != 0 and i == 5)
-					next = "C" + next;
-				else if (n != 0 and i == 6)
-					next = "G" + next;
-				else if (n != 0 and i == 7)
-					next = "T" + next;
+				if (n == 0)
+					continue;
 				else
-					next = "#NULL";
-				if (next != "#NULL")
-					q.push(next);
+				{
+					next = curr.substr(0,curr.length() - 1);
+					add_front(i,next);
+				}
+				q.push(next);
 			}
 		}
 	}
 	return true;
 }
 
-std::string deBruijnGraph::extractSequence(const std::string& source)
+// the node is a source, we search forward until we find a loop or a sink
+std::string deBruijnGraph::search(const std::string& source, bool isSource)
 {
-	std::string seq(source);
+	std::string seq;
+	int m = 0;
+	if (isSource)
+		seq = source;
+	else
+	{
+		m += 4;
+		std::string rev = source;
+		std::reverse(rev.begin(), rev.end());
+		seq = rev; // so we can append to the back of the string
+	}
 	std::string next = source;
 	bool added = true;
 	while(added)
 	{
 		added = false;
-		for (int i = 0; i < 4; i++)
+		for (int i = m; i < m+4; i++)
 		{
 			const auto& n = graph_[next][i];
 			if (n == 0)
 				continue;
-			if (n != 0 and i == 0)
-			{
+			if (i == 0 or i == 4)
 				seq += "A";
-				next = next.substr(1,next.size() - 1) + "A";
-			}
-			else if (n != 0 and i == 1)
-			{
+			else if (i == 1 or i == 5)
 				seq += "C";
-				next = next.substr(1,next.size() - 1) + "C";
-			}
-			else if (n != 0 and i == 2)
-			{
+			else if (i == 2 or i == 6)
 				seq += "G";
-				next = next.substr(1,next.size() - 1) + "G";
-			}
-			else if (n != 0 and i == 3)
-			{
+			else if (i == 3 or i == 7)
 				seq += "T";
-				next = next.substr(1,next.size() - 1) + "T";
-			}
+			graph_[next][10] = 1; // mark as visited
+			next = (isSource ? next.substr(1) : next.substr(0,next.length() - 1));
+			isSource ? add_back(i,next) : add_front(i,next);
 			added = true;
 			break; // just add one possiblity
 		}
-		if (next == source)
+		if (graph_[next][10])
 			break; // we're in a cycle
 	}
+	if (!isSource)
+		std::reverse(seq.begin(),seq.end()); // necessary?
 	return seq;
+}
+
+std::string deBruijnGraph::extractSequence(const std::string& source, int i = 0)
+{
+	bool isSource = (graph_[source][4] + graph_[source][5] + graph_[source][6] + graph_[source][7] == 0);
+	bool isSink = (graph_[source][0] + graph_[source][1] + graph_[source][2] + graph_[source][3] == 0); // check whether the node is a source or a sink
+	if (isSource and isSink)
+		return "ERROR";
+	else
+	{
+		std::string out = search(source, !isSink);
+		/*debug */
+		std::cout << ">contig_" << i << std::endl;
+		std::cout << out << std::endl;
+		/*debug end*/
+		return out;
+	}
+}
+
+void deBruijnGraph::edmonds_karp_single(const std::string& source, const std::string& sink)
+{
+	std::queue<std::string> q;
+	std::string v = source;
+	std::string path = source;
+	q.push(v);
+	while (!q.empty())
+	{
+		std::string curr = q.front();
+		q.pop();
+		for (unsigned int i = 0; i < 4; i++)
+		{
+			if (graph_[curr][i] != 0)
+			{
+				std::string next = curr.substr(1);
+				add_back(i,next);
+				if (!graph_[next][9] and next != v and graph_[curr][10] < graph_[curr][11])
+				{
+					add_back(i,path);
+					graph_[next][9] = 1;
+					q.push(next);
+				}
+			}
+		}
+	}
+	if (graph_[sink][9] == 0)
+		return; // no path from source to sink
+	int send_flow = std::numeric_limits<int>::max(); //inf
+	
+}
+
+void deBruijnGraph::resetVisits()
+{
+	for (auto& v : graph_)
+		v.second[9] = 0;
 }
