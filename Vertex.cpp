@@ -107,6 +107,13 @@ const bool Vertex::isSink() const
 	return sink;
 }
 
+const bool Vertex::isJunction() const
+{
+	bool diff1 = ((((a_out xor c_out) xor g_out) xor t_out) xor n_out);
+	bool diff2 = ((((a_in xor c_in) xor g_in) xor t_in) xor n_in);
+	return (diff1 or diff2);
+}
+
 //debug
 const void Vertex::print() const
 {

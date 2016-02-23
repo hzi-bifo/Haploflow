@@ -12,7 +12,7 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 	while (std::getline(infile,line))
 	{
 		const auto& start = line.front();
-		if (start == '@') // read name. Next line will be the sequence
+		if (start == '@') // read name. Next line will be the sequence. If quality starts with @, then the next line will as well
 		{
 			next_read = true;
 		}
@@ -54,19 +54,36 @@ void deBruijnGraph::split_read(const std::string& line)
 	graph_[kmer].add_predecessor(line[line.length() - k_ - 1]);
 }
 
-std::vector<std::string> deBruijnGraph::get_terminals(bool sink = false)
+std::string deBruijnGraph::dfs(const std::string& source, int apply, bool forward, void (*f)(Vertex&, int), bool (*condition)(const Vertex&, int), bool stop = false)
 {
-	std::vector<std::string> terminals;
-	for (const auto& v : graph_)
+	std::stack<std::string> s;
+	s.push(source);
+	while (s.size() > 0)
 	{
-		auto& neigh = v.second;
-		if (neigh.get_capacity() == 0)
-			terminals.push_back(v.first);
+		auto curr = s.top();
+		s.pop();
+		if (condition(graph_[curr], apply))
+			if (stop)
+				return curr;
+			else
+				continue;
+		else
+		{
+			f(graph_[curr],apply);
+			std::string next;
+			const auto& succ = graph_[curr].get_successors();
+			for (const auto& c : succ)
+			{
+				next = curr.substr(1);
+				next.push_back(c);
+				s.push(next);
+			}
+		}
 	}
-	return terminals;
+	return source;
 }
 
-void deBruijnGraph::mark_ccs(const std::string& source, unsigned int state)
+std::string deBruijnGraph::bfs(const std::string& source, int apply, bool forward, void (*f)(Vertex&, int), bool (*condition)(const Vertex&, int), bool stop = false)
 {
 	std::queue<std::string> q;
 	q.push(source);
@@ -74,28 +91,65 @@ void deBruijnGraph::mark_ccs(const std::string& source, unsigned int state)
 	{
 		auto curr = q.front();
 		q.pop();
-		if (graph_[curr].cc != 0)
-			continue;
+		if (condition(graph_[curr],graph_[curr].get_successors().size()))
+			if (stop)
+				{
+					graph_[curr].cc = 0;
+					return curr;
+				}
+			else
+				continue;
 		else
 		{
-			graph_[curr].cc = state;
+			f(graph_[curr], apply); // apply f to current vertex and with apply as value (e.g. flow or connected component)
 			std::string next;
 			const auto& succ = graph_[curr].get_successors();
 			for (const auto& c : succ)
 			{
 				next = curr.substr(1);
 				next.push_back(c);
-				if (graph_[next].cc == 0)
-					q.push(next);
+				q.push(next);
 			}
-			const auto& pred = graph_[curr].get_predecessors();
-			for (const auto& c : pred)
+			if (!forward) // forward only performs forward bfs in directed graph
 			{
-				next = curr.substr(0,curr.length() - 1);
-				next = c + next;
-				if (graph_[next].cc == 0)
+				const auto& pred = graph_[curr].get_predecessors();
+				for (const auto& c : pred)
+				{
+					next = curr.substr(0,curr.length() - 1);
+					next = c + next;
 					q.push(next);
+				}
 			}
 		}
 	}
+	return source; //TODO?
+}
+
+int deBruijnGraph::getSize()
+{
+	return graph_.size();
+}
+
+std::vector<std::string> deBruijnGraph::getSources()
+{
+	std::vector<std::string> sources;
+	for (const auto& p : graph_)
+		if (p.second.isSource())
+			sources.push_back(p.first);
+	return sources;
+}
+
+std::vector<std::string> deBruijnGraph::getSinks()
+{
+	std::vector<std::string> sinks;
+	for (const auto& p : graph_)
+		if (p.second.isSink())
+			sinks.push_back(p.first);
+	return sinks;
+}
+
+std::string deBruijnGraph::find_next_junction(const std::string& source)
+{
+	const auto& succ = graph_[source].get_successors();
+	return bfs(source, 0 /*do we need this?*/, true, [](Vertex& v, int x){v.cc++;},[](const Vertex& v, int x){return (v.cc == x);}, true);
 }

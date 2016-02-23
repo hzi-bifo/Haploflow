@@ -13,6 +13,7 @@ public:
 	const int get_capacity() const;
 	const bool isSource() const;
 	const bool isSink() const;
+	const bool isJunction() const;
 	const void print() const; //debug
 	
 	unsigned int cc; //this can be set from the outside - handle with care
@@ -30,7 +31,5 @@ private:
 	int n_out;
 	int flow;
 	bool visited;
-	std::vector<std::string*> sources;
-	std::vector<std::string*> sinks;
 
 };
