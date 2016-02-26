@@ -54,7 +54,7 @@ void deBruijnGraph::split_read(const std::string& line)
 	graph_[kmer].add_predecessor(line[line.length() - k_ - 1]);
 }
 
-std::string deBruijnGraph::dfs(const std::string& source, int apply, bool forward, void (*f)(Vertex&, int), bool (*condition)(const Vertex&, int), bool stop = false)
+std::string deBruijnGraph::dfs(const std::string& source, bool forward, std::function<void(std::string&)> f, std::function<bool(std::string&)> condition, bool stop = false)
 {
 	std::stack<std::string> s;
 	s.push(source);
@@ -62,14 +62,14 @@ std::string deBruijnGraph::dfs(const std::string& source, int apply, bool forwar
 	{
 		auto curr = s.top();
 		s.pop();
-		if (condition(graph_[curr], apply))
+		if (condition(curr))
 			if (stop)
 				return curr;
 			else
 				continue;
 		else
 		{
-			f(graph_[curr],apply);
+			f(curr);
 			std::string next;
 			const auto& succ = graph_[curr].get_successors();
 			for (const auto& c : succ)
@@ -83,25 +83,23 @@ std::string deBruijnGraph::dfs(const std::string& source, int apply, bool forwar
 	return source;
 }
 
-std::string deBruijnGraph::bfs(const std::string& source, int apply, bool forward, void (*f)(Vertex&, int), bool (*condition)(const Vertex&, int), bool stop = false)
+std::string deBruijnGraph::bfs(const std::string& source, bool forward, std::function<void(std::string&)> f, std::function<bool(std::string&)> condition, bool stop = false)
 {
 	std::queue<std::string> q;
+	std::string last = source;
 	q.push(source);
 	while(q.size() > 0)
 	{
 		auto curr = q.front();
 		q.pop();
-		if (condition(graph_[curr],graph_[curr].get_successors().size()))
+		if (condition(curr))
 			if (stop)
-				{
-					graph_[curr].cc = 0;
 					return curr;
-				}
 			else
 				continue;
 		else
 		{
-			f(graph_[curr], apply); // apply f to current vertex and with apply as value (e.g. flow or connected component)
+			f(curr); // apply f to current vertex
 			std::string next;
 			const auto& succ = graph_[curr].get_successors();
 			for (const auto& c : succ)
@@ -109,6 +107,7 @@ std::string deBruijnGraph::bfs(const std::string& source, int apply, bool forwar
 				next = curr.substr(1);
 				next.push_back(c);
 				q.push(next);
+				last = next;
 			}
 			if (!forward) // forward only performs forward bfs in directed graph
 			{
@@ -118,11 +117,12 @@ std::string deBruijnGraph::bfs(const std::string& source, int apply, bool forwar
 					next = curr.substr(0,curr.length() - 1);
 					next = c + next;
 					q.push(next);
+					last = next;
 				}
 			}
 		}
 	}
-	return source; //TODO?
+	return last;
 }
 
 int deBruijnGraph::getSize()
@@ -151,5 +151,47 @@ std::vector<std::string> deBruijnGraph::getSinks()
 std::string deBruijnGraph::find_next_junction(const std::string& source)
 {
 	const auto& succ = graph_[source].get_successors();
-	return bfs(source, 0 /*do we need this?*/, true, [](Vertex& v, int x){v.cc++;},[](const Vertex& v, int x){return (v.cc == x);}, true);
+	if (succ.size() == 0) //sink
+		return source;
+	else if (succ.size() == 1)
+		return bfs(source,  
+											true, 
+											[](std::string& v){}, 
+											[&](std::string& v){return (graph_[v].get_successors().size() != 1);},
+											true);
+	else
+	{
+		unsigned int x = succ.size() - 1;
+		const auto& res = bfs(source, 
+																	true, 
+																	[&](std::string& v){graph_[v].cc++;},
+																	[&,x](std::string& v){bool ret = (graph_[v].cc == x); if (ret) graph_[v].cc = 0; return ret;}, 
+																	true);
+		if (res == source)
+		{
+			auto succ = graph_[source].get_successors();
+		}
+		return res;
+	}
+	return source; // we shouldnt end here
+}
+
+std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
+{
+	std::vector<std::string> sources = getSources();
+	auto s_tmp = getSinks();
+	std::unordered_set<std::string> sinks(s_tmp.begin(), s_tmp.end());
+	std::unordered_map<std::string, std::string> junctions; // maps vertices to their next junction
+	for (const auto& source : sources)
+	{
+		std::string curr = source;
+		std::string next = find_next_junction(curr);
+		while (curr != next and junctions.emplace(curr, next).second)
+		{
+			curr = next;
+			next = find_next_junction(curr);
+		}
+	}
+	std::cout << junctions.size() << std::endl;
+	return junctions;
 }
