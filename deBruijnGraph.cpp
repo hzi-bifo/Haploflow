@@ -41,6 +41,7 @@ void deBruijnGraph::split_read(const std::string& line)
 	std::string kmer = line.substr(0,k_);
 	graph_.emplace(std::pair<std::string, Vertex>(kmer, {})); // add "empty" vertex
 	graph_[kmer].add_successor(line[k_]); // add the k+1st letter as neighbour
+	
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
 		kmer = line.substr(i - k_,k_); // extract kmer
@@ -213,7 +214,7 @@ std::string deBruijnGraph::getSequence(const std::pair<std::string,std::string>&
 {
 	std::string seq = "";
 	std::string curr = junk.first;
-	while (curr != junk.second and graph_[curr].get_successors().size())
+	while (curr != junk.second/* and graph_[curr].get_successors().size()*/)
 	{
 		auto neigh = graph_[curr].get_successors();
 		unsigned int max = 0;
