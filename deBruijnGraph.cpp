@@ -6,6 +6,7 @@ deBruijnGraph::deBruijnGraph(unsigned int k) : k_ (k)
 
 deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 {
+	unsigned int i = 0;
 	std::ifstream infile(filename);
 	std::string line;
 	bool next_read = false;
@@ -20,6 +21,7 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 		{
 			next_read = false;
 			split_read(line);
+			i++;
 		}
 	}
 }

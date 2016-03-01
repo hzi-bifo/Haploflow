@@ -13,27 +13,35 @@
 #include <cstring>
 #include "Vertex.h"
 
-class SeqHash
+struct SeqHash
 {
-public:
   unsigned long long operator() (const std::string& s) const
   {
-  	/*unsigned long long hash = 0;
-  	auto lambda = [](const char& c){ switch (c){case 'A' : return 0; case 'C' : return 1; case 'G': return 2; case 'T': return 3; default: return 2;}; }; //0b4?
-  	const char* d1 = s.data();
   	size_t i = 0;
-  	while (i < std::strlen(d1))
+  	unsigned long long hash = 0;
+  	unsigned long long rchash = 0;
+  	auto lambda = [](const char& c){ switch (c){case 'A' : return 0; case 'C' : return 1; case 'G': return 2; case 'T': return 3; default: return 4;}; }; //0b4?
+  	const char* d1 = s.data();
+  	while (std::strlen(d1))
   	{
-  		
-  		i++;
-  		hash <<= 2; 
+  		rchash += (3 - lambda(*(d1))) * std::pow(4,i++);
+  		hash *= 4; 
   		hash += lambda(*(d1++));
-  	}*/
-  	std::hash<std::string> hs;
-  	return hs(s);
+  	}
+  	return std::min(hash,rchash);
   }
 };
 
+struct SeqEq
+{
+	bool operator() (const std::string& s1, const std::string& s2) const
+	{
+		std::string rev(s1);
+		std::transform(s1.begin(),s1.end(),rev.begin(),[](const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};});
+		std::reverse(rev.begin(),rev.end());
+		return (s1 == s2 or rev == s2);
+	}
+};
 
 class deBruijnGraph
 {
@@ -54,7 +62,7 @@ public:
 	
 	
 private:
-	std::unordered_map<std::string,Vertex,SeqHash> graph_; //graph data structure
+	std::unordered_map<std::string,Vertex/*,SeqHash,SeqEq*/> graph_; //graph data structure
 	void split_read(const std::string&); // given the read, inserts its kmers in the graph
 	std::string find_next_junction(const std::string&); // find next junction in the graph
 	
