@@ -8,7 +8,7 @@ public:
 	Vertex(const Vertex& v);
 	void add_successor(char letter);
 	void add_predecessor(char letter);
-	const std::vector<char> get_successors() const;
+	const std::vector<std::pair<char, unsigned int> > get_successors() const;
 	const std::vector<char> get_predecessors() const;
 	const int get_capacity() const;
 	const bool isSource() const;
@@ -16,7 +16,8 @@ public:
 	const bool isJunction() const;
 	const void print() const; //debug
 	
-	unsigned int cc; //this can be set from the outside - handle with care
+	unsigned int cc; //these can be set from the outside - handle with care
+	bool visited;
 	
 private:
 	int a_in;
@@ -30,6 +31,5 @@ private:
 	int n_in;
 	int n_out;
 	int flow;
-	bool visited;
 
 };

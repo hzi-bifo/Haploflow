@@ -75,7 +75,7 @@ std::string deBruijnGraph::dfs(const std::string& source, bool forward, std::fun
 			for (const auto& c : succ)
 			{
 				next = curr.substr(1);
-				next.push_back(c);
+				next.push_back(c.first);
 				s.push(next);
 			}
 		}
@@ -83,8 +83,9 @@ std::string deBruijnGraph::dfs(const std::string& source, bool forward, std::fun
 	return source;
 }
 
-std::string deBruijnGraph::bfs(const std::string& source, bool forward, std::function<void(std::string&)> f, std::function<bool(std::string&)> condition, bool stop = false)
+std::pair<std::string,unsigned int> deBruijnGraph::bfs(const std::string& source, bool forward, std::function<void(std::string&)> f, std::function<bool(std::string&)> condition, bool stop = false)
 {
+	unsigned int depth = 0;
 	std::queue<std::string> q;
 	std::string last = source;
 	q.push(source);
@@ -92,11 +93,15 @@ std::string deBruijnGraph::bfs(const std::string& source, bool forward, std::fun
 	{
 		auto curr = q.front();
 		q.pop();
+		//if (graph_[curr].cc == 0)
+			depth++; // depth of the bfs
 		if (condition(curr))
+		{
 			if (stop)
-					return curr;
+					return std::make_pair(curr,depth);
 			else
 				continue;
+		}
 		else
 		{
 			f(curr); // apply f to current vertex
@@ -105,7 +110,7 @@ std::string deBruijnGraph::bfs(const std::string& source, bool forward, std::fun
 			for (const auto& c : succ)
 			{
 				next = curr.substr(1);
-				next.push_back(c);
+				next.push_back(c.first);
 				q.push(next);
 				last = next;
 			}
@@ -122,7 +127,7 @@ std::string deBruijnGraph::bfs(const std::string& source, bool forward, std::fun
 			}
 		}
 	}
-	return last;
+	return std::make_pair(last,depth);
 }
 
 int deBruijnGraph::getSize()
@@ -152,26 +157,34 @@ std::string deBruijnGraph::find_next_junction(const std::string& source)
 {
 	const auto& succ = graph_[source].get_successors();
 	if (succ.size() == 0) //sink
+	{
 		return source;
+	}
 	else if (succ.size() == 1)
 		return bfs(source,  
 											true, 
 											[](std::string& v){}, 
-											[&](std::string& v){return (graph_[v].get_successors().size() != 1);},
-											true);
+											[&, source](std::string& v){return (graph_[v].get_successors().size() != 1/* or (graph_[v].get_predecessors().size() > 1 and v != source)*/);},
+											true).first;
 	else
 	{
 		unsigned int x = succ.size() - 1;
 		const auto& res = bfs(source, 
 																	true, 
 																	[&](std::string& v){graph_[v].cc++;},
-																	[&,x](std::string& v){bool ret = (graph_[v].cc == x); if (ret) graph_[v].cc = 0; return ret;}, 
+																	[&,x](std::string& v){bool ret = (graph_[v].cc == x); if (ret){graph_[v].cc = 0;} return ret;}, 
 																	true);
-		if (res == source)
+		if (res.first == source)
 		{
 			auto succ = graph_[source].get_successors();
+			if (res.second != 1)
+			{
+				// we didnt immediately return, circle found
+				unsigned int step = res.second % k_; // ???
+				std::cout << step << std::endl;
+			}
 		}
-		return res;
+		return res.first;
 	}
 	return source; // we shouldnt end here
 }
@@ -192,6 +205,56 @@ std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
 			next = find_next_junction(curr);
 		}
 	}
-	std::cout << junctions.size() << std::endl;
+	//std::cout << junctions.size() << std::endl;
 	return junctions;
+}
+
+std::string deBruijnGraph::getSequence(const std::pair<std::string,std::string>& junk)
+{
+	std::string seq = "";
+	std::string curr = junk.first;
+	while (curr != junk.second and graph_[curr].get_successors().size())
+	{
+		auto neigh = graph_[curr].get_successors();
+		unsigned int max = 0;
+		char next; // check for uninitialized
+		for (const auto& c : neigh)
+		{
+			if (c.second > max)
+			{
+				next = c.first;
+				max = c.second; //TODO
+			}
+		}
+		seq += next;
+		curr = curr.substr(1) + next;
+	}
+	return seq;
+}
+
+std::vector<std::string> deBruijnGraph::getScaffolds(std::unordered_map<std::string, std::string>& junk)
+{
+	std::vector<std::string> sources = getSources();
+	std::vector<std::string> scaffolds;
+	for (const auto& source : sources)
+	{
+		std::string seq = source;
+		std::string curr = source; 
+		std::string next = junk[curr];
+		while (graph_[next].get_successors().size() == 0 or junk.find(next) != junk.end())
+		{
+			auto pair = std::make_pair(curr,next);
+			seq += getSequence(pair);
+			if (graph_[next].get_successors().size() == 0)
+				break;
+			curr = next;
+			next = junk[next];
+		}
+		scaffolds.push_back(seq);
+	}
+	return scaffolds;
+}
+
+void deBruijnGraph::debug()
+{
 }

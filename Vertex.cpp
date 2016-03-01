@@ -1,6 +1,7 @@
 #include "Vertex.h"
 
 Vertex::Vertex() : 	cc(0),
+										visited(false),
 										a_in(0),
 										a_out(0),
 										c_in(0),
@@ -11,13 +12,13 @@ Vertex::Vertex() : 	cc(0),
 										t_out(0),
 										n_in(0),
 										n_out(0),
-										flow(0),
-										visited(false)
+										flow(0)
 {
 }
 
 Vertex::Vertex(const Vertex& v) : 
 	cc(v.cc),
+	visited(v.visited),
 	a_in(v.a_in),
 	a_out(v.a_out),
 	c_in(v.c_in),
@@ -28,8 +29,7 @@ Vertex::Vertex(const Vertex& v) :
 	t_out(v.t_out),
 	n_in(v.n_in),
 	n_out(v.n_out),
-	flow(v.flow),
-	visited(v.visited)
+	flow(v.flow)
 {
 }
 
@@ -57,19 +57,19 @@ void Vertex::add_predecessor(char letter)
 	}
 }
 
-const std::vector<char> Vertex::get_successors() const
+const std::vector<std::pair<char, unsigned int> > Vertex::get_successors() const
 {
-	std::vector<char> succ;
+	std::vector<std::pair<char, unsigned int> > succ;
 	if (a_out)
-		succ.push_back('A');
+		succ.push_back(std::make_pair('A',a_out));
 	if (c_out)
-		succ.push_back('C');
+		succ.push_back(std::make_pair('C',c_out));
 	if (g_out)
-		succ.push_back('G');
+		succ.push_back(std::make_pair('G',g_out));
 	if (t_out)
-		succ.push_back('T');
+		succ.push_back(std::make_pair('T',t_out));
 	if (n_out)
-		succ.push_back('N');
+		succ.push_back(std::make_pair('N',n_out));
 	return succ;
 }
 
