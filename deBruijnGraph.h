@@ -62,7 +62,7 @@ public:
 	
 	
 private:
-	std::unordered_map<std::string,Vertex/*,SeqHash,SeqEq*/> graph_; //graph data structure
+	std::unordered_map<std::string,Vertex,SeqHash,SeqEq> graph_; //graph data structure
 	void split_read(const std::string&); // given the read, inserts its kmers in the graph
 	std::string find_next_junction(const std::string&); // find next junction in the graph
 	

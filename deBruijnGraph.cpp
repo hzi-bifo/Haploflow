@@ -167,7 +167,7 @@ std::string deBruijnGraph::find_next_junction(const std::string& source)
 		return bfs(source,  
 											true, 
 											[](std::string& v){}, 
-											[&, source](std::string& v){return (graph_[v].get_successors().size() != 1/* or (graph_[v].get_predecessors().size() > 1 and v != source)*/);},
+											[&, source](std::string& v){return (graph_[v].get_successors().size() != 1 or (graph_[v].get_predecessors().size() > 1 and v != source));},
 											true).first;
 	else
 	{
@@ -216,7 +216,7 @@ std::string deBruijnGraph::getSequence(const std::pair<std::string,std::string>&
 {
 	std::string seq = "";
 	std::string curr = junk.first;
-	while (curr != junk.second/* and graph_[curr].get_successors().size()*/)
+	while (curr != junk.second and graph_[curr].get_successors().size())
 	{
 		auto neigh = graph_[curr].get_successors();
 		unsigned int max = 0;
