@@ -40,8 +40,17 @@ void deBruijnGraph::printGraph()
 std::string deBruijnGraph::reverse_complement(const std::string& kmer)
 {
 	std::string rc(kmer);
-	std::reverse(rc.begin(), rc.end());
-	std::transform(rc.begin(), rc.end(), rc.begin(), [](char& c){switch(c){case 'A': return 'T'; case 'C': return 'G'; case 'G': return 'C'; case 'T': return 'A'; default: return 'N';};});
+	auto first = rc.begin();
+	auto last = rc.end();
+	auto lambda = [](char& c){switch (c){case 'A' : return 'T'; case 'C': return 'G'; case 'G': return 'C'; case 'T' : return 'A'; default : return 'N';}};
+	while (first != last and first != --last)
+	{
+		auto tmp = *first;
+		*first = lambda(*last);
+		*last = lambda(tmp);
+		++first;
+	}
+	*first = lambda(*first); // make sure, k is uneven!
 	return rc;
 }
 
@@ -49,18 +58,21 @@ void deBruijnGraph::split_read(const std::string& line)
 {
 	// the first kmer does not have predecessors, init manually
 	std::string kmer = line.substr(0,k_);
+	std::string rc = reverse_complement(kmer);
 	graph_.emplace(std::pair<std::string, Vertex>(kmer, {})); // add "empty" vertex
 	graph_[kmer].add_successor(line[k_]); // add the k+1st letter as neighbour
 	
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
 		kmer = line.substr(i - k_,k_); // extract kmer
+		rc = reverse_complement(kmer);
 		graph_.emplace(std::pair<std::string, Vertex>(kmer, {})); // if not in list, add kmer
 		graph_[kmer].add_successor(line[i]);
 		graph_[kmer].add_predecessor(line[i - k_ - 1]);
 	}
 	// this for-loop does not add the final kmer of the read, add manually:
 	kmer = line.substr(line.length() - k_, k_);
+	rc = reverse_complement(kmer);
 	graph_.emplace(std::pair<std::string, Vertex>(kmer, {})); //the last node does not have neighbours, if it already is in the graph, then nothing will change
 	graph_[kmer].add_predecessor(line[line.length() - k_ - 1]);
 }
