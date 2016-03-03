@@ -37,6 +37,14 @@ void deBruijnGraph::printGraph()
 	}
 }
 
+std::string deBruijnGraph::reverse_complement(const std::string& kmer)
+{
+	std::string rc(kmer);
+	std::reverse(rc.begin(), rc.end());
+	std::transform(rc.begin(), rc.end(), rc.begin(), [](char& c){switch(c){case 'A': return 'T'; case 'C': return 'G'; case 'G': return 'C'; case 'T': return 'A'; default: return 'N';};});
+	return rc;
+}
+
 void deBruijnGraph::split_read(const std::string& line)
 {
 	// the first kmer does not have predecessors, init manually

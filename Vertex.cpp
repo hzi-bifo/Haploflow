@@ -121,5 +121,5 @@ const void Vertex::print() const
 {
 	std::cout << "Out - A: " << a_out << ", C: " << c_out << ", G: " << g_out << ", T: " << t_out << ", N: " << n_out << std::endl;
 	std::cout << "In  - A: " << a_in << ", C: " << c_in << ", G: " << g_in << ", T: " << t_in << ", N: " << n_in << std::endl;
-	std::cout << "Component: " << cc << ", capacity: " << get_capacity() << ", used flow: " << flow << std::endl;
+	std::cout << "Component: " << cc << ", capacity: " << capacity() << ", used flow: " << flow << std::endl;
 }
