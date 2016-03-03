@@ -156,40 +156,39 @@ std::vector<std::string> deBruijnGraph::getSinks()
 	return sinks;
 }
 
-std::string deBruijnGraph::find_next_junction(const std::string& source)
+std::string deBruijnGraph::find_next_junction(const std::string* source)
 {
-	const auto& succ = graph_[source].get_successors();
+	const auto& succ = graph_[*source].get_successors();
 	if (succ.size() == 0) //sink
 	{
-		return source;
+		return *source;
 	}
 	else if (succ.size() == 1)
-		return bfs(source,  
+		return bfs(*source,  
 											true, 
-											[](std::string& v){}, 
-											[&, source](std::string& v){return (graph_[v].get_successors().size() != 1 or (graph_[v].get_predecessors().size() > 1 and v != source));},
+											[&, source](std::string& v){graph_[v].source = source;}, 
+											[&, source](std::string& v){return (graph_[v].get_successors().size() != 1 or (graph_[v].get_predecessors().size() > 1 and v != *source));},
 											true).first;
 	else
 	{
 		unsigned int x = succ.size() - 1;
-		const auto& res = bfs(source, 
+		const auto& res = bfs(*source, 
 																	true, 
-																	[&](std::string& v){graph_[v].cc++;},
-																	[&,x](std::string& v){bool ret = (graph_[v].cc == x); if (ret){graph_[v].cc = 0;} return ret;}, 
+																	[&, source](std::string& v){if (graph_[v].source != source){graph_[v].cc++;} graph_[v].source = source;},
+																	[&, x](std::string& v){bool ret = (graph_[v].cc == x); if (ret){graph_[v].cc = 0; graph_[v].source = 0;} return ret;}, 
 																	true);
-		if (res.first == source)
+		if (res.first == *source)
 		{
-			auto succ = graph_[source].get_successors();
-			if (res.second != 1)
+			auto succ = graph_[*source].get_successors();
+			if (res.second > 1)
 			{
 				// we didnt immediately return, circle found
-				unsigned int step = res.second % k_; // ???
-				std::cout << step << std::endl;
+				std::string neigh = source->substr(1) + succ[0].first;
 			}
 		}
 		return res.first;
 	}
-	return source; // we shouldnt end here
+	return *source; // we shouldnt end here
 }
 
 std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
@@ -201,14 +200,14 @@ std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
 	for (const auto& source : sources)
 	{
 		std::string curr = source;
-		std::string next = find_next_junction(curr);
+		std::string next = find_next_junction(&curr);
 		while (curr != next and junctions.emplace(curr, next).second)
 		{
 			curr = next;
-			next = find_next_junction(curr);
+			next = find_next_junction(&curr);
 		}
 	}
-	//std::cout << junctions.size() << std::endl;
+	//std::cerr << "Junctions: " << junctions.size() << std::endl;
 	return junctions;
 }
 
@@ -253,7 +252,8 @@ std::vector<std::string> deBruijnGraph::getScaffolds(std::unordered_map<std::str
 			curr = next;
 			next = junk[next];
 		}
-		scaffolds.push_back(seq);
+		std::cout << seq << std::endl;
+		//scaffolds.push_back(seq);
 	}
 	return scaffolds;
 }

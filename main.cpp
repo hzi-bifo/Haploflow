@@ -5,6 +5,7 @@ int main (int argc, char* argv[])
 {
 	clock_t t = clock();
 	deBruijnGraph dbg = deBruijnGraph(std::string(argv[1]),atoi(argv[2]));
+	std::cerr << dbg.getSize() << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	
 	t = clock();
@@ -13,8 +14,6 @@ int main (int argc, char* argv[])
 	t = clock();
 	auto seqs = dbg.getScaffolds(c);
 	std::cerr << (clock() - t)/1000000. << std::endl;
-	for (const auto& seq : seqs)
-		std::cout << seq << std::endl;
 
 	//std::cout << (clock() - t)/1000000. << std::endl;
 	//do something

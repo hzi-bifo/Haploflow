@@ -10,7 +10,7 @@ public:
 	void add_predecessor(char letter);
 	const std::vector<std::pair<char, unsigned int> > get_successors() const;
 	const std::vector<char> get_predecessors() const;
-	const int get_capacity() const;
+	const int capacity() const;
 	const bool isSource() const;
 	const bool isSink() const;
 	const bool isJunction() const;
@@ -18,6 +18,7 @@ public:
 	
 	unsigned int cc; //these can be set from the outside - handle with care
 	bool visited;
+	std::string const * source; //points to const string source (of junction)
 	
 private:
 	int a_in;

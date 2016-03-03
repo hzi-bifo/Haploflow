@@ -2,6 +2,7 @@
 
 Vertex::Vertex() : 	cc(0),
 										visited(false),
+										source(0),
 										a_in(0),
 										a_out(0),
 										c_in(0),
@@ -19,6 +20,7 @@ Vertex::Vertex() : 	cc(0),
 Vertex::Vertex(const Vertex& v) : 
 	cc(v.cc),
 	visited(v.visited),
+	source(v.source),
 	a_in(v.a_in),
 	a_out(v.a_out),
 	c_in(v.c_in),
@@ -89,7 +91,7 @@ const std::vector<char> Vertex::get_predecessors() const
 	return pred;
 }
 
-const int Vertex::get_capacity() const
+const int Vertex::capacity() const
 {
 	int cap1 = a_out + c_out + g_out + t_out;
 	return cap1; // this is the "out-capacity"
