@@ -50,7 +50,7 @@ std::string deBruijnGraph::reverse_complement(const std::string& kmer)
 		*last = lambda(tmp);
 		++first;
 	}
-	*first = lambda(*first); // make sure, k is uneven!
+	*first = lambda(*first); // make sure k is uneven!
 	return rc;
 }
 
@@ -58,21 +58,18 @@ void deBruijnGraph::split_read(const std::string& line)
 {
 	// the first kmer does not have predecessors, init manually
 	std::string kmer = line.substr(0,k_);
-	std::string rc = reverse_complement(kmer);
 	graph_.emplace(std::pair<std::string, Vertex>(kmer, {})); // add "empty" vertex
 	graph_[kmer].add_successor(line[k_]); // add the k+1st letter as neighbour
 	
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
 		kmer = line.substr(i - k_,k_); // extract kmer
-		rc = reverse_complement(kmer);
 		graph_.emplace(std::pair<std::string, Vertex>(kmer, {})); // if not in list, add kmer
 		graph_[kmer].add_successor(line[i]);
 		graph_[kmer].add_predecessor(line[i - k_ - 1]);
 	}
 	// this for-loop does not add the final kmer of the read, add manually:
 	kmer = line.substr(line.length() - k_, k_);
-	rc = reverse_complement(kmer);
 	graph_.emplace(std::pair<std::string, Vertex>(kmer, {})); //the last node does not have neighbours, if it already is in the graph, then nothing will change
 	graph_[kmer].add_predecessor(line[line.length() - k_ - 1]);
 }
@@ -231,49 +228,90 @@ std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
 	return junctions;
 }
 
-std::string deBruijnGraph::getSequence(const std::pair<std::string,std::string>& junk)
+std::vector<std::pair<std::string,unsigned int> > deBruijnGraph::getSequence(const std::pair<std::string,std::string>& junk)
 {
+	std::vector<std::pair<std::string,unsigned int> > sequences;
 	std::string seq = "";
 	std::string curr = junk.first;
-	while (curr != junk.second and graph_[curr].get_successors().size())
+	std::string next;
+	auto neigh = graph_[curr].get_successors();
+	for (const auto& n : neigh)
 	{
-		auto neigh = graph_[curr].get_successors();
-		unsigned int max = 0;
-		char next; // check for uninitialized
-		for (const auto& c : neigh)
+		unsigned int num = n.second;
+		std::cout << num << std::endl;
+		std::stack<std::string> s;
+		s.push(curr);
+		while (s.size() > 0)
 		{
-			if (c.second > max)
+			auto curr = s.top();
+			s.pop();
+			if (curr == junk.second)
 			{
-				next = c.first;
-				max = c.second; //TODO
+				sequences.push_back(std::make_pair(seq,num));
+				break;
+			}
+			else
+			{
+				std::string next;
+				const auto& succ = graph_[curr].get_successors();
+				bool found_next = false;
+				for (const auto& c : succ)
+				{
+					next = curr.substr(1);
+					next.push_back(c.first);
+					if (-2 + num <= c.second and 2 + num >= c.second)
+					{
+						if (found_next)
+						{
+							std::cout << "double path" << std::endl;
+							break;
+							// found breakpoint, TODO
+						}
+						else
+						{
+							found_next = true;
+							seq += c.first;
+							num = c.second; //
+							s.push(next);
+						}
+					}
+				}
+				if (!found_next)
+				{
+					std::cout << "no path" << std::endl;
+					// no suitable neighbour found -> maybe previous part was shared by two strains TODO
+				}
 			}
 		}
-		seq += next;
-		curr = curr.substr(1) + next;
 	}
-	return seq;
+	return sequences;
 }
 
-std::vector<std::string> deBruijnGraph::getScaffolds(std::unordered_map<std::string, std::string>& junk)
+std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getScaffolds(std::unordered_map<std::string, std::string>& junk)
 {
 	std::vector<std::string> sources = getSources();
-	std::vector<std::string> scaffolds;
+	std::vector<std::pair<std::string, unsigned int> > scaffolds;
 	for (const auto& source : sources)
 	{
-		std::string seq = source;
 		std::string curr = source; 
 		std::string next = junk[curr];
 		while (graph_[next].get_successors().size() == 0 or junk.find(next) != junk.end())
 		{
 			auto pair = std::make_pair(curr,next);
-			seq += getSequence(pair);
+			auto seqs = getSequence(pair);
+			for (auto& seq : seqs)
+			{
+				if (seq.second >= 2) //TODO: differentiate between low abundant strain and possible erroneous path 
+				{
+					scaffolds.push_back(seq);
+					//TODO
+				}
+			}
 			if (graph_[next].get_successors().size() == 0)
 				break;
 			curr = next;
 			next = junk[next];
 		}
-		std::cout << seq << std::endl;
-		//scaffolds.push_back(seq);
 	}
 	return scaffolds;
 }

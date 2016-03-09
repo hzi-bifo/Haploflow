@@ -15,6 +15,8 @@ int main (int argc, char* argv[])
 	auto seqs = dbg.getScaffolds(c);
 	std::cerr << (clock() - t)/1000000. << std::endl;
 
+	std::cerr << seqs.size() << std::endl;
+
 	//std::cout << (clock() - t)/1000000. << std::endl;
 	//do something
 	return 0;
