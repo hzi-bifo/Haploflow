@@ -135,10 +135,10 @@ std::vector<std::string> deBruijnGraph::getSinks()
 std::string deBruijnGraph::find_next_junction(const std::string* source)
 {
 	const auto& succ = graph_[*source].get_successors();
+	graph_[*source].visited = true;
 	if (succ.size() == 0) //sink
 	{
-		graph_[*source].visited = true;
-		return *source;
+		return "";
 	}
 	else if (succ.size() == 1)
 	{
@@ -153,13 +153,15 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 		int x = 1;
 		const auto& res = bfs(*source, &x,
 											[&, source](std::string& v, int* i){
+																						graph_[v].visited = true;
 																						int tmp = graph_[v].get_successors().size(); 
-																						if (tmp > 1)
+																						if (tmp > 1) // outdegree > 1: bubble begin
 																							(*i)++;
+																						if (tmp == 0)
+																							(*i)--; // outdegree = 0: sink
 																						tmp = graph_[v].get_predecessors().size();
-																						if (tmp > 1)
-																							(*i)--;
-																						graph_[v].visited = true;}, 
+																						if (tmp > 1) // indegree > 1: bubble end
+																							(*i)--;}, 
 											[&, source](std::string& v, int* i){return (graph_[v].get_successors().size() == 0 or !*i);},
 											true);
 		return res.first;
@@ -177,11 +179,13 @@ std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
 	{
 		std::string curr = source;
 		std::string next = find_next_junction(&curr);
-		while (curr != next and junctions.emplace(curr, next).second)
+		while (next != "" and junctions.emplace(curr, next).second)
 		{
 			curr = next;
 			next = find_next_junction(&curr);
 		}
+		if (next != "")
+			std::cerr << curr << " -> " << next << std::endl;
 	}
 	//std::cerr << "Junctions: " << junctions.size() << std::endl;
 	return junctions;
@@ -231,7 +235,7 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 			next = pred[next] + next.substr(0,next.size() - 1);
 		}
 		std::reverse(path.begin(),path.end());
-		path = source + path;
+		path = path + sink;
 		paths.push_back(std::make_pair(path,max_flow));
 		flow += max_flow;
 	}
@@ -260,6 +264,6 @@ void deBruijnGraph::debug()
 		std::cout << seq.first << std::endl;
 		size += seq.first.length();
 	}
-	//std::cerr << size << std::endl;
+	std::cerr << size << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
