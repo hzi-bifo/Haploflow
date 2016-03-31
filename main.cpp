@@ -12,12 +12,11 @@ int main (int argc, char* argv[])
 	auto c = dbg.find_all_junctions();
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	t = clock();
-	auto seqs = dbg.getScaffolds(c);
-	std::cerr << (clock() - t)/1000000. << std::endl;
-
-	std::cerr << seqs.size() << std::endl;
-
-	//std::cout << (clock() - t)/1000000. << std::endl;
+	for (const auto& p : c)
+	{
+		dbg.getSequences(p.first, p.second);
+	}
+	std::cout << (clock() - t)/1000000. << std::endl;
 	//do something
 	return 0;
 }
