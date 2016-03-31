@@ -20,8 +20,7 @@ public:
 	deBruijnGraph(unsigned int k); // creates empty graph
 	deBruijnGraph(std::string filename, unsigned int k); // builds the deBruijn graph from file
 	
-	std::pair<std::string,unsigned int> bfs(const std::string&, bool, std::function<void(std::string&)>, std::function<bool(std::string&)>, bool); // generalized bfs
-	std::string dfs(const std::string&, bool, std::function<void(std::string&)>, std::function<bool(std::string&)>, bool); // generalized dfs
+	std::pair<std::string,unsigned int> bfs(const std::string&, int*, std::function<void(std::string&, int*)>, std::function<bool(std::string&, int*)>, bool); // generalized bfs
 
 	std::vector<std::string> getSources(); // returns all sources
 	std::vector<std::string> getSinks(); // returns all sinks in graph
