@@ -1,7 +1,9 @@
 #include "Vertex.h"
 
 Vertex::Vertex() : 	cc(0),
+										flow(0),
 										visited(false),
+										pred('?'),
 										source(0),
 										a_in(0),
 										a_out(0),
@@ -12,14 +14,15 @@ Vertex::Vertex() : 	cc(0),
 										t_in(0),
 										t_out(0),
 										n_in(0),
-										n_out(0),
-										flow(0)
+										n_out(0)
 {
 }
 
 Vertex::Vertex(const Vertex& v) : 
 	cc(v.cc),
+	flow(v.flow),
 	visited(v.visited),
+	pred(v.pred),
 	source(v.source),
 	a_in(v.a_in),
 	a_out(v.a_out),
@@ -30,8 +33,7 @@ Vertex::Vertex(const Vertex& v) :
 	t_in(v.t_in),
 	t_out(v.t_out),
 	n_in(v.n_in),
-	n_out(v.n_out),
-	flow(v.flow)
+	n_out(v.n_out)
 {
 }
 
@@ -59,19 +61,19 @@ void Vertex::add_predecessor(char letter)
 	}
 }
 
-const std::vector<std::pair<char, unsigned int> > Vertex::get_successors() const
+const std::vector<char> Vertex::get_successors() const
 {
-	std::vector<std::pair<char, unsigned int> > succ;
+	std::vector<char> succ;
 	if (a_out)
-		succ.push_back(std::make_pair('A',a_out));
+		succ.push_back('A');
 	if (c_out)
-		succ.push_back(std::make_pair('C',c_out));
+		succ.push_back('C');
 	if (g_out)
-		succ.push_back(std::make_pair('G',g_out));
+		succ.push_back('G');
 	if (t_out)
-		succ.push_back(std::make_pair('T',t_out));
+		succ.push_back('T');
 	if (n_out)
-		succ.push_back(std::make_pair('N',n_out));
+		succ.push_back('N');
 	return succ;
 }
 
@@ -91,7 +93,7 @@ const std::vector<char> Vertex::get_predecessors() const
 	return pred;
 }
 
-const int Vertex::capacity() const
+const unsigned int Vertex::capacity() const
 {
 	int cap1 = a_out + c_out + g_out + t_out;
 	return cap1; // this is the "out-capacity"

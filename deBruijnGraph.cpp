@@ -95,7 +95,7 @@ std::string deBruijnGraph::dfs(const std::string& source, bool forward, std::fun
 			for (const auto& c : succ)
 			{
 				next = curr.substr(1);
-				next.push_back(c.first);
+				next.push_back(c);
 				s.push(next);
 			}
 		}
@@ -130,7 +130,7 @@ std::pair<std::string,unsigned int> deBruijnGraph::bfs(const std::string& source
 			for (const auto& c : succ)
 			{
 				next = curr.substr(1);
-				next.push_back(c.first);
+				next.push_back(c);
 				q.push(next);
 				last = next;
 			}
@@ -178,20 +178,24 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 	const auto& succ = graph_[*source].get_successors();
 	if (succ.size() == 0) //sink
 	{
+		graph_[*source].visited = true;
 		return *source;
 	}
 	else if (succ.size() == 1)
-		return bfs(*source,  
+	{
+		const auto& res = bfs(*source,  
 											true, 
-											[&, source](std::string& v){graph_[v].source = source;}, 
+											[&, source](std::string& v){graph_[v].source = source; graph_[v].visited = true;}, 
 											[&, source](std::string& v){return (graph_[v].get_successors().size() != 1 or (graph_[v].get_predecessors().size() > 1 and v != *source));},
-											true).first;
+											true);
+		return res.first;
+	}
 	else
 	{
 		unsigned int x = succ.size() - 1;
 		const auto& res = bfs(*source, 
 																	true, 
-																	[&, source](std::string& v){if (graph_[v].source != source){graph_[v].cc++;} graph_[v].source = source;},
+																	[&, source](std::string& v){graph_[v].visited = true; if (graph_[v].source != source){graph_[v].cc++;} graph_[v].source = source;},
 																	[&, x](std::string& v){bool ret = (graph_[v].cc == x); if (ret){graph_[v].cc = 0; graph_[v].source = 0;} return ret;}, 
 																	true);
 		if (res.first == *source)
@@ -200,7 +204,7 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 			if (res.second > 1)
 			{
 				// we didnt immediately return, circle found
-				std::string neigh = source->substr(1) + succ[0].first;
+				std::string neigh = source->substr(1) + succ[0];
 			}
 		}
 		return res.first;
@@ -228,92 +232,51 @@ std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
 	return junctions;
 }
 
-std::vector<std::pair<std::string,unsigned int> > deBruijnGraph::getSequence(const std::pair<std::string,std::string>& junk)
+std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (const std::string& source, const std::string& sink)
 {
-	std::vector<std::pair<std::string,unsigned int> > sequences;
-	std::string seq = "";
-	std::string curr = junk.first;
-	std::string next;
-	auto neigh = graph_[curr].get_successors();
-	for (const auto& n : neigh)
+	std::vector<std::pair<std::string, unsigned int> > paths;
+	unsigned int flow = 0;
+	while (true)
 	{
-		unsigned int num = n.second;
-		std::cout << num << std::endl;
-		std::stack<std::string> s;
-		s.push(curr);
-		while (s.size() > 0)
+		std::queue<std::string> q;
+		q.push(source);
+		std::unordered_map<std::string,char> pred;
+		while (q.size() > 0)
 		{
-			auto curr = s.top();
-			s.pop();
-			if (curr == junk.second)
+			std::string curr = q.front();
+			q.pop();
+			for (const auto& n : graph_[curr].get_successors())
 			{
-				sequences.push_back(std::make_pair(seq,num));
-				break;
-			}
-			else
-			{
-				std::string next;
-				const auto& succ = graph_[curr].get_successors();
-				bool found_next = false;
-				for (const auto& c : succ)
+				std::string next = curr.substr(1);
+				next.push_back(n);
+				if (pred.find(next) == pred.end() and next != source and graph_[next].capacity() > graph_[next].flow)
 				{
-					next = curr.substr(1);
-					next.push_back(c.first);
-					if (-2 + num <= c.second and 2 + num >= c.second)
-					{
-						if (found_next)
-						{
-							std::cout << "double path" << std::endl;
-							break;
-							// found breakpoint, TODO
-						}
-						else
-						{
-							found_next = true;
-							seq += c.first;
-							num = c.second; //
-							s.push(next);
-						}
-					}
-				}
-				if (!found_next)
-				{
-					std::cout << "no path" << std::endl;
-					// no suitable neighbour found -> maybe previous part was shared by two strains TODO
+					pred[next] = curr[0];
+					q.push(next);
 				}
 			}
 		}
-	}
-	return sequences;
-}
-
-std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getScaffolds(std::unordered_map<std::string, std::string>& junk)
-{
-	std::vector<std::string> sources = getSources();
-	std::vector<std::pair<std::string, unsigned int> > scaffolds;
-	for (const auto& source : sources)
-	{
-		std::string curr = source; 
-		std::string next = junk[curr];
-		while (graph_[next].get_successors().size() == 0 or junk.find(next) != junk.end())
+		if (pred.find(sink) == pred.end())
 		{
-			auto pair = std::make_pair(curr,next);
-			auto seqs = getSequence(pair);
-			for (auto& seq : seqs)
-			{
-				if (seq.second >= 2) //TODO: differentiate between low abundant strain and possible erroneous path 
-				{
-					scaffolds.push_back(seq);
-					//TODO
-				}
-			}
-			if (graph_[next].get_successors().size() == 0)
-				break;
-			curr = next;
-			next = junk[next];
+			std::cout << flow << std::endl;
+			break;
 		}
+		unsigned int max_flow = graph_[sink].capacity() - graph_[sink].flow + 1;
+		std::string next = sink;
+		while (next != source)
+		{
+			max_flow = std::min(max_flow,graph_[next].capacity() - graph_[next].flow);
+			next = pred[next] + next.substr(0,next.size() - 1);
+		}
+		next = sink;
+		while (next != source)
+		{
+			graph_[next].flow += max_flow;
+			next = pred[next] + next.substr(0,next.size() - 1);
+		}
+		flow += max_flow;
 	}
-	return scaffolds;
+	return paths;
 }
 
 void deBruijnGraph::debug()
