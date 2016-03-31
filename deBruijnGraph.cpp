@@ -240,6 +240,7 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 	{
 		std::queue<std::string> q;
 		q.push(source);
+		std::string path = "";
 		std::unordered_map<std::string,char> pred;
 		while (q.size() > 0)
 		{
@@ -258,7 +259,6 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 		}
 		if (pred.find(sink) == pred.end())
 		{
-			std::cout << flow << std::endl;
 			break;
 		}
 		unsigned int max_flow = graph_[sink].capacity() - graph_[sink].flow + 1;
@@ -271,9 +271,13 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 		next = sink;
 		while (next != source)
 		{
+			path.push_back(pred[next]);
 			graph_[next].flow += max_flow;
 			next = pred[next] + next.substr(0,next.size() - 1);
 		}
+		std::reverse(path.begin(),path.end());
+		path = source + path;
+		paths.push_back(std::make_pair(path,max_flow));
 		flow += max_flow;
 	}
 	return paths;
@@ -281,4 +285,25 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 
 void deBruijnGraph::debug()
 {
+	clock_t t = clock();
+	std::cerr << getSize() << std::endl;
+	std::cerr << (clock() - t)/1000000. << std::endl;
+	
+	t = clock();
+	auto c = find_all_junctions();
+	std::cerr << (clock() - t)/1000000. << std::endl;
+	t = clock();
+	std::vector<std::pair<std::string,unsigned int> > sequences;
+	for (const auto& p : c)
+	{
+		auto s = getSequences(p.first, p.second);
+		sequences.insert(sequences.end(),s.begin(), s.end());
+	}
+	unsigned int i = 0;
+	for (const auto& seq : sequences)
+	{
+		std::cout << "> Contig_" << i++ << std::endl;
+		std::cout << seq.first << std::endl;
+	}
+	std::cerr << (clock() - t)/1000000. << std::endl;
 }

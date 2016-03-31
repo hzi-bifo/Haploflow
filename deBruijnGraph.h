@@ -11,6 +11,7 @@
 #include <limits>
 #include <functional>
 #include <cstring>
+#include <ctime> //debug
 #include "Vertex.h"
 
 class deBruijnGraph
@@ -21,9 +22,7 @@ public:
 	
 	std::pair<std::string,unsigned int> bfs(const std::string&, bool, std::function<void(std::string&)>, std::function<bool(std::string&)>, bool); // generalized bfs
 	std::string dfs(const std::string&, bool, std::function<void(std::string&)>, std::function<bool(std::string&)>, bool); // generalized dfs
-	
-	std::unordered_map<std::string,Vertex/*,SeqHash,SeqEq*/> graph_; //graph data structure
-	
+
 	std::vector<std::string> getSources(); // returns all sources
 	std::vector<std::string> getSinks(); // returns all sinks in graph
 	std::unordered_map<std::string,std::string> find_all_junctions(); // returns pairs of <junction_source,junction_end>
@@ -39,6 +38,8 @@ private:
 	std::string reverse_complement(const std::string&);
 	
 	std::function<char(const char&)> lambda = [](const char& c){switch (c){case 'A' : return 'T'; case 'C': return 'G'; case 'G': return 'C'; case 'T' : return 'A'; default : return 'N';}};
+	
+	std::unordered_map<std::string,Vertex/*,SeqHash,SeqEq*/> graph_; //graph data structure
 	unsigned int k_; //kmer size
 };
 
