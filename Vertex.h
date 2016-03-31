@@ -8,29 +8,30 @@ public:
 	Vertex(const Vertex& v);
 	void add_successor(char letter);
 	void add_predecessor(char letter);
-	const std::vector<std::pair<char, unsigned int> > get_successors() const;
+	const std::vector<char> get_successors() const;
 	const std::vector<char> get_predecessors() const;
-	const int capacity() const;
+	const unsigned int capacity() const;
 	const bool isSource() const;
 	const bool isSink() const;
 	const bool isJunction() const;
 	const void print() const; //debug
 	
 	unsigned int cc; //these can be set from the outside - handle with care
+	unsigned int flow;
 	bool visited;
-	std::string const * source; //points to const string source (of junction)
+	char pred; // from where the path came
+	std::string const* source; //points to const string source (of junction)
 	
 private:
-	int a_in;
-	int a_out;
-	int c_in;
-	int c_out;
-	int g_in;
-	int g_out;
-	int t_in;
-	int t_out;
-	int n_in;
-	int n_out;
-	int flow;
+	unsigned int a_in;
+	unsigned int a_out;
+	unsigned int c_in;
+	unsigned int c_out;
+	unsigned int g_in;
+	unsigned int g_out;
+	unsigned int t_in;
+	unsigned int t_out;
+	unsigned int n_in;
+	unsigned int n_out;
 
 };
