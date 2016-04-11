@@ -1,6 +1,29 @@
 #include "Vertex.h"
 
-Vertex::Vertex() : 	cc(0),
+Vertex::Vertex() : 	kmer(""),
+										rev_compl(""),
+										cc(0),
+										flow(0),
+										visited(false),
+										pred('?'),
+										source(0),
+										a_in(0),
+										a_out(0),
+										c_in(0),
+										c_out(0),
+										g_in(0),
+										g_out(0),
+										t_in(0),
+										t_out(0),
+										n_in(0),
+										n_out(0)
+{
+}
+
+Vertex::Vertex(const std::string& kmer) : 	
+										kmer(kmer),
+										rev_compl(rc(kmer)),
+										cc(0),
 										flow(0),
 										visited(false),
 										pred('?'),
@@ -19,6 +42,8 @@ Vertex::Vertex() : 	cc(0),
 }
 
 Vertex::Vertex(const Vertex& v) : 
+	kmer(v.kmer),
+	rev_compl(v.rev_compl),
 	cc(v.cc),
 	flow(v.flow),
 	visited(v.visited),
@@ -35,6 +60,14 @@ Vertex::Vertex(const Vertex& v) :
 	n_in(v.n_in),
 	n_out(v.n_out)
 {
+}
+
+std::string rc (const std::string& kmer)
+{
+	std::string rev(kmer);
+	std::transform(kmer.begin(),kmer.end(),rev.begin(),[](const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};});
+	std::reverse(rev.begin(),rev.end());
+	return rev;
 }
 
 void Vertex::add_successor(char letter)
@@ -121,6 +154,7 @@ const bool Vertex::isJunction() const
 //debug
 const void Vertex::print() const
 {
+	std::cout << kmer << "/" << rev_compl << std::endl;
 	std::cout << "Out - A: " << a_out << ", C: " << c_out << ", G: " << g_out << ", T: " << t_out << ", N: " << n_out << std::endl;
 	std::cout << "In  - A: " << a_in << ", C: " << c_in << ", G: " << g_in << ", T: " << t_in << ", N: " << n_in << std::endl;
 	std::cout << "Component: " << cc << ", capacity: " << capacity() << ", used flow: " << flow << std::endl;

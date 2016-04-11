@@ -5,7 +5,9 @@ class Vertex
 {
 public:
 	Vertex();
+	Vertex(const std::string&);
 	Vertex(const Vertex& v);
+	
 	void add_successor(char letter);
 	void add_predecessor(char letter);
 	const std::vector<char> get_successors() const;
@@ -23,6 +25,9 @@ public:
 	std::string const* source; //points to const string source (of junction)
 	
 private:
+	std::string rc (const std::string&);
+	std::string kmer;
+	std::string rev_compl;
 	unsigned int a_in;
 	unsigned int a_out;
 	unsigned int c_in;
