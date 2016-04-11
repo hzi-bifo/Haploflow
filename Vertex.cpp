@@ -2,42 +2,36 @@
 
 Vertex::Vertex() : 	kmer(""),
 										rev_compl(""),
-										cc(0),
 										flow(0),
 										visited(false),
-										pred('?'),
-										source(0),
-										a_in(0),
-										a_out(0),
-										c_in(0),
-										c_out(0),
-										g_in(0),
-										g_out(0),
-										t_in(0),
-										t_out(0),
-										n_in(0),
-										n_out(0)
+										a_in(0), a_in_r(0),
+										a_out(0), a_out_r(0),
+										c_in(0), c_in_r(0),
+										c_out(0), c_out_r(0),
+										g_in(0), g_in_r(0),
+										g_out(0), g_out_r(0),
+										t_in(0), t_in_r(0),
+										t_out(0), t_out_r(0),
+										n_in(0), n_in_r(0),
+										n_out(0), n_out_r(0),
 {
 }
 
 Vertex::Vertex(const std::string& kmer) : 	
 										kmer(kmer),
 										rev_compl(rc(kmer)),
-										cc(0),
 										flow(0),
 										visited(false),
-										pred('?'),
-										source(0),
-										a_in(0),
-										a_out(0),
-										c_in(0),
-										c_out(0),
-										g_in(0),
-										g_out(0),
-										t_in(0),
-										t_out(0),
-										n_in(0),
-										n_out(0)
+										a_in(0), a_in_r(0),
+										a_out(0), a_out_r(0),
+										c_in(0), c_in_r(0),
+										c_out(0), c_out_r(0),
+										g_in(0), g_in_r(0),
+										g_out(0), g_out_r(0),
+										t_in(0), t_in_r(0),
+										t_out(0), t_out_r(0),
+										n_in(0), n_in_r(0),
+										n_out(0), n_out_r(0)
 {
 }
 
@@ -49,51 +43,57 @@ Vertex::Vertex(const Vertex& v) :
 	visited(v.visited),
 	pred(v.pred),
 	source(v.source),
-	a_in(v.a_in),
-	a_out(v.a_out),
-	c_in(v.c_in),
-	c_out(v.c_out),
-	g_in(v.g_in),
-	g_out(v.g_out),
-	t_in(v.t_in),
-	t_out(v.t_out),
-	n_in(v.n_in),
-	n_out(v.n_out)
+	a_in(v.a_in), a_in_r(v.a_in_r),
+	a_out(v.a_out), a_out_r(v.a_out_r),
+	c_in(v.c_in), c_in_r(v.c_in_r),
+	c_out(v.c_out), c_out_r(v.c_out_r),
+	g_in(v.g_in), g_in_r(v.g_in_r),
+	g_out(v.g_out), g_out_r(v.g_out_r),
+	t_in(v.t_in), t_in_r(v.t_in_r),
+	t_out(v.t_out), t_out_r(v.t_out_r),
+	n_in(v.n_in), n_in_r(v.n_in_r),
+	n_out(v.n_out), n_out_r(v.n_out_r),
 {
 }
 
-std::string rc (const std::string& kmer)
+// returns reverse complement of a string
+std::string Vertex::rc (const std::string& kmer)
 {
 	std::string rev(kmer);
-	std::transform(kmer.begin(),kmer.end(),rev.begin(),[](const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};});
+	std::transform(kmer.begin(),kmer.end(),rev.begin(),complement);
 	std::reverse(rev.begin(),rev.end());
 	return rev;
 }
 
+
+// if A -> B with letter C, then rc(B) -> rc(A) with c(C)
 void Vertex::add_successor(char letter)
 {
 	switch(letter)
 	{
-		case 'A': a_out++; break;
-		case 'C': c_out++; break;
-		case 'G': g_out++; break;
-		case 'T': t_out++; break;
-		default: n_out++; break;
+		case 'A': a_out++; t_in_r++; break;
+		case 'C': c_out++; g_in_r++; break;
+		case 'G': g_out++; c_in_r++; break;
+		case 'T': t_out++; a_in_r++; break;
+		default: n_out++; n_in_r++; break;
 	}
+	
 }
 
+// the same for predecessors
 void Vertex::add_predecessor(char letter)
 {
 	switch(letter)
 	{
-		case 'A': a_in++; break;
-		case 'C': c_in++; break;
-		case 'G': g_in++; break;
-		case 'T': t_in++; break;
-		default: n_in++; break;
+		case 'A': a_in++; t_out_r++; break;
+		case 'C': c_in++; g_out_r++; break;
+		case 'G': g_in++; c_out_r++; break;
+		case 'T': t_in++; a_out_r++; break;
+		default: n_in++; n_out_r++; break;
 	}
 }
 
+// returns the forward successors
 const std::vector<char> Vertex::get_successors() const
 {
 	std::vector<char> succ;
@@ -110,6 +110,7 @@ const std::vector<char> Vertex::get_successors() const
 	return succ;
 }
 
+// returns the forward predecessors
 const std::vector<char> Vertex::get_predecessors() const
 {
 	std::vector<char> pred;
