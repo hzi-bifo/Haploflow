@@ -8,6 +8,8 @@ public:
 	Vertex(const std::string&);
 	Vertex(const Vertex& v);
 	
+	inline bool operator==(const Vertex& lhs, const Vertex& rhs){return (lhs.kmer == rhs.kmer or lhs.rev_compl == rhs.kmer);} // these cases are sufficient as rev_compl == rev_compl iff kmer == kmer
+	
 	void add_successor(char letter);
 	void add_predecessor(char letter);
 	const std::vector<char> get_successors() const;
