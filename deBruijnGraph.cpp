@@ -184,8 +184,6 @@ std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
 			curr = next;
 			next = find_next_junction(&curr);
 		}
-		if (next != "")
-			std::cerr << curr << " -> " << next << std::endl;
 	}
 	//std::cerr << "Junctions: " << junctions.size() << std::endl;
 	return junctions;
@@ -257,13 +255,10 @@ void deBruijnGraph::debug()
 		sequences.insert(sequences.end(),s.begin(), s.end());
 	}
 	unsigned int i = 0;
-	unsigned int size = 0;
 	for (const auto& seq : sequences)
 	{
 		std::cout << "> Contig_" << i++ << std::endl;
-		std::cout << seq.first << std::endl;
-		size += seq.first.length();
+		std::cout << seq.first << " (cov " << seq.second << ")" << std::endl;
 	}
-	std::cerr << size << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
