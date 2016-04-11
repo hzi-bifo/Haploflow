@@ -9,6 +9,7 @@ public:
 	Vertex(const Vertex& v);
 	
 	inline bool operator==(const Vertex& lhs, const Vertex& rhs){return (lhs.kmer == rhs.kmer or lhs.rev_compl == rhs.kmer);} // these cases are sufficient as rev_compl == rev_compl iff kmer == kmer
+	bool isRC(const std::string&);
 	
 	void add_successor(char letter);
 	void add_predecessor(char letter);
@@ -30,7 +31,7 @@ private:
 	auto complement[](const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};}
 	std::string rc (const std::string&);
 	std::string kmer;
-	std::string rev_compl;
+	//std::string rev_compl;
 	unsigned int a_in, a_in_r;
 	unsigned int a_out, a_out_r;
 	unsigned int c_in, c_in_r;

@@ -1,7 +1,7 @@
 #include "Vertex.h"
 
 Vertex::Vertex() : 	kmer(""),
-										rev_compl(""),
+										//rev_compl(""),
 										flow(0),
 										visited(false),
 										a_in(0), a_in_r(0),
@@ -19,7 +19,7 @@ Vertex::Vertex() : 	kmer(""),
 
 Vertex::Vertex(const std::string& kmer) : 	
 										kmer(kmer),
-										rev_compl(rc(kmer)),
+										//rev_compl(rc(kmer)),
 										flow(0),
 										visited(false),
 										a_in(0), a_in_r(0),
@@ -37,7 +37,7 @@ Vertex::Vertex(const std::string& kmer) :
 
 Vertex::Vertex(const Vertex& v) : 
 	kmer(v.kmer),
-	rev_compl(v.rev_compl),
+	//rev_compl(v.rev_compl),
 	cc(v.cc),
 	flow(v.flow),
 	visited(v.visited),
@@ -65,6 +65,10 @@ std::string Vertex::rc (const std::string& kmer)
 	return rev;
 }
 
+bool Vertex::isRC(const std::string& s)
+{
+	return (rc(s) == kmer);
+}
 
 // if A -> B with letter C, then rc(B) -> rc(A) with c(C)
 void Vertex::add_successor(char letter)
