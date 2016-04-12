@@ -57,7 +57,7 @@ Vertex::Vertex(const Vertex& v) :
 }
 
 // returns reverse complement of a string
-std::string Vertex::rc (const std::string& kmer)
+std::string Vertex::rc ()
 {
 	std::string rev(kmer);
 	std::transform(kmer.begin(),kmer.end(),rev.begin(),complement);
