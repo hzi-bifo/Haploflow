@@ -13,7 +13,7 @@ Vertex::Vertex() : 	kmer(""),
 										t_in(0), t_in_r(0),
 										t_out(0), t_out_r(0),
 										n_in(0), n_in_r(0),
-										n_out(0), n_out_r(0),
+										n_out(0), n_out_r(0)
 {
 }
 
@@ -52,12 +52,12 @@ Vertex::Vertex(const Vertex& v) :
 	t_in(v.t_in), t_in_r(v.t_in_r),
 	t_out(v.t_out), t_out_r(v.t_out_r),
 	n_in(v.n_in), n_in_r(v.n_in_r),
-	n_out(v.n_out), n_out_r(v.n_out_r),
+	n_out(v.n_out), n_out_r(v.n_out_r)
 {
 }
 
 // returns reverse complement of a string
-std::string Vertex::rc ()
+const std::string Vertex::rc() const
 {
 	std::string rev(kmer);
 	std::transform(kmer.begin(),kmer.end(),rev.begin(),complement);
@@ -67,11 +67,11 @@ std::string Vertex::rc ()
 
 bool Vertex::isRC(const std::string& s)
 {
-	return (rc(s) == kmer);
+	return (s != kmer);
 }
 
 // if A -> B with letter C, then rc(B) -> rc(A) with c(C)
-void Vertex::add_successor(char letter)
+void Vertex::add_successor(const char& letter) const
 {
 	switch(letter)
 	{
@@ -85,7 +85,7 @@ void Vertex::add_successor(char letter)
 }
 
 // the same for predecessors
-void Vertex::add_predecessor(char letter)
+void Vertex::add_predecessor(const char& letter) const
 {
 	switch(letter)
 	{
@@ -159,7 +159,7 @@ const bool Vertex::isJunction() const
 //debug
 const void Vertex::print() const
 {
-	std::cout << kmer << "/" << rev_compl << std::endl;
+	std::cout << kmer << "/" << rc() << std::endl;
 	std::cout << "Out - A: " << a_out << ", C: " << c_out << ", G: " << g_out << ", T: " << t_out << ", N: " << n_out << std::endl;
 	std::cout << "In  - A: " << a_in << ", C: " << c_in << ", G: " << g_in << ", T: " << t_in << ", N: " << n_in << std::endl;
 	std::cout << "Component: " << cc << ", capacity: " << capacity() << ", used flow: " << flow << std::endl;
