@@ -42,24 +42,38 @@ void deBruijnGraph::split_read(const std::string& line)
 	std::string kmer = line.substr(0,k_);
 	Vertex toAdd(kmer);
 	auto&& v = graph_.emplace(toAdd); // add "empty" vertex
-	v.first->add_successor(line[k_]); // add the k+1st letter as neighbour
+	if (!v.second and v.first->isRC(kmer)) // vertex has been added and was a reverse complement
+		v.first->add_predecessor(complement(line[k_])); // if RC(A)->X, then X->A
+	else
+		v.first->add_successor(line[k_]); // add the k+1st letter as neighbour
 	
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
 		kmer = line.substr(i - k_,k_); // extract kmer
 		toAdd = Vertex(kmer);
 		v = graph_.emplace(toAdd); // if not in list, add kmer
-		v.first->add_successor(line[i]);
-		v.first->add_predecessor(line[i - k_ - 1]);
+		if (!v.second and v.first->isRC(kmer))
+		{
+			v.first->add_predecessor(complement(line[i]));
+			v.first->add_successor(complement(line[i - k_ - 1]));
+		}
+		else
+		{
+			v.first->add_successor(line[i]);
+			v.first->add_predecessor(line[i - k_ - 1]);
+		}
 	}
 	// this for-loop does not add the final kmer of the read, add manually:
 	kmer = line.substr(line.length() - k_, k_);
 	toAdd = Vertex(kmer);
 	v = graph_.emplace(toAdd); //the last node does not have neighbours, if it already is in the graph, then nothing will change
-	v.first->add_predecessor(line[line.length() - k_ - 1]);
+	if (!v.second and v.first->isRC(kmer))
+		v.first->add_successor(complement(line[line.length() - k_ - 1]));
+	else
+		v.first->add_predecessor(line[line.length() - k_ - 1]);
 }
 
-std::pair<std::string,unsigned int> deBruijnGraph::bfs(const std::string& source, int* x, std::function<void(std::string&,int*)> f, std::function<bool(std::string&, int*)> condition, bool stop = false)
+std::pair<std::string,unsigned int> deBruijnGraph::bfs(const std::string& source, int* x, std::function<void(const std::string&,int*)> f, std::function<bool(const std::string&, int*)> condition, bool stop = false)
 {
 	unsigned int depth = 0;
 	std::queue<std::string> q;
@@ -82,7 +96,7 @@ std::pair<std::string,unsigned int> deBruijnGraph::bfs(const std::string& source
 			f(curr,x); // apply f to current vertex
 			std::string next;
 			auto&& v = graph_.find(curr);
-			auto&& succ = v->get_successors();
+			auto&& succ = v->get_successors(v->isRC(curr));
 			for (const auto& c : succ)
 			{
 				next = curr.substr(1);
@@ -121,7 +135,7 @@ std::vector<std::string> deBruijnGraph::getSinks()
 std::string deBruijnGraph::find_next_junction(const std::string* source)
 {
 	auto v = graph_.find(*source);
-	auto succ = v->get_successors();
+	auto&& succ = v->get_successors(v->isRC(*source));
 	v->visited = true;
 	if (succ.size() == 0) //sink
 	{
@@ -130,8 +144,14 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 	else if (succ.size() == 1)
 	{
 		const std::pair<std::string,unsigned int>& res = bfs(*source, 0,
-											[&, source](std::string& v, int* i){auto s = graph_.find(v); s->visited = true;}, 
-											[&, source](std::string& v, int* i){auto s = graph_.find(v); return (s->get_successors().size() != 1 or (s->get_predecessors().size() > 1 and v != *source));},
+											[&, source](const std::string& v, int* i){
+													auto&& s = graph_.find(v);
+													s->visited = true;
+													}, 
+											[&, source](const std::string& v, int* i){
+													auto&& s = graph_.find(v);
+													return (s->get_successors(s->isRC(v)).size() != 1 or (s->get_predecessors(s->isRC(v)).size() > 1 and v != *source));
+													},
 											true);
 		return res.first;
 	}
@@ -139,18 +159,24 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 	{
 		int x = 1;
 		const std::pair<std::string,unsigned int>& res = bfs(*source, &x,
-											[&, source](std::string& v, int* i){
-																						auto&& s = graph_.find(v);
-																						s->visited = true;
-																						int tmp = s->get_successors().size(); 
-																						if (tmp > 1) // outdegree > 1: bubble begin
-																							(*i)++;
-																						if (tmp == 0)
-																							(*i)--; // outdegree = 0: sink
-																						tmp = s->get_predecessors().size();
-																						if (tmp > 1) // indegree > 1: bubble end
-																							(*i)--;}, 
-											[&, source](std::string& v, int* i){auto&& s = graph_.find(v); return (s->get_successors().size() == 0 or !*i);},
+											[&, source](const std::string& v, int* i){
+													auto&& s = graph_.find(v);
+													s->visited = true;
+													int tmp = s->get_successors(s->isRC(v)).size(); 
+													if (tmp > 1) // outdegree > 1: bubble begin
+														(*i)++;
+													if (tmp == 0)
+														(*i)--; // outdegree = 0: sink
+													tmp = s->get_predecessors(s->isRC(v)).size();
+													if (tmp > 1) // indegree > 1: bubble end
+														(*i)--;
+												}, 
+											[&, source](const std::string& v, int* i){
+													auto&& s = graph_.find(v);
+													if (s == graph_.end())
+														std::cout << v << std::endl;
+													return (s->get_successors(s->isRC(v)).size() == 0 or !*i);
+												},
 											true);
 		return res.first;
 	}
@@ -193,7 +219,7 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 			std::string curr = q.front();
 			q.pop();
 			auto&& v = graph_.find(curr);
-			for (const auto& n : v->get_successors())
+			for (const auto& n : v->get_successors(v->isRC(curr)))
 			{
 				std::string next = curr.substr(1);
 				next.push_back(n);
