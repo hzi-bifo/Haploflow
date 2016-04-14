@@ -65,7 +65,7 @@ const std::string Vertex::rc() const
 	return rev;
 }
 
-bool Vertex::isRC(const std::string& s)
+bool Vertex::isRC(const std::string& s) const
 {
 	return (s != kmer);
 }
@@ -98,35 +98,35 @@ void Vertex::add_predecessor(const char& letter) const
 }
 
 // returns the forward successors
-const std::vector<char> Vertex::get_successors() const
+const std::vector<char> Vertex::get_successors(bool rc) const
 {
 	std::vector<char> succ;
-	if (a_out)
+	if ((!rc and a_out) or (a_out_r and rc))
 		succ.push_back('A');
-	if (c_out)
+	if ((!rc and c_out) or (c_out_r and rc))
 		succ.push_back('C');
-	if (g_out)
+	if ((!rc and g_out) or (g_out_r and rc))
 		succ.push_back('G');
-	if (t_out)
+	if ((!rc and t_out) or (t_out_r and rc))
 		succ.push_back('T');
-	if (n_out)
+	if ((!rc and n_out) or (n_out_r and rc))
 		succ.push_back('N');
 	return succ;
 }
 
 // returns the forward predecessors
-const std::vector<char> Vertex::get_predecessors() const
+const std::vector<char> Vertex::get_predecessors(bool rc) const
 {
 	std::vector<char> pred;
-	if (a_in)
+	if ((!rc and a_in) or (a_in_r and rc))
 		pred.push_back('A');
-	if (c_in)
+	if ((!rc and c_in) or (c_in_r and rc))
 		pred.push_back('C');
-	if (g_in)
+	if ((!rc and g_in) or (g_in_r and rc))
 		pred.push_back('G');
-	if (t_in)
+	if ((!rc and t_in) or (t_in_r and rc))
 		pred.push_back('T');
-	if (n_in)
+	if ((!rc and n_in) or (n_in_r and rc))
 		pred.push_back('N');
 	return pred;
 }

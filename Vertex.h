@@ -11,14 +11,12 @@ public:
 	Vertex(const Vertex& v);
 	
 	inline bool operator==(const Vertex& rhs){return (kmer == rhs.kmer or rc() == rhs.kmer);};  // these cases are sufficient as rev_compl == rev_compl iff kmer == kmer
-	bool isRC(const std::string&);
+	bool isRC(const std::string&) const;
 	
 	void add_successor(const char& letter) const;
 	void add_predecessor(const char& letter) const;
-	std::vector<char> get_successors();
-	std::vector<char> get_predecessors();
-	const std::vector<char> get_successors() const;
-	const std::vector<char> get_predecessors() const; 
+	const std::vector<char> get_successors(bool rc) const;
+	const std::vector<char> get_predecessors(bool rc) const; 
 	const unsigned int capacity() const;
 	const bool isSource() const;
 	const bool isSink() const;
