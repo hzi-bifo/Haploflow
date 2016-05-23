@@ -40,7 +40,7 @@ Vertex::Vertex(const Vertex& v) :
 	cc(v.cc),
 	visited(v.visited),
 	pred(v.pred),
-	source(v.source),
+	target(v.target),
 	flow_f(v.flow_f), flow_r(v.flow_r),
 	a_in(v.a_in), a_in_r(v.a_in_r),
 	a_out(v.a_out), a_out_r(v.a_out_r),
@@ -166,10 +166,20 @@ const bool Vertex::isJunction(bool rc) const
 }
 
 //debug
-const void Vertex::print() const
+const void Vertex::print(bool cerr) const
 {
-	std::cout << kmer << "/" << rc() << std::endl;
-	std::cout << "Out - A: " << a_out << ", C: " << c_out << ", G: " << g_out << ", T: " << t_out << ", N: " << n_out << std::endl;
-	std::cout << "In  - A: " << a_in << ", C: " << c_in << ", G: " << g_in << ", T: " << t_in << ", N: " << n_in << std::endl;
-	std::cout << "Component: " << cc << ", capacity: " << capacity(false) << ", used flow: " << flow_f << " (forward)/ " << flow_r << " (reverse)" << std::endl;
+	if (cerr)
+	{
+		std::cerr << kmer << "/" << rc() << std::endl;
+		std::cerr << "Out - A: " << a_out << ", C: " << c_out << ", G: " << g_out << ", T: " << t_out << ", N: " << n_out << std::endl;
+		std::cerr << "In  - A: " << a_in << ", C: " << c_in << ", G: " << g_in << ", T: " << t_in << ", N: " << n_in << std::endl;
+		std::cerr << "Component: " << cc << ", capacity: " << capacity(false) << ", used flow: " << flow_f << " (forward)/ " << flow_r << " (reverse)" << std::endl;
+	}
+	else
+	{
+		std::cout << kmer << "/" << rc() << std::endl;
+		std::cout << "Out - A: " << a_out << ", C: " << c_out << ", G: " << g_out << ", T: " << t_out << ", N: " << n_out << std::endl;
+		std::cout << "In  - A: " << a_in << ", C: " << c_in << ", G: " << g_in << ", T: " << t_in << ", N: " << n_in << std::endl;
+		std::cout << "Component: " << cc << ", capacity: " << capacity(false) << ", used flow: " << flow_f << " (forward)/ " << flow_r << " (reverse)" << std::endl;
+	}
 }

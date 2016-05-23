@@ -24,13 +24,13 @@ public:
 	const bool isSource (bool rc) const;
 	const bool isSink(bool rc) const;
 	const bool isJunction(bool rc) const;
-	const void print() const; //debug
+	const void print(bool cerr) const; //debug
 	
 	std::string kmer;
 	mutable unsigned int cc; //these can be set from the outside - handle with care
 	mutable bool visited;
 	mutable char pred; // from where the path came
-	mutable std::string const* source; //points to const string source (of junction)
+	mutable std::string const* target; //points to const string source (of junction)
 	const std::string rc() const;
 	
 	
