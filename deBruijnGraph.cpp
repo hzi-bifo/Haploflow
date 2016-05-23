@@ -136,7 +136,7 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 {
 	auto v = graph_.find(*source);
 	auto&& succ = v->get_successors(v->isRC(*source));
-	v->visited = true;
+	//v->visited = true;
 	if (succ.size() == 0) //sink
 	{
 		return "";
@@ -145,8 +145,8 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 	{
 		const std::pair<std::string,unsigned int>& res = bfs(*source, 0,
 											[&, source](const std::string& v, int* i){
-													auto&& s = graph_.find(v);
-													s->visited = true;
+													//auto&& s = graph_.find(v);
+													//s->visited = true;
 													}, 
 											[&, source](const std::string& v, int* i){
 													auto&& s = graph_.find(v);
@@ -161,7 +161,7 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 		const std::pair<std::string,unsigned int>& res = bfs(*source, &x,
 											[&, source](const std::string& v, int* i){
 													auto&& s = graph_.find(v);
-													s->visited = true;
+													//s->visited = true;
 													int tmp = s->get_successors(s->isRC(v)).size(); 
 													if (tmp > 1) // outdegree > 1: bubble begin
 														(*i)++;
@@ -265,12 +265,52 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 	return paths;
 }
 
+std::pair<std::string, unsigned int> deBruijnGraph::glue(const std::string& source, const std::string& sink, const std::unordered_map<std::string, std::string>& junctions)
+{
+	std::string contig = "";
+	unsigned int coverage = 0;
+	std::string nsource = source;
+	std::string nsink = sink;
+	while (!graph_.find(nsink)->isSink(false)) // until the sink is a "real" sink
+	{
+		auto seqs = getSequences(nsource, nsink);
+		if (seqs.size() == 1) // single path, glueing is easy
+		{
+			contig += seqs[0].first;
+			if (seqs[0].second < coverage) // this is currently for debugging only, TODO proper coverage handling
+				coverage = seqs[0].second;
+		}
+		else if (seqs.size() > 1) // multiple pathes -> "haplotype" detected
+		{
+			unsigned int max_cov = 0;
+			unsigned int i = 0;
+			unsigned int pos = 0;
+			for (const auto& seq : seqs)
+			{
+				if (seq.second > max_cov)
+				{
+					max_cov = seq.second;
+					pos = i;
+				}
+				i++;
+			}
+			if (max_cov < coverage)
+				coverage = max_cov;
+			contig += seqs[pos].first;
+		}
+		nsource = nsink;
+		nsink = junctions.at(nsink);
+	}
+	return std::make_pair(contig,coverage);
+}
+
 void deBruijnGraph::debug()
 {
-	std::cerr << getSize() << std::endl;
+	std::cerr << "Vertices: " << getSize() << std::endl;
 		
 	clock_t t = clock();
 	auto c = find_all_junctions();
+	std::cerr << "Partitioned into " << c.size() << " components" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	t = clock();
 	std::vector<std::pair<std::string,unsigned int> > sequences;
