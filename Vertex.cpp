@@ -1,9 +1,9 @@
 #include "Vertex.h"
 
 Vertex::Vertex() : 	kmer(""),
-										//rev_compl(""),
-										flow(0),
+										cc(0),
 										visited(false),
+										flow_f(0), flow_r(0),
 										a_in(0), a_in_r(0),
 										a_out(0), a_out_r(0),
 										c_in(0), c_in_r(0),
@@ -19,9 +19,9 @@ Vertex::Vertex() : 	kmer(""),
 
 Vertex::Vertex(const std::string& kmer) : 	
 										kmer(kmer),
-										//rev_compl(rc(kmer)),
-										flow(0),
+										cc(0),
 										visited(false),
+										flow_f(0), flow_r(0),
 										a_in(0), a_in_r(0),
 										a_out(0), a_out_r(0),
 										c_in(0), c_in_r(0),
@@ -37,12 +37,11 @@ Vertex::Vertex(const std::string& kmer) :
 
 Vertex::Vertex(const Vertex& v) : 
 	kmer(v.kmer),
-	//rev_compl(v.rev_compl),
 	cc(v.cc),
-	flow(v.flow),
 	visited(v.visited),
 	pred(v.pred),
 	source(v.source),
+	flow_f(v.flow_f), flow_r(v.flow_r),
 	a_in(v.a_in), a_in_r(v.a_in_r),
 	a_out(v.a_out), a_out_r(v.a_out_r),
 	c_in(v.c_in), c_in_r(v.c_in_r),
@@ -131,25 +130,35 @@ const std::vector<char> Vertex::get_predecessors(bool rc) const
 	return pred;
 }
 
-const unsigned int Vertex::capacity() const
+const unsigned int Vertex::capacity(bool rc) const
 {
 	int cap1 = a_out + c_out + g_out + t_out;
-	return cap1; // this is the "out-capacity"
+	int cap2 = a_out_r + c_out_r + g_out_r + t_out_r;
+	return (rc ? cap2 : cap1); // this is the "out-capacity"
 }
 
-const bool Vertex::isSource() const
+const unsigned int Vertex::flow(bool rc) const
+{
+	return (rc ? flow_r : flow_f);
+}
+
+void Vertex::add_flow(bool rc, unsigned int max_flow) const
+{
+	(rc ? flow_r : flow_f) += max_flow;
+}
+const bool Vertex::isSource(bool rc) const
 {
 	bool source = !(a_in + c_in + g_in + t_in + n_in); // all 0 ("real" source)
-	return source;
+	return ((!rc and source) or (rc and isSink(!rc)));
 }
 
-const bool Vertex::isSink() const
+const bool Vertex::isSink(bool rc) const
 {
 	bool sink = !(a_out + c_out + g_out + t_out + n_out); // all 0 ("real" sink)
-	return sink;
+	return ((!rc and sink) or (rc and isSource(!rc))); // if we are reverse complement and sink, then original is a source 
 }
 
-const bool Vertex::isJunction() const
+const bool Vertex::isJunction(bool rc) const
 {
 	bool diff1 = ((((a_out xor c_out) xor g_out) xor t_out) xor n_out);
 	bool diff2 = ((((a_in xor c_in) xor g_in) xor t_in) xor n_in);
@@ -162,5 +171,5 @@ const void Vertex::print() const
 	std::cout << kmer << "/" << rc() << std::endl;
 	std::cout << "Out - A: " << a_out << ", C: " << c_out << ", G: " << g_out << ", T: " << t_out << ", N: " << n_out << std::endl;
 	std::cout << "In  - A: " << a_in << ", C: " << c_in << ", G: " << g_in << ", T: " << t_in << ", N: " << n_in << std::endl;
-	std::cout << "Component: " << cc << ", capacity: " << capacity() << ", used flow: " << flow << std::endl;
+	std::cout << "Component: " << cc << ", capacity: " << capacity(false) << ", used flow: " << flow_f << " (forward)/ " << flow_r << " (reverse)" << std::endl;
 }

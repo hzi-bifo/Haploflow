@@ -118,7 +118,7 @@ std::vector<std::string> deBruijnGraph::getSources()
 {
 	std::vector<std::string> sources;
 	for (const auto& p : graph_)
-		if (p.isSource())
+		if (p.isSource(false) /*or p.isSource(true)*/)
 			sources.push_back(p.kmer);
 	return sources;
 }
@@ -127,7 +127,7 @@ std::vector<std::string> deBruijnGraph::getSinks()
 {
 	std::vector<std::string> sinks;
 	for (const auto& p : graph_)
-		if (p.isSink())
+		if (p.isSink(false) /*or p.isSink(true)*/)
 			sinks.push_back(p.kmer);
 	return sinks;
 }
@@ -208,6 +208,7 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 	std::vector<std::pair<std::string, unsigned int> > paths;
 	unsigned int flow = 0;
 	auto&& w = graph_.find(sink);
+	bool rc = false;
 	while (true)
 	{
 		std::queue<std::string> q;
@@ -224,7 +225,8 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 				std::string next = curr.substr(1);
 				next.push_back(n);
 				v = graph_.find(next);
-				if (pred.find(next) == pred.end() and next != source and v->capacity() > v->flow)
+				rc = v->isRC(next);
+				if (pred.find(next) == pred.end() and next != source and v->capacity(rc) > v->flow(rc))
 				{
 					pred[next] = curr[0];
 					q.push(next);
@@ -235,20 +237,24 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 		{
 			break;
 		}
-		unsigned int max_flow = w->capacity() - w->flow + 1;
+		rc = w->isRC(sink);
+		unsigned int max_flow = w->capacity(rc) - w->flow(rc) + 1;
 		std::string next = sink;
 		while (next != source)
 		{
 			w = graph_.find(next);
-			max_flow = std::min(max_flow,w->capacity() - w->flow);
+			rc = w->isRC(next);
+			max_flow = std::min(max_flow,w->capacity(rc) - w->flow(rc));
 			next = pred[next] + next.substr(0,next.size() - 1);
 		}
 		next = sink;
 		while (next != source)
 		{
 			w = graph_.find(next);
+			rc = w->isRC(next);
 			path.push_back(pred[next]);
-			w->flow += max_flow;
+			w->add_flow(rc, max_flow);
+			//w->add_flow(!rc, max_flow); //?
 			next = pred[next] + next.substr(0,next.size() - 1);
 		}
 		std::reverse(path.begin(),path.end());
@@ -277,7 +283,7 @@ void deBruijnGraph::debug()
 	for (const auto& seq : sequences)
 	{
 		std::cout << "> Contig_" << i++ << std::endl;
-		std::cout << seq.first << " (cov " << seq.second << ")" << std::endl;
+		std::cout << seq.first << std::endl;
 	}
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
