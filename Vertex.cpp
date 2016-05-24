@@ -132,9 +132,9 @@ const std::vector<char> Vertex::get_predecessors(bool rc) const
 
 const unsigned int Vertex::capacity(bool rc) const
 {
-	int cap1 = a_out + c_out + g_out + t_out;
-	int cap2 = a_out_r + c_out_r + g_out_r + t_out_r;
-	return (rc ? cap2 : cap1); // this is the "out-capacity"
+	int cap1 = a_in + c_in + g_in + t_in;
+	int cap2 = a_in_r + c_in_r + g_in_r + t_in_r;
+	return (rc ? cap2 : cap1); // this is the "in-capacity". We do not check capacity of source, only of the following!
 }
 
 const unsigned int Vertex::flow(bool rc) const
