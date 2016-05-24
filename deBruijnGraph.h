@@ -26,7 +26,7 @@ public:
 	std::vector<std::string> getSinks(); // returns all sinks in graph
 	std::unordered_map<std::string,std::string> find_all_junctions(); // returns pairs of <junction_source,junction_end>
 	std::vector<std::pair<std::string, unsigned int> > getSequences(const std::string& source, const std::string& sink); // finds all paths + sequences between two junctions
-	std::pair<std::string,unsigned int> glue(const std::string& source, const std::string& sink, const std::unordered_map<std::string, std::string>&); // glues together possible contigs
+	std::pair<std::string,unsigned int> glue(const std::string& source, const std::unordered_map<std::string, std::string>&); // glues together possible contigs
 	
 	
 	void printGraph(); //debug	

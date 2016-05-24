@@ -136,7 +136,7 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 {
 	auto v = graph_.find(*source);
 	auto&& succ = v->get_successors(v->isRC(*source));
-	//v->visited = true;
+	v->visited = true;
 	if (succ.size() == 0) //sink
 	{
 		return "";
@@ -145,12 +145,12 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 	{
 		const std::pair<std::string,unsigned int>& res = bfs(*source, 0,
 											[&, source](const std::string& v, int* i){
-													//auto&& s = graph_.find(v);
-													//s->visited = true;
+														auto&& s = graph_.find(v);
+														s->visited = true;
 													}, 
 											[&, source](const std::string& v, int* i){
 													auto&& s = graph_.find(v);
-													return (s->get_successors(s->isRC(v)).size() != 1 or (s->get_predecessors(s->isRC(v)).size() > 1 and v != *source));
+													return (s->get_successors(s->isRC(v)).size() != 1 or (s->get_predecessors(s->isRC(v)).size() != 1 and v != *source));
 													},
 											true);
 		return res.first;
@@ -161,7 +161,7 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 		const std::pair<std::string,unsigned int>& res = bfs(*source, &x,
 											[&, source](const std::string& v, int* i){
 													auto&& s = graph_.find(v);
-													//s->visited = true;
+													s->visited = true;
 													int tmp = s->get_successors(s->isRC(v)).size(); 
 													if (tmp > 1) // outdegree > 1: bubble begin
 														(*i)++;
@@ -173,8 +173,6 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 												}, 
 											[&, source](const std::string& v, int* i){
 													auto&& s = graph_.find(v);
-													if (s == graph_.end())
-														std::cout << v << std::endl;
 													return (s->get_successors(s->isRC(v)).size() == 0 or !*i);
 												},
 											true);
@@ -186,8 +184,6 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
 {
 	std::vector<std::string> sources = getSources();
-	auto s_tmp = getSinks();
-	std::unordered_set<std::string> sinks(s_tmp.begin(), s_tmp.end());
 	std::unordered_map<std::string, std::string> junctions; // maps vertices to their next junction
 	for (const auto& source : sources)
 	{
@@ -213,16 +209,20 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 	// implementation of Edmonds-Karp
 	while (true)
 	{
+		// queue to bfs from
 		std::queue<std::string> q;
 		q.push(source);
 		std::string path = "";
+		// store backward path
 		std::unordered_map<std::string,char> pred;
 		while (q.size() > 0)
 		{
 			std::string curr = q.front();
 			q.pop();
 			auto&& v = graph_.find(curr);
-			for (const auto& n : v->get_successors(v->isRC(curr)))
+			auto&& succ = v->get_successors(v->isRC(curr));
+			//create path when there is capacity and we havent been here before
+			for (const auto& n : succ)
 			{
 				std::string next = curr.substr(1);
 				next.push_back(n);
@@ -240,7 +240,7 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 			break;
 		}
 		rc = w->isRC(sink);
-		unsigned int max_flow = w->capacity(rc) - w->flow(rc) + 1;
+		unsigned int max_flow = w->capacity(rc) + 1;
 		std::string next = sink;
 		while (next != source)
 		{
@@ -256,52 +256,46 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 			rc = w->isRC(next);
 			path.push_back(pred[next]);
 			w->add_flow(rc, max_flow);
-			//w->add_flow(!rc, max_flow); //?
 			next = pred[next] + next.substr(0,next.size() - 1);
 		}
 		std::reverse(path.begin(),path.end());
-		path = source + path;
+		//path += sink; // careful if "glueing" is about to take place!
 		paths.push_back(std::make_pair(path,max_flow));
 		flow += max_flow;
 	}
 	return paths;
 }
 
-std::pair<std::string, unsigned int> deBruijnGraph::glue(const std::string& source, const std::string& sink, const std::unordered_map<std::string, std::string>& junctions)
+std::pair<std::string, unsigned int> deBruijnGraph::glue(const std::string& source, const std::unordered_map<std::string, std::string>& junctions)
 {
 	std::string contig = "";
 	unsigned int coverage = 0;
 	std::string nsource = source;
-	std::string nsink = sink;
-	graph_.find(nsource)->visited = true;
+	std::string nsink = junctions.at(nsource);
 	while (true) // until the sink is a "real" sink (or its RC)
 	{
 		auto v = graph_.find(nsink);
-		if (!v->isRC(nsink) and v->isSink(false))
-		{
+		// stop if sink
+		if (v->isSink(false))
 			break;
-		}
-		else if (v->isRC(nsink) and v->isSource(false))
-		{
-			break;
-		}
 		auto seqs = getSequences(nsource, nsink);
+		std::cout << seqs.size() << std::endl;
 		if (seqs.size() == 1) // single path, glueing is easy
 		{
 			contig += seqs[0].first;
 			if (seqs[0].second < coverage) // this is currently for debugging only, TODO proper coverage handling
 				coverage = seqs[0].second;
 		}
-		else if (seqs.size() > 1) // multiple pathes -> "haplotype" detected
+		else if (seqs.size() > 1) // multiple pathes -> "haplotype" detected -> the magic happens here
 		{
 			unsigned int max_cov = 0;
 			unsigned int i = 0;
 			unsigned int pos = 0;
 			for (const auto& seq : seqs)
 			{
-				if (seq.first.length() > max_cov)
+				if (seq.second > max_cov)
 				{
-					max_cov = seq.first.length();
+					max_cov = seq.second;
 					pos = i;
 				}
 				i++;
@@ -313,14 +307,18 @@ std::pair<std::string, unsigned int> deBruijnGraph::glue(const std::string& sour
 		nsource = nsink;
 		try
 		{
-			nsink = junctions.at(nsink);
+			nsink = junctions.at(nsource);
 		}
-		catch (const std::out_of_range& err)
+		// if nsink only has a reverse complement neighbour -> what we find will be the reverse strand
+		// nsink is not a "real" sink
+		// do not append unless we find diversions on "the way back"?
+		catch (const std::out_of_range& err) 
 		{
-			auto v = graph_.find(nsink);
-			nsink = junctions.at(v->rc());
+			break; //TODO
+			//auto v = graph_.find(nsource);
+			//nsink = junctions.at(v->rc());
 		}
-	}	
+	}
 	return std::make_pair(contig,coverage);
 }
 
@@ -334,25 +332,30 @@ void deBruijnGraph::debug()
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	t = clock();
 	unsigned int i = 0;
+	/*std::vector<std::string> sources = getSources();
+	std::cerr << sources.size() << " sources found" << std::endl;
 	std::vector<std::pair<std::string,unsigned int> > sequences;
-	for (const auto& p : c)
+	for (const auto& p : sources)
 	{
-		auto seq = glue(p.first,p.second,c);
-		sequences.push_back(seq);
-		std::cout << "> Contig_" << i++ << std::endl;
-		std::cout << seq.first << std::endl;
-	}
-	/*std::vector<std::pair<std::string,unsigned int> > sequences;
+		auto seq = glue(p,c);
+		if (seq.first.size() > 0) // otherwise we found a reverse complement
+		{
+			sequences.push_back(seq);
+			std::cout << ">Contig_" << i++ << std::endl;
+			std::cout << seq.first << std::endl;
+		}
+	}*/
+	std::vector<std::pair<std::string,unsigned int> > sequences;
+	i = 0;
 	for (const auto& p : c)
 	{
 		auto s = getSequences(p.first, p.second);
-		sequences.insert(sequences.end(),s.begin(), s.end());
+		for (auto&& seq : s)
+		{
+			std::cout << "> Contig_" << i++ << std::endl;
+			std::cout << seq.first /*+ p.second*/ << " " << seq.second << std::endl;
+		}
+		sequences.insert(sequences.end(), s.begin(), s.end());
 	}
-	i = 0;
-	for (const auto& seq : sequences)
-	{
-		std::cout << "> Contig_" << i++ << std::endl;
-		std::cout << seq.first << std::endl;
-	}*/
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
