@@ -1,6 +1,7 @@
 #include "Vertex.h"
 
-Vertex::Vertex() : 	kmer(""),
+// empty constructor does not make sense, because adding kmers later is something which shouldnt be allowed.
+/*Vertex::Vertex() : 	kmer(""),
 										cc(0),
 										visited(false),
 										flow_f(0), flow_r(0),
@@ -15,7 +16,7 @@ Vertex::Vertex() : 	kmer(""),
 										n_in(0), n_in_r(0),
 										n_out(0), n_out_r(0)
 {
-}
+}*/
 
 Vertex::Vertex(const std::string& kmer) : 	
 										kmer(kmer),
@@ -33,6 +34,12 @@ Vertex::Vertex(const std::string& kmer) :
 										n_in(0), n_in_r(0),
 										n_out(0), n_out_r(0)
 {
+	//replace all occurances of letter other than A C G T by N
+	auto pos = std::string::npos;
+	while ((pos = this->kmer.find_first_not_of("ACGTN")) != std::string::npos)
+	{
+		this->kmer.replace(pos,1,"N");
+	}
 }
 
 Vertex::Vertex(const Vertex& v) : 

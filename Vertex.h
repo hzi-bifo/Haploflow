@@ -6,7 +6,7 @@ class Vertex
 {
 	friend bool operator==(const Vertex& lhs, const Vertex& rhs){return (lhs.kmer == rhs.kmer or lhs.rc() == rhs.kmer);};
 public:
-	Vertex();
+	//Vertex();
 	Vertex(const std::string&);
 	Vertex(const Vertex& v);
 	
