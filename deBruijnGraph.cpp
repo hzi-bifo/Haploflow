@@ -4,25 +4,67 @@ deBruijnGraph::deBruijnGraph(unsigned int k) : k_ (k)
 {
 }
 
-deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
+deBruijnGraph::deBruijnGraph(std::string filename, bool fasta, unsigned int k) : k_ (k)
 {
 	unsigned int i = 0;
+	// create dBg from FASTA/Q file. FASTA assumed to have only header + sequence in body
+	if (!fasta)
+	{
+		std::ifstream infile(filename);
+		std::string line;
+		bool next_read = false;
+		while (std::getline(infile,line))
+		{
+			const auto& start = line.front();
+			if (start == '@') // read name. Next line will be the sequence. If quality starts with @, then the next line will as well
+			{
+				next_read = true;
+			}
+			else if (next_read)
+			{
+				next_read = false;
+				split_read(line);
+				i++;
+			}
+		}
+	}
+	else
+	{
+		split_fasta(filename);
+	}
+}
+
+//currently only for adding fasta sequences
+void deBruijnGraph::add_sequence(std::string filename)
+{
+	split_fasta(filename);
+}
+
+void deBruijnGraph::split_fasta(std::string filename)
+{
 	std::ifstream infile(filename);
 	std::string line;
-	bool next_read = false;
-	while (std::getline(infile,line))
+	// first line is header, ignore(?)
+	std::string header;
+	std::getline(infile, header);
+	// save previous read to include the first k-1 signs in the next line if necessary
+	std::string prev;
+	std::getline(infile, prev);
+	split_read(prev);
+	while (std::getline(infile, line))
 	{
-		const auto& start = line.front();
-		if (start == '@') // read name. Next line will be the sequence. If quality starts with @, then the next line will as well
+		auto&& linesize = prev.length();
+		if (linesize > k_)
 		{
-			next_read = true;
+			std::string to_sep = prev.substr(linesize - k_) + line;
+			split_read(to_sep);
 		}
-		else if (next_read)
+		else
 		{
-			next_read = false;
-			split_read(line);
-			i++;
+			std::cerr << "FASTA line too short" << std::endl;
+			continue; // that doesnt make sense though
 		}
+		prev = line;
 	}
 }
 
@@ -46,12 +88,14 @@ void deBruijnGraph::split_read(const std::string& line)
 		v.first->add_predecessor(complement(line[k_])); // if RC(A)->X, then X->A
 	else
 		v.first->add_successor(line[k_]); // add the k+1st letter as neighbour
-	
+
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
 		kmer = line.substr(i - k_,k_); // extract kmer
 		toAdd = Vertex(kmer);
 		v = graph_.emplace(toAdd); // if not in list, add kmer
+		if (!v.second)
+			std::cout << "kmer " << kmer << " appeared multiple times" << std::endl;
 		if (!v.second and v.first->isRC(kmer))
 		{
 			v.first->add_predecessor(complement(line[i]));
@@ -266,20 +310,17 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 	return paths;
 }
 
+// glues together shorter contigs to "unitigs"
 std::pair<std::string, unsigned int> deBruijnGraph::glue(const std::string& source, const std::unordered_map<std::string, std::string>& junctions)
 {
 	std::string contig = "";
 	unsigned int coverage = 0;
-	std::string nsource = source;
+	std::string nsource = source; // needs source to start with
 	std::string nsink = junctions.at(nsource);
 	while (true) // until the sink is a "real" sink (or its RC)
 	{
-		auto v = graph_.find(nsink);
-		// stop if sink
-		if (v->isSink(false))
-			break;
-		auto seqs = getSequences(nsource, nsink);
-		std::cout << seqs.size() << std::endl;
+		auto seqs = getSequences(nsource, nsink); //internally uses flow to determine sequence between current source/sink pair
+		//std::cout << seqs.size() << std::endl; // number of following sequences
 		if (seqs.size() == 1) // single path, glueing is easy
 		{
 			contig += seqs[0].first;
@@ -304,6 +345,10 @@ std::pair<std::string, unsigned int> deBruijnGraph::glue(const std::string& sour
 				coverage = max_cov;
 			contig += seqs[pos].first;
 		}
+		auto v = graph_.find(nsink);
+		// stop if sink (only "real sink" = no outgoing)
+		if (v->isSink(false))
+			break;
 		nsource = nsink;
 		try
 		{
@@ -322,6 +367,12 @@ std::pair<std::string, unsigned int> deBruijnGraph::glue(const std::string& sour
 	return std::make_pair(contig,coverage);
 }
 
+std::string deBruijnGraph::make_graph()
+{
+	std::string ret;
+	return ret;
+}
+
 void deBruijnGraph::debug()
 {
 	std::cerr << "Vertices: " << getSize() << std::endl;
@@ -332,7 +383,7 @@ void deBruijnGraph::debug()
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	t = clock();
 	unsigned int i = 0;
-	/*std::vector<std::string> sources = getSources();
+	std::vector<std::string> sources = getSources();
 	std::cerr << sources.size() << " sources found" << std::endl;
 	std::vector<std::pair<std::string,unsigned int> > sequences;
 	for (const auto& p : sources)
@@ -344,8 +395,8 @@ void deBruijnGraph::debug()
 			std::cout << ">Contig_" << i++ << std::endl;
 			std::cout << seq.first << std::endl;
 		}
-	}*/
-	std::vector<std::pair<std::string,unsigned int> > sequences;
+	}
+	/*std::vector<std::pair<std::string,unsigned int> > sequences;
 	i = 0;
 	for (const auto& p : c)
 	{
@@ -353,9 +404,10 @@ void deBruijnGraph::debug()
 		for (auto&& seq : s)
 		{
 			std::cout << "> Contig_" << i++ << std::endl;
-			std::cout << seq.first /*+ p.second*/ << " " << seq.second << std::endl;
+			std::cout << seq.first /*+ p.second << " " << seq.second << std::endl;
 		}
 		sequences.insert(sequences.end(), s.begin(), s.end());
-	}
+	}*/
+
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
