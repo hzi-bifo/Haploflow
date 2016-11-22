@@ -61,8 +61,8 @@ void deBruijnGraph::split_fasta(std::string filename)
 		}
 		else
 		{
-			std::cerr << "FASTA line too short" << std::endl;
-			continue; // that doesnt make sense though
+			std::cerr << "Linesize is " << linesize << " expected to be at least " << k_ << std::endl;
+			std::cerr << "lines: " << line << " " << prev << std::endl;
 		}
 		prev = line;
 	}
@@ -94,8 +94,6 @@ void deBruijnGraph::split_read(const std::string& line)
 		kmer = line.substr(i - k_,k_); // extract kmer
 		toAdd = Vertex(kmer);
 		v = graph_.emplace(toAdd); // if not in list, add kmer
-		if (!v.second)
-			std::cout << "kmer " << kmer << " appeared multiple times" << std::endl;
 		if (!v.second and v.first->isRC(kmer))
 		{
 			v.first->add_predecessor(complement(line[i]));
@@ -382,9 +380,10 @@ void deBruijnGraph::debug()
 	std::cerr << "Partitioned into " << c.size() << " components" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	t = clock();
-	unsigned int i = 0;
 	std::vector<std::string> sources = getSources();
 	std::cerr << sources.size() << " sources found" << std::endl;
+	// This isnt working as intended
+	/*unsigned int i = 0;
 	std::vector<std::pair<std::string,unsigned int> > sequences;
 	for (const auto& p : sources)
 	{
@@ -396,6 +395,7 @@ void deBruijnGraph::debug()
 			std::cout << seq.first << std::endl;
 		}
 	}
+	*/
 	/*std::vector<std::pair<std::string,unsigned int> > sequences;
 	i = 0;
 	for (const auto& p : c)
