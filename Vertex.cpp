@@ -73,7 +73,12 @@ const std::string Vertex::rc() const
 
 bool Vertex::isRC(const std::string& s) const
 {
-	return (s != kmer);
+	std::string cmp = s;
+	auto pos = std::string::npos;
+	while ((pos = cmp.find_first_not_of("ACGTN")) != std::string::npos)
+		cmp.replace(pos,1,"N");
+	return (cmp != kmer);
+		
 }
 
 // if A -> B with letter C, then rc(B) -> rc(A) with c(C)
