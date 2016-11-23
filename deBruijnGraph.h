@@ -38,7 +38,7 @@ public:
 	
 private:
 	inline static char complement(const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};}
-	void split_read(const std::string&); // given the read, inserts its kmers in the graph
+	unsigned int split_read(const std::string&); // given the read, inserts its kmers in the graph
 	std::string find_next_junction(const std::string*); // find next junction in the graph
 	void split_fasta(std::string filename); // split fasta into kmers
 

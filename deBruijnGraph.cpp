@@ -42,6 +42,7 @@ void deBruijnGraph::add_sequence(std::string filename)
 
 void deBruijnGraph::split_fasta(std::string filename)
 {
+	unsigned int rep_k = 0;
 	std::ifstream infile(filename);
 	std::string line;
 	// first line is header, ignore(?)
@@ -53,19 +54,20 @@ void deBruijnGraph::split_fasta(std::string filename)
 	split_read(prev);
 	while (std::getline(infile, line))
 	{
-		auto&& linesize = prev.length();
-		if (linesize > k_)
-		{
-			std::string to_sep = prev.substr(linesize - k_) + line;
-			split_read(to_sep);
-		}
+		std::string to_sep;
+		// check how we have to append the previous line to account for line wrapping 
+		auto&& linesize = line.length();
+		if (linesize > k_ and prev.length())
+			to_sep = prev.substr(linesize - k_) + line;
+		else if (linesize)
+			to_sep = prev + line;
 		else
-		{
-			std::cerr << "Linesize is " << linesize << " expected to be at least " << k_ << std::endl;
-			std::cerr << "lines: " << line << " " << prev << std::endl;
-		}
+			continue;
+		rep_k += split_read(to_sep);
 		prev = line;
 	}
+	//DEBUG
+	std::cerr << rep_k << " kmers appeared >1 times" << std::endl;
 }
 
 void deBruijnGraph::printGraph()
@@ -78,12 +80,15 @@ void deBruijnGraph::printGraph()
 	}
 }
 
-void deBruijnGraph::split_read(const std::string& line)
+unsigned int deBruijnGraph::split_read(const std::string& line)
 {
 	// the first kmer does not have predecessors, init manually
+	unsigned int rep_k = 0;
 	std::string kmer = line.substr(0,k_);
 	Vertex toAdd(kmer);
 	auto&& v = graph_.emplace(toAdd); // add "empty" vertex
+	if (!v.second)//DEBUG
+		rep_k++;
 	if (!v.second and v.first->isRC(kmer)) // vertex has been added and was a reverse complement
 		v.first->add_predecessor(complement(line[k_])); // if RC(A)->X, then X->A
 	else
@@ -94,6 +99,8 @@ void deBruijnGraph::split_read(const std::string& line)
 		kmer = line.substr(i - k_,k_); // extract kmer
 		toAdd = Vertex(kmer);
 		v = graph_.emplace(toAdd); // if not in list, add kmer
+		if (!v.second)//DEBUG
+			rep_k++;
 		if (!v.second and v.first->isRC(kmer))
 		{
 			v.first->add_predecessor(complement(line[i]));
@@ -109,10 +116,13 @@ void deBruijnGraph::split_read(const std::string& line)
 	kmer = line.substr(line.length() - k_, k_);
 	toAdd = Vertex(kmer);
 	v = graph_.emplace(toAdd); //the last node does not have neighbours, if it already is in the graph, then nothing will change
+	if (!v.second)//DEBUG
+		rep_k++;
 	if (!v.second and v.first->isRC(kmer))
 		v.first->add_successor(complement(line[line.length() - k_ - 1]));
 	else
 		v.first->add_predecessor(line[line.length() - k_ - 1]);
+	return rep_k; //DEBUG
 }
 
 std::pair<std::string,unsigned int> deBruijnGraph::bfs(const std::string& source, int* x, std::function<void(const std::string&,int*)> f, std::function<bool(const std::string&, int*)> condition, bool stop = false)
