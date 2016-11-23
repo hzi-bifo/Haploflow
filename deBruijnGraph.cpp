@@ -191,7 +191,7 @@ std::string deBruijnGraph::find_next_junction(const std::string* source)
 	v->visited = true;
 	if (succ.size() == 0) //sink
 	{
-		return "";
+		return std::string{succ.begin(),succ.end()}; // check
 	}
 	else if (succ.size() == 1)
 	{
@@ -241,7 +241,7 @@ std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
 	{
 		std::string curr = source;
 		std::string next = find_next_junction(&curr);
-		while (next != "" and junctions.find(graph_.find(curr)->rc()) == junctions.end() and junctions.emplace(curr, next).second)
+		while (junctions.find(graph_.find(curr)->rc()) == junctions.end() and junctions.emplace(curr, next).second)
 		{
 			curr = next;
 			next = find_next_junction(&curr);
@@ -378,6 +378,7 @@ std::pair<std::string, unsigned int> deBruijnGraph::glue(const std::string& sour
 std::string deBruijnGraph::make_graph()
 {
 	std::string ret;
+	
 	return ret;
 }
 
@@ -391,33 +392,25 @@ void deBruijnGraph::debug()
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	t = clock();
 	std::vector<std::string> sources = getSources();
+	std::vector<std::string> sinks = getSinks();
 	std::cerr << sources.size() << " sources found" << std::endl;
-	// This isnt working as intended
-	/*unsigned int i = 0;
-	std::vector<std::pair<std::string,unsigned int> > sequences;
-	for (const auto& p : sources)
+	std::cerr << sinks.size() << " sinks found" << std::endl;
+	for (auto&& junction : c)
 	{
-		auto seq = glue(p,c);
-		if (seq.first.size() > 0) // otherwise we found a reverse complement
+		auto&& curr = junction.first;
+		auto&& v = graph_.find(curr);
+		auto&& sink = junction.second;
+		auto&& w = graph_.find(sink);
+		if (v->isSource(false) or v->isSource(true))
 		{
-			sequences.push_back(seq);
-			std::cout << ">Contig_" << i++ << std::endl;
-			std::cout << seq.first << std::endl;
+			std::cout << "Source" << std::endl;
+			v->print(false);
 		}
+		if (w->isSink(false) or w->isSink(true))
+			w->print(false);
+		//v->print(false);
+		//w->print(false);
+		//std::cout << "matched" << std::endl;
 	}
-	*/
-	/*std::vector<std::pair<std::string,unsigned int> > sequences;
-	i = 0;
-	for (const auto& p : c)
-	{
-		auto s = getSequences(p.first, p.second);
-		for (auto&& seq : s)
-		{
-			std::cout << "> Contig_" << i++ << std::endl;
-			std::cout << seq.first /*+ p.second << " " << seq.second << std::endl;
-		}
-		sequences.insert(sequences.end(), s.begin(), s.end());
-	}*/
-
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
