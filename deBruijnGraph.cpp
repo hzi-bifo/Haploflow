@@ -51,23 +51,40 @@ void deBruijnGraph::split_fasta(std::string filename)
 	// save previous read to include the first k-1 signs in the next line if necessary
 	std::string prev;
 	std::getline(infile, prev);
-	split_read(prev);
+	if (prev.length() > k_)
+		rep_k += split_read(prev);
+	else
+		std::cerr << "Make sure that linesize it at least k" << std::endl;
 	while (std::getline(infile, line))
 	{
 		std::string to_sep;
 		// check how we have to append the previous line to account for line wrapping 
 		auto&& linesize = line.length();
 		if (linesize > k_ and prev.length())
-			to_sep = prev.substr(linesize - k_) + line;
+			to_sep = prev.substr(linesize - k_ + 1) + line;
 		else if (linesize)
 			to_sep = prev + line;
-		else
+		else //TODO newlines causes kmer to be added twice, might cause problems
 			continue;
 		rep_k += split_read(to_sep);
-		prev = line;
+		auto&& fchar = line.front();
+		std::string lastk = prev.substr(prev.length() - k_, k_);
+		std::string firstk = lastk.substr(1) + fchar;
+		auto&& lchar = lastk.front();
+		auto&& v = graph_.find(lastk);
+		auto&& w = graph_.find(firstk);
+		// connect the two lines
+		if (v->isRC(lastk))
+			v->add_predecessor(complement(fchar));
+		else
+			v->add_successor(fchar);
+		if (w->isRC(firstk))
+			w->add_successor(complement(lchar));
+		else
+			w->add_predecessor(lchar);
+		prev = line;	
 	}
-	//DEBUG
-	std::cerr << rep_k << " kmers appeared >1 times" << std::endl;
+	std::cout << rep_k << " kmers appeared >1 times" << std::endl;
 }
 
 void deBruijnGraph::printGraph()
@@ -82,8 +99,9 @@ void deBruijnGraph::printGraph()
 
 unsigned int deBruijnGraph::split_read(const std::string& line)
 {
-	// the first kmer does not have predecessors, init manually
+	// DEBUG
 	unsigned int rep_k = 0;
+	// the first kmer does not have predecessors, init manually
 	std::string kmer = line.substr(0,k_);
 	Vertex toAdd(kmer);
 	auto&& v = graph_.emplace(toAdd); // add "empty" vertex
@@ -378,39 +396,20 @@ std::pair<std::string, unsigned int> deBruijnGraph::glue(const std::string& sour
 std::string deBruijnGraph::make_graph()
 {
 	std::string ret;
-	
 	return ret;
 }
 
 void deBruijnGraph::debug()
 {
 	std::cerr << "Vertices: " << getSize() << std::endl;
-		
 	clock_t t = clock();
-	auto c = find_all_junctions();
-	std::cerr << "Partitioned into " << c.size() << " components" << std::endl;
-	std::cerr << (clock() - t)/1000000. << std::endl;
-	t = clock();
+	//auto c = find_all_junctions();
+	//std::cerr << "Partitioned into " << c.size() << " components" << std::endl;
+	//std::cerr << (clock() - t)/1000000. << std::endl;
+	//t = clock();
 	std::vector<std::string> sources = getSources();
 	std::vector<std::string> sinks = getSinks();
 	std::cerr << sources.size() << " sources found" << std::endl;
 	std::cerr << sinks.size() << " sinks found" << std::endl;
-	for (auto&& junction : c)
-	{
-		auto&& curr = junction.first;
-		auto&& v = graph_.find(curr);
-		auto&& sink = junction.second;
-		auto&& w = graph_.find(sink);
-		if (v->isSource(false) or v->isSource(true))
-		{
-			std::cout << "Source" << std::endl;
-			v->print(false);
-		}
-		if (w->isSink(false) or w->isSink(true))
-			w->print(false);
-		//v->print(false);
-		//w->print(false);
-		//std::cout << "matched" << std::endl;
-	}
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
