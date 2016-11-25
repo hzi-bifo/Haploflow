@@ -202,7 +202,7 @@ std::vector<std::string> deBruijnGraph::getSinks()
 	return sinks;
 }
 
-std::string deBruijnGraph::find_next_junction(const std::string* source)
+/*std::string deBruijnGraph::find_next_junction(const std::string* source)
 {
 	auto v = graph_.find(*source);
 	auto&& succ = v->get_successors(v->isRC(*source));
@@ -267,10 +267,10 @@ std::unordered_map<std::string, std::string> deBruijnGraph::find_all_junctions()
 	}
 	//std::cerr << "Junctions: " << junctions.size() << std::endl;
 	return junctions;
-}
+}*/
 
 // returns all possible sequences between a single source and sink (maximum 4?)
-std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (const std::string& source, const std::string& sink)
+/*std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (const std::string& source, const std::string& sink)
 {
 	std::vector<std::pair<std::string, unsigned int> > paths;
 	unsigned int flow = 0;
@@ -334,6 +334,36 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (
 		flow += max_flow;
 	}
 	return paths;
+}*/
+
+std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (const std::string& source, const std::string& sink)
+{
+	std::vector<std::pair<std::string, unsigned int> > ret;
+	return ret;
+}
+
+std::string deBruijnGraph::find_next_junction(const std::string* source)
+{
+	std::string next;
+	const std::pair<std::string,unsigned int>& res = bfs(*source, 0,
+	                                             [&, source](const std::string& v, int* i){
+	                                                         auto&& s = graph_.find(v);
+	                                                         s->visited = true;
+	                                                     }, 
+	                                             [&, source](const std::string& v, int* i){
+	                                                     auto&& s = graph_.find(v);
+	                                                     return (s->get_successors(s->isRC(v)).size() != 1 or (s->get_predecessors(s->isRC(v)).size() != 1));
+	                                                     },
+	                                             true);
+	next = res.first;
+	return next;
+}
+
+std::unordered_map<std::string,std::string> find_all_junctions()
+{
+	std::unordered_map<std::string,std::string> junc;
+	
+	return junc;
 }
 
 // glues together shorter contigs to "unitigs"
