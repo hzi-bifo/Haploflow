@@ -280,10 +280,26 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences(c
 	return paths;
 }
 
-std::string deBruijnGraph::find_next_junction(const std::string* source)
+std::string deBruijnGraph::find_next_junction(const std::string& source)
 {
-	std::string next;
-	return next;
+	bfs<unsigned int>(source,0,
+					[&,source](const std::string& source, unsigned int* i)
+					{
+						auto&& v = graph_.find(source);
+						v->visited = true;
+					},
+					[&,source](const std::string& source, unsigned int* i)
+					{
+						auto&& v = graph_.find(source);
+						if (v.get_successors(v->isRC(source)).size() > 1 or v.get_predecessors(v->isRC(source)).size() > 1)
+						{
+							//junction found
+
+						}
+						return v->visited;
+					},
+					true);
+	return "LUL";
 }
 
 std::string deBruijnGraph::make_graph()
@@ -291,6 +307,12 @@ std::string deBruijnGraph::make_graph()
 	std::string ret;
 	return ret;
 }
+
+void shrink(const std::string source)
+{
+		
+}
+
 
 void deBruijnGraph::debug()
 {
