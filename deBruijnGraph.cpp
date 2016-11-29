@@ -88,7 +88,6 @@ void deBruijnGraph::split_fasta(std::string filename)
 			junctions_.emplace(*w);
 		prev = line;	
 	}
-	std::cout << rep_k << " kmers appeared >1 times" << std::endl;
 }
 
 void deBruijnGraph::printGraph()
@@ -214,11 +213,71 @@ std::vector<std::string> deBruijnGraph::getSinks()
 	return sinks;
 }
 
-
-std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences (const std::string& source, const std::string& sink)
+std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences(const std::string& source, const std::string& sink)
 {
-	std::vector<std::pair<std::string, unsigned int> > ret;
-	return ret;
+	std::vector<std::pair<std::string, unsigned int> > paths;
+	unsigned int flow = 0;
+	auto&& w = graph_.find(sink);
+	bool rc = false;
+	// implementation of Edmonds-Karp
+	while (true)
+	{
+		// queue to bfs from
+		std::queue<std::string> q;
+		q.push(source);
+		std::string path = "";
+		// store backward path
+		std::unordered_map<std::string,char> pred;
+		while (q.size() > 0)
+		{
+			std::string curr = q.front();
+			q.pop();
+			auto&& v = graph_.find(curr);
+			auto&& succ = v->get_successors(v->isRC(curr));
+			//create path when there is capacity and we havent been here before
+			for (const auto& n : succ)
+			{
+				std::string next = curr.substr(1);
+				next.push_back(n);
+				v = graph_.find(next);
+				rc = v->isRC(next);
+				// if next in pred: we have found a cycle before finding sink
+				if (pred.find(next) == pred.end() and v->capacity(rc) > v->flow(rc))
+				{
+					pred[next] = curr[0];
+					q.push(next);
+				}
+			}
+		}
+		if (pred.find(sink) == pred.end())
+		{
+			break;
+		}
+		rc = w->isRC(sink);
+		unsigned int max_flow = w->capacity(rc) + 1;
+		std::string next = sink;
+		while (next != source)
+		{
+			w = graph_.find(next);
+			rc = w->isRC(next);
+			max_flow = std::min(max_flow,w->capacity(rc) - w->flow(rc));
+			next = pred[next] + next.substr(0,next.size() - 1);
+		}
+		next = sink;
+		while (next != source)
+		{
+			w = graph_.find(next);
+			rc = w->isRC(next);
+			path.push_back(pred[next]);
+			w->add_flow(rc, max_flow);
+			next = pred[next] + next.substr(0,next.size() - 1);
+		}
+		std::reverse(path.begin(),path.end());
+		//path += sink; // careful if "glueing" is about to take place!
+		paths.push_back(std::make_pair(path,max_flow));
+		flow += max_flow;
+	}
+	return paths;
 }
 
 std::string deBruijnGraph::find_next_junction(const std::string* source)
@@ -237,12 +296,12 @@ void deBruijnGraph::debug()
 {
 	std::cerr << "Vertices: " << getSize() << std::endl;
 	clock_t t = clock();
-	std::cerr << "Partitioned into " << junctions_.size() << " components" << std::endl;
-	std::cerr << (clock() - t)/1000000. << std::endl;
-	t = clock();
 	std::vector<std::string> sources = getSources();
 	std::vector<std::string> sinks = getSinks();
 	std::cerr << sources.size() << " sources found" << std::endl;
 	std::cerr << sinks.size() << " sinks found" << std::endl;
+	auto&& path = getSequences(sources[0],sinks[0]);
+	for (const auto& p : path)
+		std::cout << p.first << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
