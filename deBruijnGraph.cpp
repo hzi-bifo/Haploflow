@@ -291,7 +291,7 @@ std::string deBruijnGraph::find_next_junction(const std::string& source)
 					[&,source](const std::string& source, unsigned int* i)
 					{
 						auto&& v = graph_.find(source);
-						if (v.get_successors(v->isRC(source)).size() > 1 or v.get_predecessors(v->isRC(source)).size() > 1)
+						if (v->get_successors(v->isRC(source)).size() > 1 or v->get_predecessors(v->isRC(source)).size() > 1)
 						{
 							//junction found
 
