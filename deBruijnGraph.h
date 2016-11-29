@@ -20,14 +20,13 @@ public:
 	deBruijnGraph(unsigned int k); // creates empty graph
 	deBruijnGraph(std::string filename, bool fasta, unsigned int k); // builds the deBruijn graph from file
 	
-	std::pair<std::string,unsigned int> bfs(const std::string&, int*, std::function<void(const std::string&, int*)>, std::function<bool(const std::string&, int*)>, bool); // generalized bfs
+	template<typename T>
+	std::pair<std::string,unsigned int> bfs(const std::string&, T*, std::function<void(const std::string&, T*)>, std::function<bool(const std::string&, T*)>, bool); // generalized bfs
 	void add_sequence(std::string filename);
 
 	std::vector<std::string> getSources(); // returns all sources
 	std::vector<std::string> getSinks(); // returns all sinks in graph
-	std::unordered_map<std::string,std::string> find_all_junctions(); // returns pairs of <junction_source,junction_end>
 	std::vector<std::pair<std::string, unsigned int> > getSequences(const std::string& source, const std::string& sink); // finds all paths + sequences between two junctions
-	std::pair<std::string,unsigned int> glue(const std::string& source, const std::unordered_map<std::string, std::string>&); // glues together possible contigs
 	
 	std::string make_graph();	
 
@@ -43,5 +42,6 @@ private:
 	void split_fasta(std::string filename); // split fasta into kmers
 
 	std::unordered_set<Vertex> graph_;
+	std::unordered_set<Vertex> junctions_;
 	unsigned int k_; //kmer size
 };
