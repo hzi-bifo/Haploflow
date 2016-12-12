@@ -22,6 +22,8 @@ public:
 	
 	template<typename T>
 	std::pair<std::string,unsigned int> bfs(const std::string&, T*, std::function<void(const std::string&, T*)>, std::function<bool(const std::string&, T*)>, bool); // generalized bfs
+	template<typename T>
+	std::pair<std::string,unsigned int> dfs(const std::string&, T*, std::function<void(const std::string&, T*)>, std::function<bool(const std::string&, T*)>, bool); // generalized bfs
 	void add_sequence(std::string filename);
 
 	std::vector<std::string> getSources(); // returns all sources
@@ -33,7 +35,6 @@ public:
 	void printGraph(); //debug	
 	int getSize(); // returns number of vertices in graph
 	void debug(); // debug
-	
 	
 private:
 	inline static char complement(const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};}

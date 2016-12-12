@@ -154,7 +154,44 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 }
 
 template<typename T>
-std::pair<std::string,unsigned int> deBruijnGraph::bfs(const std::string& source, T* x, std::function<void(const std::string&,T*)> f, std::function<bool(const std::string&, T*)> condition, bool stop = false)
+std::pair<std::string, unsigned int> deBruijnGraph::dfs(const std::string& source, T* x, std::function<void(const std::string&,T*)> f, std::function<bool(const std::string&, T*)> condition, bool stop = false)
+{
+	unsigned int depth = 0;
+	std::stack<std::string> s;
+	std::string last = source;
+	s.push(source);
+	while (s.size() > 0)
+	{
+		std::string curr = s.top();
+		s.pop();
+		depth++; // depth of the bfs
+		if (condition(curr,x))
+		{
+			if (stop)
+					return std::make_pair(curr,depth);
+			else
+				continue;
+		}
+		else
+		{
+			f(curr,x); // apply f to current vertex
+			std::string next;
+			auto&& v = graph_.find(curr);
+			auto&& succ = v->get_successors(v->isRC(curr));
+			for (const auto& c : succ)
+			{
+				next = curr.substr(1);
+				next.push_back(c);
+				s.push(next);
+				last = next;
+			}
+		}
+	}
+	return std::make_pair(last,depth);
+}
+
+template<typename T>
+std::pair<std::string, unsigned int> deBruijnGraph::bfs(const std::string& source, T* x, std::function<void(const std::string&,T*)> f, std::function<bool(const std::string&, T*)> condition, bool stop = false)
 {
 	unsigned int depth = 0;
 	std::queue<std::string> q;
@@ -308,22 +345,24 @@ std::string deBruijnGraph::make_graph()
 	return ret;
 }
 
-void shrink(const std::string source)
-{
-		
-}
-
-
 void deBruijnGraph::debug()
 {
 	std::cerr << "Vertices: " << getSize() << std::endl;
 	clock_t t = clock();
 	std::vector<std::string> sources = getSources();
 	std::vector<std::string> sinks = getSinks();
+	unsigned int j1 = 0;
+	unsigned int j2 = 0; // definition junction might be in != out or (in > 1 or out > 1) 
+	for (auto&& v : graph_)
+	{
+		if (v.get_successors(false).size() > 1 or v.get_successors(true).size() > 1)
+			j1++;
+		if (v.get_successors(false).size() != v.get_predecessors(false).size()
+		or v.get_successors(true).size() != v.get_predecessors(true).size())
+			j2++;
+	}
 	std::cerr << sources.size() << " sources found" << std::endl;
 	std::cerr << sinks.size() << " sinks found" << std::endl;
-	auto&& path = getSequences(sources[0],sinks[0]);
-	for (const auto& p : path)
-		std::cout << p.first << std::endl;
+	std::cerr << j1 << " / " << j2 << " junctions found" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
