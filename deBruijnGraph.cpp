@@ -34,12 +34,6 @@ deBruijnGraph::deBruijnGraph(std::string filename, bool fasta, unsigned int k) :
 	}
 }
 
-Vertex deBruijnGraph::find(const std::string& kmer)
-{
-	Vertex toFind(kmer);
-	return graph_.find(toFind);
-}
-
 //currently only for adding fasta sequences
 void deBruijnGraph::add_sequence(std::string filename)
 {
@@ -77,194 +71,115 @@ void deBruijnGraph::split_fasta(std::string filename)
 		std::string lastk = prev.substr(prev.length() - k_, k_);
 		std::string firstk = lastk.substr(1) + fchar;
 		auto&& lchar = lastk.front();
-		auto&& v = graph_.find(lastk);
-		auto&& w = graph_.find(firstk);
-		// connect the two lines
-		if (v->isRC(lastk))
-			v->add_predecessor(complement(fchar));
+		auto&& seq_v = Sequence(lastk);
+		auto&& seq_w = Sequence(firstk);
+		auto&& v = graph_.find(seq_v);
+		auto&& w = graph_.find(seq_w);
+		// connect the two lines 
+		if (v->first == lastk) //check for reverse complement
+			v->second.add_successor(fchar,*this);
 		else
-			v->add_successor(fchar);
-		if (w->isRC(firstk))
-			w->add_successor(complement(lchar));
+			v->second.add_predecessor(complement(fchar),*this);
+		if (w->first == firstk)
+			w->second.add_predecessor(lchar,*this);
 		else
-			w->add_predecessor(lchar);
+			w->second.add_successor(complement(lchar),*this);
 		prev = line;	
 	}
 }
 
-void deBruijnGraph::printGraph()
+void deBruijnGraph::printGraph() const
 {
 	std::cout << graph_.size() << std::endl;
 	for (const auto& v: graph_)
-	{
-		v.print(false);
+	{	
+		std::cout << v.first.get_kmer() << std::endl;
+		v.second.print(false);
 		std::cout << std::endl;
 	}
 }
 
 unsigned int deBruijnGraph::split_read(const std::string& line)
 {
-	// DEBUG
-	unsigned int rep_k = 0;
 	// the first kmer does not have predecessors, init manually
 	std::string kmer = line.substr(0,k_);
-	Vertex toAdd(kmer);
-	auto&& v = graph_.emplace(toAdd); // add "empty" vertex
-	if (!v.second)//DEBUG
-		rep_k++;
-	if (!v.second and v.first->isRC(kmer)) // vertex has been added and was a reverse complement
-		v.first->add_predecessor(complement(line[k_])); // if RC(A)->X, then X->A
+	Sequence toAdd(kmer);
+	auto&& v = graph_.emplace(toAdd,Vertex());
+	if (!v.second and v.first->first != kmer) // vertex has been added and was a reverse complement
+		v.first->second.add_predecessor(complement(line[k_]),*this); // if RC(A)->X, then X->A
 	else
-		v.first->add_successor(line[k_]); // add the k+1st letter as neighbour
+		v.first->second.add_successor(line[k_],*this); // add the k+1st letter as neighbour
 
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
 		kmer = line.substr(i - k_,k_); // extract kmer
-		toAdd = Vertex(kmer);
-		v = graph_.emplace(toAdd); // if not in list, add kmer
-		if (!v.second)//DEBUG
-			rep_k++;
-		if (!v.second and v.first->isRC(kmer))
+		toAdd = Sequence(kmer);
+		v = graph_.emplace(toAdd,Vertex()); // if not in list, add kmer
+		if (!v.second and v.first->first != kmer)
 		{
-			v.first->add_predecessor(complement(line[i]));
-			v.first->add_successor(complement(line[i - k_ - 1]));
+			v.first->second.add_predecessor(complement(line[i]),*this);
+			v.first->second.add_successor(complement(line[i - k_ - 1]),*this);
 		}
 		else
 		{
-			v.first->add_successor(line[i]);
-			v.first->add_predecessor(line[i - k_ - 1]);
+			v.first->second.add_successor(line[i],*this);
+			v.first->second.add_predecessor(line[i - k_ - 1],*this);
 		}
 	}
 	// this for-loop does not add the final kmer of the read, add manually:
 	kmer = line.substr(line.length() - k_, k_);
-	toAdd = Vertex(kmer);
-	v = graph_.emplace(toAdd); //the last node does not have neighbours, if it already is in the graph, then nothing will change
-	if (!v.second)//DEBUG
-		rep_k++;
-	if (!v.second and v.first->isRC(kmer))
-		v.first->add_successor(complement(line[line.length() - k_ - 1]));
+	toAdd = Sequence(kmer);
+	v = graph_.emplace(toAdd,Vertex()); //the last node does not have neighbours, if it already is in the graph, then nothing will change
+	if (!v.second and v.first->first != kmer)
+		v.first->second.add_successor(complement(line[line.length() - k_ - 1]),*this);
 	else
-		v.first->add_predecessor(line[line.length() - k_ - 1]);
+		v.first->second.add_predecessor(line[line.length() - k_ - 1],*this);
 	
-	return rep_k; //DEBUG
+	return 0;
 }
 
-template<typename T>
-std::pair<std::string, unsigned int> deBruijnGraph::dfs(const std::string& source, T* x, std::function<void(const std::string&,T*)> f, std::function<bool(const std::string&, T*)> condition, bool stop = false)
-{
-	unsigned int depth = 0;
-	std::stack<std::string> s;
-	std::string last = source;
-	s.push(source);
-	while (s.size() > 0)
-	{
-		std::string curr = s.top();
-		s.pop();
-		depth++; // depth of the bfs
-		if (condition(curr,x))
-		{
-			if (stop)
-					return std::make_pair(curr,depth);
-			else
-				continue;
-		}
-		else
-		{
-			f(curr,x); // apply f to current vertex
-			std::string next;
-			auto&& v = graph_.find(curr);
-			auto&& succ = v->get_successors(v->isRC(curr));
-			for (const auto& c : succ)
-			{
-				next = curr.substr(1);
-				next.push_back(c);
-				s.push(next);
-				last = next;
-			}
-		}
-	}
-	return std::make_pair(last,depth);
-}
-
-template<typename T>
-std::pair<std::string, unsigned int> deBruijnGraph::bfs(const std::string& source, T* x, std::function<void(const std::string&,T*)> f, std::function<bool(const std::string&, T*)> condition, bool stop = false)
-{
-	unsigned int depth = 0;
-	std::queue<std::string> q;
-	std::string last = source;
-	q.push(source);
-	while(q.size() > 0)
-	{
-		std::string curr = q.front();
-		q.pop();
-		depth++; // depth of the bfs
-		if (condition(curr,x))
-		{
-			if (stop)
-					return std::make_pair(curr,depth);
-			else
-				continue;
-		}
-		else
-		{
-			f(curr,x); // apply f to current vertex
-			std::string next;
-			auto&& v = graph_.find(curr);
-			auto&& succ = v->get_successors(v->isRC(curr));
-			for (const auto& c : succ)
-			{
-				next = curr.substr(1);
-				next.push_back(c);
-				q.push(next);
-				last = next;
-			}
-		}
-	}
-	return std::make_pair(last,depth);
-}
-
-int deBruijnGraph::getSize()
+int deBruijnGraph::getSize() const
 {
 	return graph_.size();
 }
 
 //all unbalanced vertices which are not also conflicting (both succ and pred > 1)
-std::pair<std::vector<Vertex>,std::vector<Vertex> > deBruijnGraph::getUnbalanced()
+std::pair<std::vector<Vertex>,std::vector<Vertex> > deBruijnGraph::getUnbalanced() const
 {
 	std::vector<Vertex> unbalanced_in;
 	std::vector<Vertex> unbalanced_out;
 	for (const auto& v : graph_)
 	{
-		unsigned int succ = v.get_successors(false).size();
-		unsigned int pred = v.get_predecessors(false).size();
+		unsigned int succ = v.second.get_successors().size();
+		unsigned int pred = v.second.get_predecessors().size();
 		// make sure that unbalanced conflicting nodes are treated separately
 		if (succ > pred and pred == 1)
-			unbalanced_out.push_back(v);
+			unbalanced_out.push_back(v.second);
 		else if (succ < pred and succ == 1)
-			unbalanced_in.push_back(v);
+			unbalanced_in.push_back(v.second);
 	}
 	return std::make_pair(unbalanced_out,unbalanced_in);
 }
 
-std::vector<std::string> deBruijnGraph::getSources()
+std::vector<std::string> deBruijnGraph::getSources() const
 {
 	std::vector<std::string> sources;
 	for (const auto& p : graph_)
-		if (p.isSource(false) /*or p.isSource(true)*/)
-			sources.push_back(p.kmer);
+		if (p.second.isSource())
+			sources.push_back(p.first.get_kmer());
 	return sources;
 }
 
-std::vector<std::string> deBruijnGraph::getSinks()
+std::vector<std::string> deBruijnGraph::getSinks() const
 {
 	std::vector<std::string> sinks;
 	for (const auto& p : graph_)
-		if (p.isSink(false) /*or p.isSink(true)*/)
-			sinks.push_back(p.kmer);
+		if (p.second.isSink())
+			sinks.push_back(p.first.get_kmer());
 	return sinks;
 }
 
-std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences(const std::string& source, const std::string& sink)
+/*std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences(const std::string& source, const std::string& sink)
 {
 	std::vector<std::pair<std::string, unsigned int> > paths;
 	unsigned int flow = 0;
@@ -329,13 +244,8 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences(c
 		flow += max_flow;
 	}
 	return paths;
-}
-
-std::string deBruijnGraph::make_graph()
-{
-	std::string ret;
-	return ret;
-}
+}*/
+//TODO move to UnitigGraph
 
 void deBruijnGraph::debug()
 {
@@ -347,5 +257,14 @@ void deBruijnGraph::debug()
 	std::cerr << sinks.size() << " sinks found" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	t = clock();
+	auto&& unbalanced = getUnbalanced();
+	std::cerr << unbalanced.first.size() << "/" << unbalanced.second.size() << " unbalanced vertices" << std::endl;
+	int i = 0;
+	int j = 0;
+	for (auto&& u : unbalanced.first)
+		i += u.get_successors().size() - u.get_predecessors().size();
+	for (auto&& u : unbalanced.second)
+		j += u.get_successors().size() - u.get_predecessors().size();
+	std::cerr << i << "/" << j << " amount of imbalance" << std::endl;
 	std::cerr << (clock() -t)/1000000. << std::endl;
 }
