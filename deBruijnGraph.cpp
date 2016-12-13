@@ -34,6 +34,12 @@ deBruijnGraph::deBruijnGraph(std::string filename, bool fasta, unsigned int k) :
 	}
 }
 
+Vertex deBruijnGraph::find(const std::string& kmer)
+{
+	Vertex toFind(kmer);
+	return graph_.find(toFind);
+}
+
 //currently only for adding fasta sequences
 void deBruijnGraph::add_sequence(std::string filename)
 {
@@ -82,10 +88,6 @@ void deBruijnGraph::split_fasta(std::string filename)
 			w->add_successor(complement(lchar));
 		else
 			w->add_predecessor(lchar);
-		if (v->get_successors(false).size() > 1 or v->get_predecessors(false).size() > 1)
-			junctions_.emplace(*v);
-		if (w->get_successors(false).size() > 1 or w->get_predecessors(false).size() > 1)
-			junctions_.emplace(*w);
 		prev = line;	
 	}
 }
@@ -114,8 +116,6 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 		v.first->add_predecessor(complement(line[k_])); // if RC(A)->X, then X->A
 	else
 		v.first->add_successor(line[k_]); // add the k+1st letter as neighbour
-	if (v.first->get_predecessors(false).size() > 1 or v.first->get_successors(false).size() > 1)
-		junctions_.emplace(*v.first);
 
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
@@ -134,8 +134,6 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 			v.first->add_successor(line[i]);
 			v.first->add_predecessor(line[i - k_ - 1]);
 		}
-		if (v.first->get_predecessors(false).size() > 1 or v.first->get_successors(false).size() > 1)
-			junctions_.emplace(*v.first);
 	}
 	// this for-loop does not add the final kmer of the read, add manually:
 	kmer = line.substr(line.length() - k_, k_);
@@ -147,8 +145,6 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 		v.first->add_successor(complement(line[line.length() - k_ - 1]));
 	else
 		v.first->add_predecessor(line[line.length() - k_ - 1]);
-	if (v.first->get_predecessors(false).size() > 1 or v.first->get_successors(false).size() > 1)
-		junctions_.emplace(*v.first);
 	
 	return rep_k; //DEBUG
 }
@@ -230,6 +226,24 @@ std::pair<std::string, unsigned int> deBruijnGraph::bfs(const std::string& sourc
 int deBruijnGraph::getSize()
 {
 	return graph_.size();
+}
+
+//all unbalanced vertices which are not also conflicting (both succ and pred > 1)
+std::pair<std::vector<Vertex>,std::vector<Vertex> > deBruijnGraph::getUnbalanced()
+{
+	std::vector<Vertex> unbalanced_in;
+	std::vector<Vertex> unbalanced_out;
+	for (const auto& v : graph_)
+	{
+		unsigned int succ = v.get_successors(false).size();
+		unsigned int pred = v.get_predecessors(false).size();
+		// make sure that unbalanced conflicting nodes are treated separately
+		if (succ > pred and pred == 1)
+			unbalanced_out.push_back(v);
+		else if (succ < pred and succ == 1)
+			unbalanced_in.push_back(v);
+	}
+	return std::make_pair(unbalanced_out,unbalanced_in);
 }
 
 std::vector<std::string> deBruijnGraph::getSources()
@@ -317,28 +331,6 @@ std::vector<std::pair<std::string, unsigned int> > deBruijnGraph::getSequences(c
 	return paths;
 }
 
-std::string deBruijnGraph::find_next_junction(const std::string& source)
-{
-	bfs<unsigned int>(source,0,
-					[&,source](const std::string& source, unsigned int* i)
-					{
-						auto&& v = graph_.find(source);
-						v->visited = true;
-					},
-					[&,source](const std::string& source, unsigned int* i)
-					{
-						auto&& v = graph_.find(source);
-						if (v->get_successors(v->isRC(source)).size() > 1 or v->get_predecessors(v->isRC(source)).size() > 1)
-						{
-							//junction found
-
-						}
-						return v->visited;
-					},
-					true);
-	return "LUL";
-}
-
 std::string deBruijnGraph::make_graph()
 {
 	std::string ret;
@@ -351,18 +343,9 @@ void deBruijnGraph::debug()
 	clock_t t = clock();
 	std::vector<std::string> sources = getSources();
 	std::vector<std::string> sinks = getSinks();
-	unsigned int j1 = 0;
-	unsigned int j2 = 0; // definition junction might be in != out or (in > 1 or out > 1) 
-	for (auto&& v : graph_)
-	{
-		if (v.get_successors(false).size() > 1 or v.get_successors(true).size() > 1)
-			j1++;
-		if (v.get_successors(false).size() != v.get_predecessors(false).size()
-		or v.get_successors(true).size() != v.get_predecessors(true).size())
-			j2++;
-	}
 	std::cerr << sources.size() << " sources found" << std::endl;
 	std::cerr << sinks.size() << " sinks found" << std::endl;
-	std::cerr << j1 << " / " << j2 << " junctions found" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
+	t = clock();
+	std::cerr << (clock() -t)/1000000. << std::endl;
 }

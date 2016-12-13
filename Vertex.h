@@ -1,3 +1,6 @@
+#ifndef VERTEX_H
+#define VERTEX_H
+
 #include <vector>
 #include <iostream>
 #include <algorithm>
@@ -62,3 +65,5 @@ namespace std {
     }
   };
 }
+
+#endif
