@@ -239,5 +239,43 @@ void deBruijnGraph::debug()
 	std::cerr << sinks.size() << " sinks found" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	t = clock();
+	std::queue<std::string> q;
+	q.push(sources[0]);
+	while (q.size() > 0)
+	{
+		std::string cmp = q.front();
+		q.pop();
+		Sequence curr(cmp);
+		auto&& c = graph_[curr];
+		if (!c.is_visited())
+			c.visit();
+		else
+			continue;
+		for (auto&& n : c.get_successors())
+		{
+			std::string next = complement(n) + curr.get_kmer().substr(0,curr.get_kmer().length() - 1);
+			q.push(next);
+			next = curr.get_kmer().substr(1) + n;
+			q.push(next);
+		}
+		for (auto&& n : c.get_predecessors())
+		{
+			std::string next = curr.get_kmer().substr(1) + complement(n);
+			q.push(next);
+			next = n + curr.get_kmer().substr(0,curr.get_kmer().length() - 1);
+			q.push(next);
+		}
+	}
+	int i = 0;
+	for (const auto& p : graph_)
+	{
+		if (!p.second.is_visited())
+		{
+			//std::cerr << p.first.get_kmer() << std::endl;
+			//p.second.print(true); throw;
+			i++;
+		}
+	}
+	std::cerr << i << " unvisited vertices" << std::endl;
 	std::cerr << (clock() -t)/1000000. << std::endl;
 }

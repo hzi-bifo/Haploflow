@@ -61,6 +61,21 @@ void Vertex::add_predecessor(const char& letter)
 	}
 }
 
+void Vertex::visit()
+{
+	visited = true;
+}
+
+void Vertex::unvisit()
+{
+	visited = false;
+}
+
+bool Vertex::is_visited() const
+{
+	return visited;
+}
+
 // if indegree not equal outdegree
 bool Vertex::is_junction() const
 {
@@ -75,16 +90,26 @@ bool Vertex::is_conflicting() const
 
 // TODO beauty
 // returns the forward successors
-const std::vector<unsigned int> Vertex::get_successors() const
+const std::vector<char> Vertex::get_successors() const
 {
-	std::vector<unsigned int> ret({a_out,c_out,g_out,t_out,n_out});
+	std::vector<char> ret;
+	if (a_out) ret.push_back('A');
+	if (c_out) ret.push_back('C');
+	if (g_out) ret.push_back('G');
+	if (t_out) ret.push_back('T');
+	if (n_out) ret.push_back('N');
 	return ret;
 }
 
 // returns the forward predecessors
-const std::vector<unsigned int> Vertex::get_predecessors() const
+const std::vector<char> Vertex::get_predecessors() const
 {
-	std::vector<unsigned int> ret({a_in,c_in,g_in,t_in,n_in});
+	std::vector<char> ret;
+	if (a_in) ret.push_back('A');
+	if (c_in) ret.push_back('C');
+	if (g_in) ret.push_back('G');
+	if (t_in) ret.push_back('T');
+	if (n_in) ret.push_back('N');
 	return ret;
 }
 
