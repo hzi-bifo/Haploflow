@@ -5,6 +5,7 @@
 #include <iostream>
 
 class deBruijnGraph;
+class Sequence; 
 
 class Vertex
 {
@@ -12,20 +13,19 @@ public:
 	Vertex();
 	Vertex(const Vertex& v);
 	
-	void add_successor(const char& letter, deBruijnGraph&);
-	void add_successor(Vertex* next);
-	void add_predecessor(const char& letter, deBruijnGraph&);
-	void add_predecessor(Vertex* prev);
+	void add_successor(const char& letter);
+	void add_predecessor(const char& letter);
 	
-	const std::vector<Vertex*> get_successors() const;
-	const std::vector<Vertex*> get_predecessors() const; 
+	bool is_junction() const;
+	bool is_conflicting() const;
+	const std::vector<unsigned int> get_successors() const;
+	const std::vector<unsigned int> get_predecessors() const; 
 	
 	const bool isSource () const;
 	const bool isSink() const;
 	const void print(bool cerr) const; //debug
 
 private:
-	mutable bool visited;
 	mutable unsigned int a_in;
 	mutable unsigned int a_out;
 	mutable unsigned int c_in;
@@ -36,8 +36,7 @@ private:
 	mutable unsigned int t_out;
 	mutable unsigned int n_in;
 	mutable unsigned int n_out;
-	std::vector<Vertex*> successors;
-	std::vector<Vertex*> predecessors;
+	bool visited;
 };
 
 #endif

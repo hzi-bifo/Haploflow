@@ -77,13 +77,13 @@ void deBruijnGraph::split_fasta(std::string filename)
 		auto&& w = graph_.find(seq_w);
 		// connect the two lines 
 		if (v->first == lastk) //check for reverse complement
-			v->second.add_successor(fchar,*this);
+			v->second.add_successor(fchar);
 		else
-			v->second.add_predecessor(complement(fchar),*this);
+			v->second.add_predecessor(complement(fchar));
 		if (w->first == firstk)
-			w->second.add_predecessor(lchar,*this);
+			w->second.add_predecessor(lchar);
 		else
-			w->second.add_successor(complement(lchar),*this);
+			w->second.add_successor(complement(lchar));
 		prev = line;	
 	}
 }
@@ -106,9 +106,9 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 	Sequence toAdd(kmer);
 	auto&& v = graph_.emplace(toAdd,Vertex());
 	if (!v.second and v.first->first != kmer) // vertex has been added and was a reverse complement
-		v.first->second.add_predecessor(complement(line[k_]),*this); // if RC(A)->X, then X->A
+		v.first->second.add_predecessor(complement(line[k_])); // if RC(A)->X, then X->A
 	else
-		v.first->second.add_successor(line[k_],*this); // add the k+1st letter as neighbour
+		v.first->second.add_successor(line[k_]); // add the k+1st letter as neighbour
 
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
@@ -117,13 +117,13 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 		v = graph_.emplace(toAdd,Vertex()); // if not in list, add kmer
 		if (!v.second and v.first->first != kmer)
 		{
-			v.first->second.add_predecessor(complement(line[i]),*this);
-			v.first->second.add_successor(complement(line[i - k_ - 1]),*this);
+			v.first->second.add_predecessor(complement(line[i]));
+			v.first->second.add_successor(complement(line[i - k_ - 1]));
 		}
 		else
 		{
-			v.first->second.add_successor(line[i],*this);
-			v.first->second.add_predecessor(line[i - k_ - 1],*this);
+			v.first->second.add_successor(line[i]);
+			v.first->second.add_predecessor(line[i - k_ - 1]);
 		}
 	}
 	// this for-loop does not add the final kmer of the read, add manually:
@@ -131,9 +131,9 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 	toAdd = Sequence(kmer);
 	v = graph_.emplace(toAdd,Vertex()); //the last node does not have neighbours, if it already is in the graph, then nothing will change
 	if (!v.second and v.first->first != kmer)
-		v.first->second.add_successor(complement(line[line.length() - k_ - 1]),*this);
+		v.first->second.add_successor(complement(line[line.length() - k_ - 1]));
 	else
-		v.first->second.add_predecessor(line[line.length() - k_ - 1],*this);
+		v.first->second.add_predecessor(line[line.length() - k_ - 1]);
 	
 	return 0;
 }
@@ -141,24 +141,6 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 int deBruijnGraph::getSize() const
 {
 	return graph_.size();
-}
-
-//all unbalanced vertices which are not also conflicting (both succ and pred > 1)
-std::pair<std::vector<Vertex>,std::vector<Vertex> > deBruijnGraph::getUnbalanced() const
-{
-	std::vector<Vertex> unbalanced_in;
-	std::vector<Vertex> unbalanced_out;
-	for (const auto& v : graph_)
-	{
-		unsigned int succ = v.second.get_successors().size();
-		unsigned int pred = v.second.get_predecessors().size();
-		// make sure that unbalanced conflicting nodes are treated separately
-		if (succ > pred and pred == 1)
-			unbalanced_out.push_back(v.second);
-		else if (succ < pred and succ == 1)
-			unbalanced_in.push_back(v.second);
-	}
-	return std::make_pair(unbalanced_out,unbalanced_in);
 }
 
 std::vector<std::string> deBruijnGraph::getSources() const
@@ -257,14 +239,5 @@ void deBruijnGraph::debug()
 	std::cerr << sinks.size() << " sinks found" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 	t = clock();
-	auto&& unbalanced = getUnbalanced();
-	std::cerr << unbalanced.first.size() << "/" << unbalanced.second.size() << " unbalanced vertices" << std::endl;
-	int i = 0;
-	int j = 0;
-	for (auto&& u : unbalanced.first)
-		i += u.get_successors().size() - u.get_predecessors().size();
-	for (auto&& u : unbalanced.second)
-		j += u.get_successors().size() - u.get_predecessors().size();
-	std::cerr << i << "/" << j << " amount of imbalance" << std::endl;
 	std::cerr << (clock() -t)/1000000. << std::endl;
 }
