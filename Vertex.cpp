@@ -12,7 +12,8 @@ Vertex::Vertex() :
 										t_out(0),
 										n_in(0),
 										n_out(0),
-										visited(false)
+										visited(false),
+										index(0)
 {
 }
 
@@ -27,7 +28,8 @@ Vertex::Vertex(const Vertex& v) :
 	t_out(v.t_out),
 	n_in(v.n_in),
 	n_out(v.n_out),
-	visited(v.visited)
+	visited(v.visited),
+	index(v.index)
 {
 }
 
@@ -71,6 +73,16 @@ void Vertex::unvisit()
 	visited = false;
 }
 
+void Vertex::set_index(unsigned int i)
+{
+	index = i;
+}
+
+unsigned int Vertex::get_index() const
+{
+	return index;
+}
+
 bool Vertex::is_visited() const
 {
 	return visited;
@@ -90,7 +102,7 @@ bool Vertex::is_conflicting() const
 
 // TODO beauty
 // returns the forward successors
-const std::vector<char> Vertex::get_successors() const
+std::vector<char> Vertex::get_successors() const
 {
 	std::vector<char> ret;
 	if (a_out) ret.push_back('A');
@@ -102,7 +114,7 @@ const std::vector<char> Vertex::get_successors() const
 }
 
 // returns the forward predecessors
-const std::vector<char> Vertex::get_predecessors() const
+std::vector<char> Vertex::get_predecessors() const
 {
 	std::vector<char> ret;
 	if (a_in) ret.push_back('A');
