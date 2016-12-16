@@ -28,7 +28,8 @@ public:
 
 	std::vector<std::string> getSources() const; // returns all sources
 	std::vector<std::string> getSinks() const; // returns all sinks in graph
-	std::pair<std::vector<Vertex>,std::vector<Vertex> > getUnbalanced() const; // returns all unbalanced vertices
+	std::pair<std::vector<Sequence>, std::vector<Sequence> > getJunctions() const;
+	Vertex* getVertex(const std::string&); // return the vertex corresponding to kmer, 0 if not found
 
 	void printGraph() const; //debug	
 	int getSize() const; // returns number of vertices in graph
@@ -36,7 +37,8 @@ public:
 	
 private:
 	inline static char complement(const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};}
-	unsigned int split_read(const std::string&); // given the read, inserts its kmers in the graph
+	unsigned int split_read(const std::string&, bool); // given the read, inserts its kmers in the graph
+	// bool asks whether handling a FASTA or FASTQ (changed reverse complement handling)
 	void split_fasta(std::string filename); // split fasta into kmers
 
 	std::unordered_map<Sequence,Vertex> graph_;
