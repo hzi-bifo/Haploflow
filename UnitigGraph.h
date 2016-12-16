@@ -11,7 +11,8 @@
 #include <unordered_set>
 
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
-						boost::property<boost::vertex_name_t, std::string>,
+						boost::property<boost::vertex_index1_t, unsigned int,
+						boost::property<boost::vertex_name_t, std::string> >,
 							boost::property<boost::edge_name_t, std::string,
 							boost::property<boost::edge_capacity_t, unsigned int,
 							boost::property<boost::edge_residual_capacity_t, unsigned int> > > > UGraph;
@@ -23,9 +24,14 @@ typedef typename boost::graph_traits<UGraph>::edge_descriptor UEdge;
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(const deBruijnGraph&);
+	UnitigGraph(deBruijnGraph&);
 private:
+	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, bool);
+	UEdge buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, deBruijnGraph&);
+	UVertex addVertex(unsigned int*, std::string name);
+	
 	UGraph g_;
+	std::unordered_map<unsigned int, UVertex> graph_;
 };
 
 #endif
