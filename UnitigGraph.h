@@ -1,6 +1,9 @@
 #ifndef UNIG_H
 #define UNIG_H
 
+#include <boost/graph/graphviz.hpp>
+#include <boost/graph/copy.hpp>
+#include <boost/graph/connected_components.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/subgraph.hpp>
@@ -19,6 +22,7 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
 
 typedef typename boost::graph_traits<UGraph>::vertex_descriptor UVertex;
 typedef typename boost::graph_traits<UGraph>::edge_descriptor UEdge;
+typedef boost::graph_traits<UGraph>::vertex_iterator uvertex_iter;
 
 // wrapper around the unitig graph defined above
 class UnitigGraph {

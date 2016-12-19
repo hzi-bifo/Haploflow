@@ -23,7 +23,7 @@ deBruijnGraph::deBruijnGraph(std::string filename, bool fasta, unsigned int k) :
 			else if (next_read)
 			{
 				next_read = false;
-				split_read(line, false);
+				split_read(line);
 				i++;
 			}
 		}
@@ -52,7 +52,7 @@ void deBruijnGraph::split_fasta(std::string filename)
 	std::string prev;
 	std::getline(infile, prev);
 	if (prev.length() > k_)
-		rep_k += split_read(prev, true);
+		rep_k += split_read(prev);
 	else
 		std::cerr << "Make sure that linesize it at least k" << std::endl;
 	while (std::getline(infile, line))
@@ -66,7 +66,7 @@ void deBruijnGraph::split_fasta(std::string filename)
 			to_sep = prev + line;
 		else //TODO newlines causes kmer to be added twice, might cause problems
 			continue;
-		rep_k += split_read(to_sep, true);
+		rep_k += split_read(to_sep);
 		auto&& fchar = line.front();
 		std::string lastk = prev.substr(prev.length() - k_, k_);
 		std::string firstk = lastk.substr(1) + fchar;
@@ -77,13 +77,21 @@ void deBruijnGraph::split_fasta(std::string filename)
 		auto&& w = graph_.find(seq_w);
 		// connect the two lines 
 		if (v->first == lastk) //check for reverse complement
+		{
 			v->second.add_successor(fchar);
+		}
 		else
+		{
 			v->second.add_predecessor(complement(fchar));
+		}
 		if (w->first == firstk)
+		{
 			w->second.add_predecessor(lchar);
+		}
 		else
+		{
 			w->second.add_successor(complement(lchar));
+		}
 		prev = line;	
 	}
 }
@@ -99,13 +107,13 @@ void deBruijnGraph::printGraph() const
 	}
 }
 
-unsigned int deBruijnGraph::split_read(const std::string& line, bool fasta)
+unsigned int deBruijnGraph::split_read(const std::string& line)
 {
 	// the first kmer does not have predecessors, init manually
 	std::string kmer = line.substr(0,k_);
 	Sequence toAdd(kmer);
 	auto&& v = graph_.emplace(toAdd,Vertex());
-	if (!v.second and v.first->first != kmer and !fasta) // vertex has been added and was a reverse complement
+	if (!v.second and v.first->first != kmer) // vertex has been added and was a reverse complement
 		v.first->second.add_predecessor(complement(line[k_])); // if RC(A)->X, then X->A
 	else
 		v.first->second.add_successor(line[k_]); // add the k+1st letter as neighbour
@@ -115,7 +123,7 @@ unsigned int deBruijnGraph::split_read(const std::string& line, bool fasta)
 		kmer = line.substr(i - k_,k_); // extract kmer
 		toAdd = Sequence(kmer);
 		v = graph_.emplace(toAdd,Vertex()); // if not in list, add kmer
-		if (!v.second and v.first->first != kmer and !fasta)
+		if (!v.second and v.first->first != kmer)
 		{
 			v.first->second.add_predecessor(complement(line[i]));
 			v.first->second.add_successor(complement(line[i - k_ - 1]));
@@ -125,12 +133,21 @@ unsigned int deBruijnGraph::split_read(const std::string& line, bool fasta)
 			v.first->second.add_successor(line[i]);
 			v.first->second.add_predecessor(line[i - k_ - 1]);
 		}
+		Sequence cmp("AACGGCGGCAGAGTCATAAAGCACCTCATTACCCTTGCCAC");
+		if (toAdd == cmp)
+		{
+			std::cerr << v.first->first.get_kmer() << std::endl;
+			std::cerr << cmp.rc() << std::endl;
+			std::cerr << (v.first->first == kmer ? "Forward" : "Backward") << std::endl;
+			std::cerr << line[i] << " -> " << line[i - k_ - 1] << std::endl;
+			v.first->second.print(true);
+		}
 	}
 	// this for-loop does not add the final kmer of the read, add manually:
 	kmer = line.substr(line.length() - k_, k_);
 	toAdd = Sequence(kmer);
 	v = graph_.emplace(toAdd,Vertex()); //the last node does not have neighbours, if it already is in the graph, then nothing will change
-	if (!v.second and v.first->first != kmer and !fasta)
+	if (!v.second and v.first->first != kmer)
 		v.first->second.add_successor(complement(line[line.length() - k_ - 1]));
 	else
 		v.first->second.add_predecessor(line[line.length() - k_ - 1]);
@@ -177,6 +194,19 @@ std::pair<std::vector<Sequence>, std::vector<Sequence> > deBruijnGraph::getJunct
 	}
 	return std::make_pair(out_unbalanced,in_unbalanced);
 
+}
+
+// returns Sequence in graph, throws exception if not in graph
+const Sequence& deBruijnGraph::getSequence(const std::string& kmer)
+{
+	Sequence seq(kmer);
+	auto&& ret = graph_.find(seq);
+	if (ret != graph_.end())
+		return ret->first;
+	else
+	{
+		throw;
+	}
 }
 
 Vertex* deBruijnGraph::getVertex(const std::string& kmer)
