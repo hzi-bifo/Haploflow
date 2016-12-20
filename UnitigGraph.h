@@ -30,8 +30,8 @@ public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
 	UnitigGraph(deBruijnGraph&);
 private:
-	unsigned int connectUnbalanced(Vertex*, unsigned int, std::string, deBruijnGraph&, bool);
-	bool buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int, deBruijnGraph&, bool);
+	unsigned int connectUnbalanced(Vertex*, unsigned int, std::string, deBruijnGraph&);
+	bool buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int, deBruijnGraph&);
 	UVertex addVertex(unsigned int, std::string name);
 	
 	UGraph g_;

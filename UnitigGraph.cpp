@@ -10,13 +10,13 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	{
 		std::string curr = v.get_kmer();
 		Vertex* source = dbg.getVertex(curr);
-		index = connectUnbalanced(source, index, curr, dbg, true);
+		index = connectUnbalanced(source, index, curr, dbg);
 	}
 	for (auto& w: in_unbalanced)
 	{
 		std::string curr = w.get_kmer();
 		Vertex* sink = dbg.getVertex(curr);
-		connectUnbalanced(sink, index, curr, dbg, false);
+		connectUnbalanced(sink, index, curr, dbg);
 	}
 	// DEBUG
 	auto&& numV = boost::num_vertices(g_);
@@ -45,61 +45,103 @@ UVertex UnitigGraph::addVertex(unsigned int index, std::string name)
 	return uv;
 }
 
-unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, std::string curr, deBruijnGraph& dbg, bool forward)
+unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, std::string curr, deBruijnGraph& dbg)
 {
-	std::vector<char> neigh;
-	if (forward)
-		neigh = source->get_successors();
-	else
-		neigh = source->get_predecessors();
+	std::vector<char> succ = source->get_successors();
+	bool rc = false;
 	if (!source->is_visited())
 	{
 		source->visit();
 		UVertex uv = addVertex(++index, curr);
 		source->set_index(index);
 		//dfs for all neighbours
-		for (const auto& n : neigh)
+		for (const auto& n : succ)
 		{
 			std::string sequence("");
-			std::string next;
-			if (forward)
-				next = curr.substr(1) + n;
-			else
-				next = n + curr.substr(0,curr.length() - 1);
-			sequence += n;
+			std::string next = curr.substr(1) + n;
 			auto&& nextV = dbg.getVertex(next);
+			if (!nextV)
+			{
+				rc = true;
+				break;
+			}
+			else
+				rc = false;
+			sequence += n;
 			// what if nextV = 0
-			if (!buildEdge(uv, nextV, next, sequence, index, dbg, forward))
+			if (!buildEdge(uv, nextV, next, sequence, index, dbg))
 				index++;
+		}
+		if (rc)
+		{
+			std::vector<char> pred = source->get_predecessors();
+			for (const auto& n : pred)
+			{
+				std::string sequence("");
+				std::string next = curr.substr(1) + deBruijnGraph::complement(n);
+				auto&& nextV = dbg.getVertex(next);
+				if (!nextV)
+				{
+					std::cerr << 1 << std::endl;
+					std::cerr << next << std::endl;
+					throw;
+				}
+				sequence += deBruijnGraph::complement(n);
+				if (!buildEdge(uv, nextV, next, sequence, index, dbg))
+					index++;
+			}
 		}
 	}
 	else
 	{
 		unsigned int idx = source->get_index();
 		UVertex uv = graph_[idx];
-		for (const auto& n : neigh)
+		for (const auto& n : succ)
 		{
-			std::string next;
-			if (forward)
-				next = curr.substr(1) + n;
-			else
-				next = n + curr.substr(0,curr.length() - 1);
+			std::string next = curr.substr(1) + n;
 			auto&& nextV = dbg.getVertex(next);
+			if (!nextV)
+			{
+				rc = true;
+				break;
+			}
+			else
+				rc = false;
 			if (nextV->is_visited())
 				continue;
 			else
 			{
 				std::string sequence("");
 				sequence += n;
-				if (!buildEdge(uv, nextV, next, sequence, index, dbg, forward))
+				if (!buildEdge(uv, nextV, next, sequence, index, dbg))
 					index++;
+			}
+		}
+		if (rc)
+		{
+			std::vector<char> pred = source->get_predecessors();
+			for (const auto& n : pred)
+			{
+				std::string sequence("");
+				std::string next = curr.substr(1) + deBruijnGraph::complement(n);
+				auto&& nextV = dbg.getVertex(next);
+				if (!nextV)
+				{
+					std::cerr << 2 << std::endl;
+					std::cerr << next << std::endl;
+					throw;
+				}
+				sequence += deBruijnGraph::complement(n);
+				if (!buildEdge(uv, nextV, next, sequence, index, dbg))
+					index++;
+				
 			}
 		}
 	}
 	return index;
 }
 
-bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int index, deBruijnGraph& dbg, bool forward)
+bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int index, deBruijnGraph& dbg)
 {
 	bool visited = true;
 	auto&& succ = nextV->get_successors();
@@ -128,11 +170,7 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		nextV->set_index(index);
 		visited = false;
 	}
-	UEdge e;
-	if (forward)
-		e = (boost::add_edge(src, graph_[nextV->get_index()],g_)).first;
-	else
-		e = (boost::add_edge(graph_[nextV->get_index()],src,g_)).first;
+	UEdge e = (boost::add_edge(src, graph_[nextV->get_index()],g_)).first;
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
 	boost::put(name,e,sequence);
 	return visited;
