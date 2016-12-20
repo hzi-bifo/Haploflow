@@ -133,15 +133,6 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 			v.first->second.add_successor(line[i]);
 			v.first->second.add_predecessor(line[i - k_ - 1]);
 		}
-		Sequence cmp("AACGGCGGCAGAGTCATAAAGCACCTCATTACCCTTGCCAC");
-		if (toAdd == cmp)
-		{
-			std::cerr << v.first->first.get_kmer() << std::endl;
-			std::cerr << cmp.rc() << std::endl;
-			std::cerr << (v.first->first == kmer ? "Forward" : "Backward") << std::endl;
-			std::cerr << line[i] << " -> " << line[i - k_ - 1] << std::endl;
-			v.first->second.print(true);
-		}
 	}
 	// this for-loop does not add the final kmer of the read, add manually:
 	kmer = line.substr(line.length() - k_, k_);
@@ -302,7 +293,7 @@ void deBruijnGraph::debug()
 	clock_t t = clock();
 	std::vector<std::string> sources = getSources();
 	std::vector<std::string> sinks = getSinks();
-	std::cerr << sources.size() << " sources found" << std::endl;
-	std::cerr << sinks.size() << " sinks found" << std::endl;
+	std::cerr << sources[0] << " (source)" << std::endl;
+	std::cerr << sinks[0] << " (sink)" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
