@@ -12,6 +12,8 @@ Vertex::Vertex() :
 										t_out(0),
 										n_in(0),
 										n_out(0),
+										degree(0),
+										used_edges(0),
 										visited(false),
 										index(0)
 {
@@ -28,6 +30,8 @@ Vertex::Vertex(const Vertex& v) :
 	t_out(v.t_out),
 	n_in(v.n_in),
 	n_out(v.n_out),
+	degree(v.degree),
+	used_edges(v.used_edges), //?
 	visited(v.visited),
 	index(v.index)
 {
@@ -45,6 +49,7 @@ void Vertex::add_successor(const char& letter)
 		case 'T': is_set = t_out; t_out++; break;
 		default: is_set = n_out; n_out++; break;
 	}
+	if (is_set) degree++;
 	// junction if it has been visited (has successors) but this particular successor has not been set
 	// this means it has at least 2 different successors
 }
@@ -61,10 +66,12 @@ void Vertex::add_predecessor(const char& letter)
 		case 'T': is_set = t_in; t_in++; break;
 		default: is_set = n_in; n_in++; break;
 	}
+	if (!is_set) degree++;
 }
 
 void Vertex::visit()
 {
+	used_edges++; //?
 	visited = true;
 }
 
@@ -83,6 +90,12 @@ unsigned int Vertex::get_index() const
 	return index;
 }
 
+// a vertex is accessible if less edges than degree have been used so far
+bool Vertex::accessible() const
+{
+	return (degree > used_edges);
+}
+
 bool Vertex::is_visited() const
 {
 	return visited;
@@ -98,6 +111,11 @@ bool Vertex::is_conflicting() const
 {
 	return ((!!a_in + !!c_in + !!g_in + !!t_in + !!n_in) > 1
 	and (!!a_out + !!c_out + !!g_out + !!t_out + !!n_out) > 1 and !is_junction());
+}
+
+unsigned int Vertex::get_degree() const
+{
+	return degree;
 }
 
 // TODO beauty

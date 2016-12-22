@@ -45,6 +45,28 @@ UVertex UnitigGraph::addVertex(unsigned int index, std::string name)
 	return uv;
 }
 
+unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, std::string curr, deBruijnGraph& dbg)
+{
+	std::vector<char> succ = source->get_successors();
+	std::vector<char> pred = source->get_predecessors();
+	UVertex uv;
+	if (!source->is_visited())
+	{
+		uv = addVertex(++index, curr);
+		source->set_index(index);
+		//dfs for all neighbours
+	}
+	else
+	{
+		unsigned int idx = source->get_index();
+		uv = graph_[idx];
+	}
+	source->visit();
+	addNeighbours(curr, succ, pred, dbg, index, uv);
+
+	return index;
+}
+
 unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int index, UVertex& uv)
 {
 	bool rc = false;
@@ -58,8 +80,6 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 			rc = true;
 			break;
 		}
-		else if (nextV->is_visited()) 
-			continue; //break; should not make a difference, but does so. TODO
 		else
 			rc = false;
 		sequence += n;
@@ -82,30 +102,10 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 	return index;
 }
 
-unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, std::string curr, deBruijnGraph& dbg)
-{
-	std::vector<char> succ = source->get_successors();
-	std::vector<char> pred = source->get_predecessors();
-	if (!source->is_visited())
-	{
-		source->visit();
-		UVertex uv = addVertex(++index, curr);
-		source->set_index(index);
-		//dfs for all neighbours
-		addNeighbours(curr, succ, pred, dbg, index, uv);
-	}
-	else
-	{
-		unsigned int idx = source->get_index();
-		UVertex uv = graph_[idx];
-		addNeighbours(curr, succ, pred, dbg, index, uv);
-	}
-	return index;
-}
-
 bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int index, deBruijnGraph& dbg)
 {
 	bool visited = true;
+	// with a little effort this can be moved inside the while loop for efficiency reasons
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)

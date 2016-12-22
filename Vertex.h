@@ -18,6 +18,7 @@ public:
 	void visit();
 	void unvisit();
 	void set_index(unsigned int);
+	bool accessible() const;
 	unsigned int get_index() const;
 
 	bool is_junction() const;
@@ -25,7 +26,8 @@ public:
 	bool is_visited() const;
 	std::vector<char> get_successors() const;
 	std::vector<char> get_predecessors() const; 
-	
+	unsigned int get_degree() const;
+
 	const bool isSource () const;
 	const bool isSink() const;
 	const void print(bool cerr) const; //debug
@@ -41,6 +43,8 @@ private:
 	unsigned int t_out;
 	unsigned int n_in;
 	unsigned int n_out;
+	unsigned int degree; // in_degree + out_degree
+	unsigned int used_edges; // whether the degree has been used off
 	bool visited;
 	unsigned int index; // to possibly identify this vertex in the unitig graph
 };
