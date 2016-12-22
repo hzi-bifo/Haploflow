@@ -31,6 +31,7 @@ public:
 	UnitigGraph(deBruijnGraph&);
 private:
 	unsigned int connectUnbalanced(Vertex*, unsigned int, std::string, deBruijnGraph&);
+	unsigned int addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int, UVertex&);
 	bool buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int, deBruijnGraph&);
 	UVertex addVertex(unsigned int, std::string name);
 	

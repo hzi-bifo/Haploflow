@@ -293,7 +293,9 @@ void deBruijnGraph::debug()
 	clock_t t = clock();
 	std::vector<std::string> sources = getSources();
 	std::vector<std::string> sinks = getSinks();
-	std::cerr << sources[0] << " (source)" << std::endl;
-	std::cerr << sinks[0] << " (sink)" << std::endl;
+	for (const auto& s : sources)
+		std::cerr << s << " (source)" << std::endl;
+	for (const auto& t : sinks)
+		std::cerr << t << " (sink)" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }

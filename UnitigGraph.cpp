@@ -45,98 +45,60 @@ UVertex UnitigGraph::addVertex(unsigned int index, std::string name)
 	return uv;
 }
 
+unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int index, UVertex& uv)
+{
+	bool rc = false;
+	for (const auto& n : succ)
+	{
+		std::string sequence("");
+		std::string next = curr.substr(1) + n;
+		auto&& nextV = dbg.getVertex(next);
+		if (!nextV)
+		{
+			rc = true;
+			break;
+		}
+		else if (nextV->is_visited()) 
+			continue; //break; should not make a difference, but does so. TODO
+		else
+			rc = false;
+		sequence += n;
+		// what if nextV = 0
+		if (!buildEdge(uv, nextV, next, sequence, index, dbg))
+			index++;
+	}
+	if (rc)
+	{
+		for (const auto& n : pred)
+		{
+			std::string sequence("");
+			std::string next = curr.substr(1) + deBruijnGraph::complement(n);
+			auto&& nextV = dbg.getVertex(next);
+			sequence += deBruijnGraph::complement(n);
+			if (!buildEdge(uv, nextV, next, sequence, index, dbg))
+				index++;
+		}
+	}
+	return index;
+}
+
 unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, std::string curr, deBruijnGraph& dbg)
 {
 	std::vector<char> succ = source->get_successors();
-	bool rc = false;
+	std::vector<char> pred = source->get_predecessors();
 	if (!source->is_visited())
 	{
 		source->visit();
 		UVertex uv = addVertex(++index, curr);
 		source->set_index(index);
 		//dfs for all neighbours
-		for (const auto& n : succ)
-		{
-			std::string sequence("");
-			std::string next = curr.substr(1) + n;
-			auto&& nextV = dbg.getVertex(next);
-			if (!nextV)
-			{
-				rc = true;
-				break;
-			}
-			else
-				rc = false;
-			sequence += n;
-			// what if nextV = 0
-			if (!buildEdge(uv, nextV, next, sequence, index, dbg))
-				index++;
-		}
-		if (rc)
-		{
-			std::vector<char> pred = source->get_predecessors();
-			for (const auto& n : pred)
-			{
-				std::string sequence("");
-				std::string next = curr.substr(1) + deBruijnGraph::complement(n);
-				auto&& nextV = dbg.getVertex(next);
-				if (!nextV)
-				{
-					std::cerr << 1 << std::endl;
-					std::cerr << next << std::endl;
-					throw;
-				}
-				sequence += deBruijnGraph::complement(n);
-				if (!buildEdge(uv, nextV, next, sequence, index, dbg))
-					index++;
-			}
-		}
+		addNeighbours(curr, succ, pred, dbg, index, uv);
 	}
 	else
 	{
 		unsigned int idx = source->get_index();
 		UVertex uv = graph_[idx];
-		for (const auto& n : succ)
-		{
-			std::string next = curr.substr(1) + n;
-			auto&& nextV = dbg.getVertex(next);
-			if (!nextV)
-			{
-				rc = true;
-				break;
-			}
-			else
-				rc = false;
-			if (nextV->is_visited())
-				continue;
-			else
-			{
-				std::string sequence("");
-				sequence += n;
-				if (!buildEdge(uv, nextV, next, sequence, index, dbg))
-					index++;
-			}
-		}
-		if (rc)
-		{
-			std::vector<char> pred = source->get_predecessors();
-			for (const auto& n : pred)
-			{
-				std::string sequence("");
-				std::string next = curr.substr(1) + deBruijnGraph::complement(n);
-				auto&& nextV = dbg.getVertex(next);
-				if (!nextV)
-				{
-					std::cerr << 2 << std::endl;
-					std::cerr << next << std::endl;
-					throw;
-				}
-				sequence += deBruijnGraph::complement(n);
-				if (!buildEdge(uv, nextV, next, sequence, index, dbg))
-					index++;
-				
-			}
-		}
+		addNeighbours(curr, succ, pred, dbg, index, uv);
 	}
 	return index;
 }
