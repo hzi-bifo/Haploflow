@@ -16,7 +16,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	{
 		std::string curr = w.get_kmer();
 		Vertex* sink = dbg.getVertex(curr);
-		connectUnbalanced(sink, index, curr, dbg);
+		index = connectUnbalanced(sink, index, curr, dbg);
 	}
 	// DEBUG
 	auto&& numV = boost::num_vertices(g_);
@@ -27,9 +27,19 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	IndexMap mapIndex;
 	boost::associative_property_map<IndexMap> propmapIndex(mapIndex);
 	uvertex_iter vi, vi_end;
-	int i = 0;
+	int i = 1;
+	const auto& name = boost::get(boost::vertex_name_t(),g_);
+	std::cout << std::endl;
 	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
-	    boost::put(propmapIndex,*vi,i++);
+	{
+		/*if (boost::in_degree(*vi,g_) == 0 or boost::out_degree(*vi,g_) == 0)
+		{
+			std::cerr << "Vertex " << i << std::endl;
+			std::cerr << boost::get(name,*vi) << std::endl;
+			std::cerr << "In: " << boost::in_degree(*vi,g_) << " Out: " << boost::out_degree(*vi,g_) << std::endl;
+		}*/
+		boost::put(propmapIndex,*vi,i++);
+	}
 	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
@@ -62,7 +72,7 @@ unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, 
 		uv = graph_[idx];
 	}
 	source->visit();
-	addNeighbours(curr, succ, pred, dbg, index, uv);
+	index = addNeighbours(curr, succ, pred, dbg, index, uv);
 
 	return index;
 }
@@ -82,8 +92,8 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 		}
 		else
 			rc = false;
+		// this vertex has been found from a complement
 		sequence += n;
-		// what if nextV = 0
 		if (!buildEdge(uv, nextV, next, sequence, index, dbg))
 			index++;
 	}
@@ -94,6 +104,7 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 			std::string sequence("");
 			std::string next = curr.substr(1) + deBruijnGraph::complement(n);
 			auto&& nextV = dbg.getVertex(next);
+			//this vertex has been found from a complement
 			sequence += deBruijnGraph::complement(n);
 			if (!buildEdge(uv, nextV, next, sequence, index, dbg))
 				index++;
@@ -124,7 +135,13 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
 		sequence += c; 
-	} //after this we found a junction (visited vertex can only be visited twice if junction)
+	}
+	/* 
+	if nextV is visited then nextV may either be a junction, in which case it should have been
+	added as a vertex to the graph and will receive an edge. Or the path we are starting to build has already
+	been found having the target of the path to be found as source. This means we can break now.
+	If nextV still isn't visited we found a junction which has not been considered before
+	*/
 	if (!nextV->is_visited())
 	{
 		nextV->visit();
@@ -132,6 +149,8 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		nextV->set_index(index);
 		visited = false;
 	}
+	else if (succ.size() == 1 and pred.size() == 1)
+		return true; // path has been found, do not add anything
 	UEdge e = (boost::add_edge(src, graph_[nextV->get_index()],g_)).first;
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
 	boost::put(name,e,sequence);
