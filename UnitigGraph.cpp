@@ -114,7 +114,6 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 			std::string sequence("");
 			std::string prev = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
 			auto&& nextV = dbg.getVertex(prev);
-			
 			sequence += n; // sequence will be reversed in buildEdgeReverse 
 			if (!buildEdgeReverse(uv, nextV, prev, sequence, index, dbg))
 				index++;
@@ -166,10 +165,15 @@ bool UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 	}
 	else if (succ.size() == 1 and pred.size() == 1)
 		return true;
-	UEdge e = (boost::add_edge(graph_[nextV->get_index()],trg,g_)).first;
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
-	std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
-	boost::put(name,e,sequence);
+	auto src = graph_[nextV->get_index()];
+	auto e = boost::edge(src,trg,g_);
+	if (!(sequence.length() == 1 and e.second and boost::get(name,e.first).length() == 1))
+	{
+		e = boost::add_edge(src,trg,g_);
+		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
+		boost::put(name,e.first,sequence);
+	}
 	return visited;
 }
 
@@ -211,8 +215,13 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 	}
 	else if (succ.size() == 1 and pred.size() == 1)
 		return true; // path has been found, do not add anything
-	UEdge e = (boost::add_edge(src, graph_[nextV->get_index()],g_)).first;
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
-	boost::put(name,e,sequence);
+	auto trg = graph_[nextV->get_index()];
+	auto e = boost::edge(src,trg,g_);
+	if (!(sequence.length() == 1 and e.second and boost::get(name,e.first).length() == 1))
+	{
+		e = boost::add_edge(src,trg,g_);
+		boost::put(name,e.first,sequence);
+	}
 	return visited;
 }
