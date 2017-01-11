@@ -109,8 +109,68 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 			if (!buildEdge(uv, nextV, next, sequence, index, dbg))
 				index++;
 		}
+		for (const auto& n : succ)
+		{
+			std::string sequence("");
+			std::string prev = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
+			auto&& nextV = dbg.getVertex(prev);
+			
+			sequence += n; // sequence will be reversed in buildEdgeReverse 
+			if (!buildEdgeReverse(uv, nextV, prev, sequence, index, dbg))
+				index++;
+		}
+	}
+	else
+	{
+		for (const auto& n : pred)
+		{
+			std::string sequence("");
+			std::string prev = n + curr.substr(0,curr.length() - 1);
+			auto&& nextV = dbg.getVertex(prev);
+			sequence += deBruijnGraph::complement(n);
+			if (!buildEdgeReverse(uv, nextV, prev, sequence, index, dbg))
+				index++;
+		}
 	}
 	return index;
+}
+
+bool UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int index, deBruijnGraph& dbg)
+{
+	bool visited = true;
+	auto&& succ = nextV->get_successors();
+	auto&& pred = nextV->get_predecessors();
+	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
+	{
+		nextV->visit();
+		char c = pred[0];
+		Sequence tmp = dbg.getSequence(prev);
+		if (tmp == prev)
+			prev = c + prev.substr(0,prev.length() - 1);
+		else
+		{
+			c = succ[0];
+			prev = deBruijnGraph::complement(c) + prev.substr(0,prev.length() - 1);
+		}
+		nextV = dbg.getVertex(prev);
+		pred = nextV->get_predecessors();
+		succ = nextV->get_successors();
+		sequence += deBruijnGraph::complement(c);
+	}
+	if (!nextV->is_visited())
+	{
+		nextV->visit();
+		addVertex(++index, prev);
+		nextV->set_index(index);
+		visited = false;
+	}
+	else if (succ.size() == 1 and pred.size() == 1)
+		return true;
+	UEdge e = (boost::add_edge(graph_[nextV->get_index()],trg,g_)).first;
+	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
+	std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
+	boost::put(name,e,sequence);
+	return visited;
 }
 
 bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int index, deBruijnGraph& dbg)
