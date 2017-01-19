@@ -143,6 +143,24 @@ std::vector<char> Vertex::get_predecessors() const
 	return ret;
 }
 
+unsigned int Vertex::get_out_coverage(const char c) const
+{
+	if (c == 'A') return a_out;
+	else if (c == 'C') return c_out;
+	else if (c == 'G') return g_out;
+	else if (c == 'T') return t_out;
+	else return n_out;
+}
+
+unsigned int Vertex::get_in_coverage(const char c) const
+{
+	if (c == 'A') return a_in;
+	else if (c == 'C') return c_in;
+	else if (c == 'G') return g_in;
+	else if (c == 'T') return t_in;
+	else return n_in;
+}
+
 const bool Vertex::isSource() const
 {
 	bool source = !(a_in + c_in + g_in + t_in + n_in); // all 0 ("real" source)

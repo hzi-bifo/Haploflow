@@ -26,6 +26,8 @@ public:
 	bool is_visited() const;
 	std::vector<char> get_successors() const;
 	std::vector<char> get_predecessors() const; 
+	unsigned int get_out_coverage(const char) const;
+	unsigned int get_in_coverage(const char) const;
 	unsigned int get_degree() const;
 
 	const bool isSource () const;
