@@ -29,18 +29,12 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	uvertex_iter vi, vi_end;
 	int i = 1;
 	const auto& name = boost::get(boost::vertex_name_t(),g_);
-	std::cout << std::endl;
 	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
 	{
-		/*if (boost::in_degree(*vi,g_) == 0 or boost::out_degree(*vi,g_) == 0)
-		{
-			std::cerr << "Vertex " << i << std::endl;
-			std::cerr << boost::get(name,*vi) << std::endl;
-			std::cerr << "In: " << boost::in_degree(*vi,g_) << " Out: " << boost::out_degree(*vi,g_) << std::endl;
-		}*/
 		boost::put(propmapIndex,*vi,i++);
 	}
-	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::default_writer(), boost::default_writer(), propmapIndex);
 }
 
 UVertex UnitigGraph::addVertex(unsigned int index, std::string name)
@@ -79,25 +73,25 @@ unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, 
 
 unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int index, UVertex& uv)
 {
-	bool rc = false;
+	//bool rc = false;
 	for (const auto& n : succ)
 	{
 		std::string sequence("");
 		std::string next = curr.substr(1) + n;
 		auto&& nextV = dbg.getVertex(next);
-		if (!nextV)
+		/*if (!nextV)
 		{
 			rc = true;
 			break;
 		}
 		else
-			rc = false;
-		// this vertex has been found from a complement
+			rc = false;*/
+		// this vertex has been found from a complement [doesnt happen (but why?)]
 		sequence += n;
 		if (!buildEdge(uv, nextV, next, sequence, index, dbg))
 			index++;
 	}
-	if (rc)
+	/*if (rc)
 	{
 		for (const auto& n : pred)
 		{
@@ -120,17 +114,17 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 		}
 	}
 	else
+	{*/
+	for (const auto& n : pred)
 	{
-		for (const auto& n : pred)
-		{
-			std::string sequence("");
-			std::string prev = n + curr.substr(0,curr.length() - 1);
-			auto&& nextV = dbg.getVertex(prev);
-			sequence += deBruijnGraph::complement(n);
-			if (!buildEdgeReverse(uv, nextV, prev, sequence, index, dbg))
-				index++;
-		}
+		std::string sequence("");
+		std::string prev = n + curr.substr(0,curr.length() - 1);
+		auto&& nextV = dbg.getVertex(prev);
+		sequence += deBruijnGraph::complement(n);
+		if (!buildEdgeReverse(uv, nextV, prev, sequence, index, dbg))
+			index++;
 	}
+	//}
 	return index;
 }
 

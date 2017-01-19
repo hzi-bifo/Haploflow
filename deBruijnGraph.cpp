@@ -16,7 +16,7 @@ deBruijnGraph::deBruijnGraph(std::string filename, bool fasta, unsigned int k) :
 		while (std::getline(infile,line))
 		{
 			const auto& start = line.front();
-			if (start == '@') // read name. Next line will be the sequence. If quality starts with @, then the next line will as well
+			if (start == '@' or start == '>') // read name. Next line will be the sequence. If quality starts with @, then the next line will as well
 			{
 				next_read = true;
 			}
@@ -53,7 +53,7 @@ void deBruijnGraph::split_fasta(std::string filename)
 	std::getline(infile, prev);
 	if (prev.length() > k_)
 		rep_k += split_read(prev);
-	else
+	else // remove newlines beforehand
 		std::cerr << "Make sure that linesize it at least k" << std::endl;
 	while (std::getline(infile, line))
 	{
@@ -229,9 +229,9 @@ void deBruijnGraph::debug()
 	clock_t t = clock();
 	std::vector<std::string> sources = getSources();
 	std::vector<std::string> sinks = getSinks();
-	for (const auto& s : sources)
-		std::cerr << s << " (source)" << std::endl;
-	for (const auto& t : sinks)
-		std::cerr << t << " (sink)" << std::endl;
+	//for (const auto& s : sources)
+	//	std::cerr << s << " (source)" << std::endl;
+	//for (const auto& t : sinks)
+	//	std::cerr << t << " (sink)" << std::endl;
 	std::cerr << (clock() - t)/1000000. << std::endl;
 }
