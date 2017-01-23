@@ -87,48 +87,17 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 	// this means the index can be increased by at most one in every step of the for loop
 	// first, find the successing unbalanced vertices
 	auto&& currV = dbg.getVertex(curr);
+	// check for "real" source/sink property here
 	for (const auto& n : succ)
 	{
 		std::string sequence("");
 		std::string next = curr.substr(1) + n;
 		auto&& nextV = dbg.getVertex(next);
-		/*if (!nextV)
-		{
-			rc = true;
-			break;
-		}
-		else
-			rc = false;*/
-		// this vertex has been found from a complement [doesnt happen (but why?)]
 		sequence += n;
 		unsigned int coverage = currV->get_out_coverage(n);
 		if (!buildEdge(uv, nextV, next, sequence, index, coverage, dbg))
 			index++; // make sure to keep the index intact
 	}
-	/*if (rc)
-	{
-		for (const auto& n : pred)
-		{
-			std::string sequence("");
-			std::string next = curr.substr(1) + deBruijnGraph::complement(n);
-			auto&& nextV = dbg.getVertex(next);
-			//this vertex has been found from a complement
-			sequence += deBruijnGraph::complement(n);
-			if (!buildEdge(uv, nextV, next, sequence, index, dbg))
-				index++;
-		}
-		for (const auto& n : succ)
-		{
-			std::string sequence("");
-			std::string prev = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
-			auto&& nextV = dbg.getVertex(prev);
-			sequence += n; // sequence will be reversed in buildEdgeReverse 
-			if (!buildEdgeReverse(uv, nextV, prev, sequence, index, dbg))
-				index++;
-		}
-	}
-	else
-	{*/
 	// finding the predecessing unbalanced vertices
 	for (const auto& n : pred)
 	{
@@ -153,7 +122,7 @@ bool UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 	// DEBUG
 	unsigned int min = 1000000; // TODO
 	unsigned int max = 0;
-	unsigned int avg = coverage;
+	float avg = coverage;
 	unsigned int length = 1;
 	// loop until the next unbalanced node is found, which is either visited (has been added) or will be added
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
@@ -188,16 +157,21 @@ bool UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 		nextV->set_index(index);
 		visited = false;
 	}
-	// this shouldnt happen TODO
+	// this shouldnt happen (it does though) TODO
 	else if (succ.size() == 1 and pred.size() == 1)
+	{
 		return true;
+	}
 	avg /= float(length); // average
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
 	boost::property_map<UGraph, boost::edge_capacity_t>::type cap = boost::get(boost::edge_capacity_t(), g_);
 	auto src = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
+	bool toAdd = true;
+	if ((sequence.length() <= dbg.getK() and avg < 2) or avg < 1.1)
+		toAdd = false;
 	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge TODO
-	if (!(sequence.length() == 1 and e.second and boost::get(name,e.first).length() == 1))
+	if (!(sequence.length() == 1 and e.second and boost::get(name,e.first).length() == 1) and toAdd)
 	{
 		e = boost::add_edge(src,trg,g_);
 		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
@@ -217,7 +191,7 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 	// DEBUG, coverage information
 	unsigned int min = 1000000; // TODO
 	unsigned int max = 0;
-	unsigned int avg = coverage;
+	float avg = coverage;
 	unsigned int length = 1;
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
@@ -256,14 +230,27 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		nextV->set_index(index);
 		visited = false;
 	}
-	else if (succ.size() == 1 and pred.size() == 1)
+	else if (succ.size() == 1 and pred.size() == 1) // check how this happens
+	{
 		return true; // path has been found, do not add anything
+	}
 	avg /= float(length);
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
 	boost::property_map<UGraph, boost::edge_capacity_t>::type cap = boost::get(boost::edge_capacity_t(), g_);
 	auto trg = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
-	if (!(sequence.length() == 1 and e.second and boost::get(name,e.first).length() == 1))
+	// error correction, TODO make threshold variable
+	bool addEdge = true;
+	if ((sequence.length() <= dbg.getK() and avg < 2) or avg < 1.1) // this path is considered illegal
+	{
+		/*boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
+		auto& sseq = boost::get(vn, uv);
+		std::string sstring = sseq.get_kmer();
+		Vertex* v = dbg.getVertex(sstring);
+		Vertex* w = dbg.getVertex(next);*/
+		addEdge = false;
+	}
+	if (!(sequence.length() == 1 and e.second and boost::get(name,e.first).length() == 1) and addEdge)
 	{
 		e = boost::add_edge(src,trg,g_);
 		boost::put(name,e.first,sequence);

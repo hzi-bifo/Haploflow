@@ -17,7 +17,7 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
 						boost::property<boost::vertex_index1_t, unsigned int,
 						boost::property<boost::vertex_name_t, std::string> >,
 							boost::property<boost::edge_name_t, std::string,
-							boost::property<boost::edge_capacity_t, unsigned int,
+							boost::property<boost::edge_capacity_t, float,
 							boost::property<boost::edge_residual_capacity_t, unsigned int> > > > UGraph;
 
 typedef typename boost::graph_traits<UGraph>::vertex_descriptor UVertex;
