@@ -4,95 +4,31 @@ deBruijnGraph::deBruijnGraph(unsigned int k) : k_ (k)
 {
 }
 
-deBruijnGraph::deBruijnGraph(std::string filename, bool fasta, unsigned int k) : k_ (k)
+deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 {
 	unsigned int i = 0;
-	// create dBg from FASTA/Q file. FASTA assumed to have only header + sequence in body
-	if (!fasta)
+	// create dBg from FASTA/Q file. Currently expects one-lined sequences 
+	std::ifstream infile(filename);
+	std::string line;
+	bool next_read = false;
+	while (std::getline(infile,line))
 	{
-		std::ifstream infile(filename);
-		std::string line;
-		bool next_read = false;
-		while (std::getline(infile,line))
+		const auto& start = line.front();
+		if (start == '@' or start == '>') // read name. Next line will be the sequence. If quality starts with @, then the next line will as well
 		{
-			const auto& start = line.front();
-			if (start == '@' or start == '>') // read name. Next line will be the sequence. If quality starts with @, then the next line will as well
+			next_read = true;
+		}
+		else if (next_read)
+		{
+			next_read = false;
+			if (line.length() >= k_)
 			{
-				next_read = true;
-			}
-			else if (next_read)
-			{
-				next_read = false;
 				split_read(line);
 				i++;
 			}
+			//else 
+			//	std::cerr << "Read length less than k, skipping" << std::endl; 
 		}
-	}
-	else
-	{
-		split_fasta(filename);
-	}
-}
-
-//currently only for adding fasta sequences
-void deBruijnGraph::add_sequence(std::string filename)
-{
-	split_fasta(filename);
-}
-
-void deBruijnGraph::split_fasta(std::string filename)
-{
-	unsigned int rep_k = 0;
-	std::ifstream infile(filename);
-	std::string line;
-	// first line is header, ignore(?)
-	std::string header;
-	std::getline(infile, header);
-	// save previous read to include the first k-1 signs in the next line if necessary
-	std::string prev;
-	std::getline(infile, prev);
-	if (prev.length() > k_)
-		rep_k += split_read(prev);
-	else // remove newlines beforehand
-		std::cerr << "Make sure that linesize it at least k" << std::endl;
-	while (std::getline(infile, line))
-	{
-		std::string to_sep;
-		// check how we have to append the previous line to account for line wrapping 
-		auto&& linesize = line.length();
-		if (linesize > k_ and prev.length())
-			to_sep = prev.substr(linesize - k_ + 1) + line;
-		else if (linesize)
-			to_sep = prev + line;
-		else //TODO newlines causes kmer to be added twice, might cause problems
-			continue;
-		rep_k += split_read(to_sep);
-		auto&& fchar = line.front();
-		std::string lastk = prev.substr(prev.length() - k_, k_);
-		std::string firstk = lastk.substr(1) + fchar;
-		auto&& lchar = lastk.front();
-		auto&& seq_v = Sequence(lastk);
-		auto&& seq_w = Sequence(firstk);
-		auto&& v = graph_.find(seq_v);
-		auto&& w = graph_.find(seq_w);
-		// connect the two lines 
-		if (v->first == lastk) //check for reverse complement
-		{
-			v->second.add_successor(fchar);
-		}
-		else
-		{
-			v->second.add_predecessor(complement(fchar));
-		}
-		if (w->first == firstk)
-		{
-			w->second.add_predecessor(lchar);
-		}
-		else
-		{
-			w->second.add_successor(complement(lchar));
-		}
-		prev = line;	
 	}
 }
 
