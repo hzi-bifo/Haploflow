@@ -13,7 +13,6 @@ Vertex::Vertex() :
 										n_in(0),
 										n_out(0),
 										degree(0),
-										used_edges(0),
 										visited(false),
 										index(0)
 {
@@ -31,7 +30,6 @@ Vertex::Vertex(const Vertex& v) :
 	n_in(v.n_in),
 	n_out(v.n_out),
 	degree(v.degree),
-	used_edges(v.used_edges), //?
 	visited(v.visited),
 	index(v.index)
 {
@@ -71,13 +69,17 @@ void Vertex::add_predecessor(const char& letter)
 
 void Vertex::visit()
 {
-	used_edges++; //?
 	visited = true;
 }
 
 void Vertex::unvisit()
 {
 	visited = false;
+}
+
+void Vertex::flag()
+{
+	flagged = true; // what is flagged may never ... be unflagged
 }
 
 void Vertex::set_index(unsigned int i)
@@ -88,12 +90,6 @@ void Vertex::set_index(unsigned int i)
 unsigned int Vertex::get_index() const
 {
 	return index;
-}
-
-// a vertex is accessible if less edges than degree have been used so far
-bool Vertex::accessible() const
-{
-	return (degree > used_edges);
 }
 
 bool Vertex::is_visited() const
