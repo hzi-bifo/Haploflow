@@ -49,7 +49,7 @@ void Vertex::add_successor(const char& letter)
 		case 'T': is_set = t_out; t_out++; break;
 		default: is_set = n_out; n_out++; break;
 	}
-	if (is_set) degree++;
+	if (!is_set) degree++;
 	// junction if it has been visited (has successors) but this particular successor has not been set
 	// this means it has at least 2 different successors
 }
