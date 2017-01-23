@@ -43,6 +43,11 @@ void deBruijnGraph::printGraph() const
 	}
 }
 
+unsigned int deBruijnGraph::getK() const
+{
+	return k_;
+}
+
 unsigned int deBruijnGraph::split_read(const std::string& line)
 {
 	// the first kmer does not have predecessors, init manually

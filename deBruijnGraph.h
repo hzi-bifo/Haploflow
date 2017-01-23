@@ -24,13 +24,14 @@ public:
 	deBruijnGraph(unsigned int k); // creates empty graph
 	deBruijnGraph(std::string filename, unsigned int k); // builds the deBruijn graph from file
 	inline static char complement(const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};}
-	
+
 	std::vector<std::string> getSources() const; // returns all sources
 	std::vector<std::string> getSinks() const; // returns all sinks in graph
 	std::pair<std::vector<Sequence>, std::vector<Sequence> > getJunctions() const;
 	const Sequence& getSequence(const std::string&);
 	Vertex* getVertex(const std::string&); // return the vertex corresponding to kmer, 0 if not found
 
+	unsigned int getK() const; // return the value of k
 	void printGraph() const; //debug	
 	int getSize() const; // returns number of vertices in graph
 	void debug(); // debug
