@@ -13,7 +13,7 @@
 #include "deBruijnGraph.h"
 #include <unordered_set>
 
-typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
+typedef boost::adjacency_list<boost::listS, boost::listS, boost::bidirectionalS,
 						boost::property<boost::vertex_index1_t, unsigned int,
 						boost::property<boost::vertex_name_t, std::string> >,
 							boost::property<boost::edge_name_t, std::string,
@@ -35,7 +35,8 @@ private:
 	bool buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int, unsigned int, deBruijnGraph&);
 	bool buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int, unsigned int, deBruijnGraph&);
 	UVertex addVertex(unsigned int, std::string name);
-	
+	void cleanGraph();
+
 	UGraph g_;
 	std::unordered_map<unsigned int, UVertex> graph_;
 };
