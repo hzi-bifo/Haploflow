@@ -1,5 +1,19 @@
 #include "UnitigGraph.h"
 
+// so we can use range-based for loops on BGL graphs
+namespace std
+{
+	template <typename A> A begin(const pair<A, A>& s)
+	{
+		return s.first;
+	}
+
+	template <typename A> A end(const pair<A, A>& s)
+	{
+		return s.second;
+	}
+}
+
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
@@ -40,39 +54,42 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	boost::associative_property_map<IndexMap> propmapIndex(mapIndex);
 	uvertex_iter vi, vi_end;
 	int i = 1;
-	int j = 0;
-	int k = 0;
-	int l = 0;
-	//const auto& name = boost::get(boost::vertex_name_t(),g_);
-	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
-	float avg = 0;
+	int simpletons = 0;
+	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
+	const auto& name = boost::get(boost::edge_name_t(),g_);
+	const auto& vname = boost::get(boost::vertex_name_t(),g_);
 	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
 	{
 		auto indegree = boost::in_degree(*vi,g_);
 		auto outdegree = boost::out_degree(*vi,g_);
-		if (indegree == 0 and outdegree == 1)
+		if (indegree == 0)
 		{
-			auto outedge = boost::out_edges(*vi,g_).first;
-			auto v = boost::target(*outedge,g_);
-			if (boost::out_degree(v,g_) == 0 and boost::in_degree(v,g_) == 1)
-			{
-				auto e = boost::edge(*vi,v,g_).first;
-				auto seq = boost::get(name,e);
-				avg += seq.length();
-				l++;
-			}
-			j++;
+			if (outdegree == 1)
+				std::cerr << "Source: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
 		}
-		if (outdegree == 0 and indegree == 1)
+		else if (outdegree == 0)
 		{
-			k++;
+			if (indegree == 1)
+				std::cerr << "Sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" <<std::endl;
+		}
+		else if (indegree == 1 and outdegree == 1)
+			simpletons++;
+		else
+		{
+			if (outdegree > 1)
+			{
+				for (const auto& out : boost::out_edges(*vi,g_))
+				{
+					auto e = boost::edge(*vi,boost::target(out,g_),g_);
+					//std::cerr << boost::get(name,e.first) << ": " << boost::get(cap,e.first) << std::endl;
+				}
+				//std::cerr << std::endl;
+			}
 		}
 		boost::put(propmapIndex,*vi,i++);
 	}
-	std::cerr << j << " sources / " << k << " sinks" << std::endl;
-	std::cerr << l << " singular paths with average length " << avg/l << std::endl;
-	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
-	boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::make_label_writer(boost::get(boost::edge_residual_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -125,22 +142,42 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 	{
 		std::string sequence("");
 		std::string next = curr.substr(1) + n;
+		Sequence s = dbg.getSequence(next);
 		auto&& nextV = dbg.getVertex(next);
-		sequence += n;
 		unsigned int coverage = currV->get_out_coverage(n);
-		if (!buildEdge(uv, nextV, next, sequence, index, coverage, dbg))
-			index++; // make sure to keep the index intact
+		if (s == next)
+		{
+			sequence += n;
+			if (!buildEdge(uv, nextV, next, sequence, index, coverage, dbg))
+				index++; // make sure to keep the index intact
+		}
+		else
+		{
+			sequence += deBruijnGraph::complement(n);
+			if (!buildEdgeReverse(uv, nextV, next, sequence, index, coverage, dbg))
+				index++;
+		}
 	}
 	// finding the predecessing unbalanced vertices
 	for (const auto& n : pred)
 	{
 		std::string sequence("");
 		std::string prev = n + curr.substr(0,curr.length() - 1);
+		Sequence s = dbg.getSequence(prev);
 		auto&& nextV = dbg.getVertex(prev);
 		unsigned int coverage = currV->get_in_coverage(n);
-		sequence += deBruijnGraph::complement(n);
-		if (!buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg))
-			index++;
+		if (s == prev)
+		{
+			sequence += deBruijnGraph::complement(n);
+			if (!buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg))
+				index++;
+		}
+		else
+		{
+			sequence += n;
+			if (!buildEdge(uv, nextV, prev, sequence, index, coverage, dbg))
+				index++;
+		}
 	}
 	//}
 	return index;
@@ -202,7 +239,7 @@ bool UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 	auto src = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
 	bool toAdd = true;
-	if ((sequence.length() <= dbg.getK() and avg < 10) or avg < 5)
+	if ((sequence.length() <= dbg.getK() and avg < 50) or avg < 30)
 		toAdd = false;
 	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge TODO
 	if (!(sequence.length() == 1 and e.second and boost::get(name,e.first).length() == 1) and toAdd)
@@ -277,7 +314,7 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 	auto e = boost::edge(src,trg,g_);
 	// error correction, TODO make threshold variable
 	bool addEdge = true;
-	if ((sequence.length() <= dbg.getK() and avg < 10) or avg < 5) // this path is considered illegal
+	if ((sequence.length() <= dbg.getK() and avg < 50) or avg < 30) // this path is considered illegal
 	{
 		/*boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
 		auto& sseq = boost::get(vn, uv);
@@ -300,67 +337,17 @@ void UnitigGraph::cleanGraph()
 {
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
 	boost::tie(vi, vi_end) = boost::vertices(g_);
-	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
+	//boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
   	bool merged = true;
 	// as long as some pathes are merged, continue looping
-	while (merged)
-	{
-		merged = false;
-		/*for (next = vi; vi != vi_end; vi = next) {
-			++next;
-			auto indegree = boost::in_degree(*vi,g_);
-			auto outdegree = boost::out_degree(*vi,g_);
-			// if a vertex was disconnected by error correction or path merging, delete it from graph
-			if (indegree != 1 or outdegree != 1) 
-			{
-				continue;
-			//	boost::remove_vertex(*vi, g_);
-			}
-			// now merge simple paths which have been generated by deleting junctions
-			std::string sequence = "";
-			auto tmpV = *vi;
-			auto outedge = boost::out_edges(tmpV,g_).first;
-			auto pathlength = 0;
-			// singular self loops are covered by this as well, will have to be treated separately
-			while (indegree == 1 and outdegree == 1 and boost::target(*outedge,g_) != tmpV)
-			{
-				merged = true;
-				auto inedge = boost::in_edges(tmpV,g_).first;
-				auto e = boost::edge(boost::source(*inedge,g_),tmpV,g_);
-				sequence += boost::get(name,e.first);
-				// delete the in edge
-				//boost::clear_in_edges(tmpV,g_);
-				//move on
-				outedge = boost::out_edges(tmpV,g_).first;
-				tmpV = boost::target(*outedge,g_);
-				indegree = boost::in_degree(tmpV, g_);
-				outdegree = boost::out_degree(tmpV,g_);
-				pathlength++;
-			}
-			// the simple path ends here, merge the ends
-			if (merged)
-			{
-				auto e_add = boost::edge(boost::source(*outedge,g_),boost::target(*outedge,g_),g_);
-				sequence += boost::get(name,e_add.first);
-				//boost::remove_edge(*outedge,g_);
-				boost::property_map<UGraph, boost::edge_residual_capacity_t>::type len = boost::get(boost::edge_residual_capacity_t(), g_);
-				//if (pathlength > 1 or sequence.length() > 100) // TODO choose threshold 
-				//{
-					auto e = boost::add_edge(*vi,tmpV,g_);
-					boost::put(name,e.first,sequence);
-					boost::put(len,e.first,sequence.length());
-				//} // if pathlength = 1, we found a single edge between two vertices
-			}
-		}*/
-		boost::tie(vi, vi_end) = boost::vertices(g_);
-		for (next = vi; vi != vi_end; vi = next) {
-			++next;
-			auto indegree = boost::in_degree(*vi, g_);
-			auto outdegree = boost::out_degree(*vi,g_);
-			if (outdegree == 0 and indegree == 0)
-			{
-				boost::remove_vertex(*vi,g_);
-			}
+	boost::tie(vi, vi_end) = boost::vertices(g_);
+	for (next = vi; vi != vi_end; vi = next) {
+		++next;
+		auto indegree = boost::in_degree(*vi, g_);
+		auto outdegree = boost::out_degree(*vi,g_);
+		if (outdegree == 0 and indegree == 0)
+		{
+			boost::remove_vertex(*vi,g_);
 		}
 	}
 }
