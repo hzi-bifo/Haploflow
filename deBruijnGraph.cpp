@@ -55,9 +55,13 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 	Sequence toAdd(kmer);
 	auto&& v = graph_.emplace(toAdd,Vertex());
 	if (!v.second and v.first->first != kmer) // vertex has been added and was a reverse complement
+	{
 		v.first->second.add_predecessor(complement(line[k_])); // if RC(A)->X, then X->A
+	}
 	else
+	{
 		v.first->second.add_successor(line[k_]); // add the k+1st letter as neighbour
+	}
 
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
@@ -80,10 +84,13 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 	toAdd = Sequence(kmer);
 	v = graph_.emplace(toAdd,Vertex()); //the last node does not have neighbours, if it already is in the graph, then nothing will change
 	if (!v.second and v.first->first != kmer)
+	{
 		v.first->second.add_successor(complement(line[line.length() - k_ - 1]));
+	}
 	else
+	{
 		v.first->second.add_predecessor(line[line.length() - k_ - 1]);
-	
+	}
 	return 0;
 }
 

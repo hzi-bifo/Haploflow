@@ -29,13 +29,13 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	{
 		std::string curr = v.get_kmer();
 		Vertex* source = dbg.getVertex(curr);
-		index = connectUnbalanced(source, index, curr, dbg);
+		connectUnbalanced(source, &index, curr, dbg);
 	}
 	for (auto& w: in_unbalanced)
 	{
 		std::string curr = w.get_kmer();
 		Vertex* sink = dbg.getVertex(curr);
-		index = connectUnbalanced(sink, index, curr, dbg);
+		connectUnbalanced(sink, &index, curr, dbg);
 	}
 	// DEBUG
 	auto&& numV = boost::num_vertices(g_);
@@ -55,8 +55,8 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	uvertex_iter vi, vi_end;
 	int i = 1;
 	int simpletons = 0;
-	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-	const auto& name = boost::get(boost::edge_name_t(),g_);
+	//const auto& cap = boost::get(boost::edge_capacity_t(),g_);
+	//const auto& name = boost::get(boost::edge_name_t(),g_);
 	const auto& vname = boost::get(boost::vertex_name_t(),g_);
 	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
 	{
@@ -74,18 +74,19 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 		}
 		else if (indegree == 1 and outdegree == 1)
 			simpletons++;
-		else
+		/*else
 		{
 			if (outdegree > 1)
 			{
 				for (const auto& out : boost::out_edges(*vi,g_))
 				{
+					
 					auto e = boost::edge(*vi,boost::target(out,g_),g_);
 					//std::cerr << boost::get(name,e.first) << ": " << boost::get(cap,e.first) << std::endl;
 				}
 				//std::cerr << std::endl;
 			}
-		}
+		}*/
 		boost::put(propmapIndex,*vi,i++);
 	}
 	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
@@ -93,20 +94,21 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
-UVertex UnitigGraph::addVertex(unsigned int index, std::string name)
+UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
 {
 	UVertex uv = boost::add_vertex(g_);
 	boost::property_map<UGraph, boost::vertex_name_t>::type n = boost::get(boost::vertex_name_t(), g_);
 	boost::put(n, uv, name);
 	boost::property_map<UGraph, boost::vertex_index1_t>::type idx = boost::get(boost::vertex_index1_t(), g_);
-	boost::put(idx, uv, index);
-	auto&& ins = std::make_pair(index,uv);
+	(*index)++;
+	boost::put(idx, uv, *index);
+	auto&& ins = std::make_pair(*index,uv);
 	graph_.insert(ins);
 	return uv;
 }
 
 // function for connecting a given source/sink vertex to all its unbalanced successors/predecessors
-unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, std::string curr, deBruijnGraph& dbg)
+void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::string curr, deBruijnGraph& dbg)
 {
 	std::vector<char> succ = source->get_successors();
 	std::vector<char> pred = source->get_predecessors();
@@ -114,8 +116,8 @@ unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, 
 	// if the source is not yet a vertex of the graph, add it
 	if (!source->is_visited())
 	{
-		uv = addVertex(++index, curr);
-		source->set_index(index);
+		uv = addVertex(index, curr);
+		source->set_index(*index);
 		//dfs for all neighbours
 	}
 	else
@@ -124,13 +126,11 @@ unsigned int UnitigGraph::connectUnbalanced(Vertex* source, unsigned int index, 
 		uv = graph_[idx];
 	}
 	source->visit(); // make sure the next time we find it we dont add it another time
-	index = addNeighbours(curr, succ, pred, dbg, index, uv); // finding the next unbalanced vertices
-
-	return index;
+	addNeighbours(curr, succ, pred, dbg, index, uv); // finding the next unbalanced vertices
 }
 
 // iterating over all neighbours of current node, build the different sequences to the next unbalanced node
-unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int index, UVertex& uv)
+void UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int* index, UVertex& uv)
 {
 	//bool rc = false;
 	// since the source or the sink node has been created before, every edge can at least add one new vertex
@@ -138,6 +138,7 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 	// first, find the successing unbalanced vertices
 	auto&& currV = dbg.getVertex(curr);
 	// check for "real" source/sink property here
+	
 	for (const auto& n : succ)
 	{
 		std::string sequence("");
@@ -145,18 +146,8 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 		Sequence s = dbg.getSequence(next);
 		auto&& nextV = dbg.getVertex(next);
 		unsigned int coverage = currV->get_out_coverage(n);
-		if (s == next)
-		{
-			sequence += n;
-			if (!buildEdge(uv, nextV, next, sequence, index, coverage, dbg))
-				index++; // make sure to keep the index intact
-		}
-		else
-		{
-			sequence += deBruijnGraph::complement(n);
-			if (!buildEdgeReverse(uv, nextV, next, sequence, index, coverage, dbg))
-				index++;
-		}
+		sequence += n;
+		buildEdge(uv, nextV, next, sequence, index, coverage, dbg);
 	}
 	// finding the predecessing unbalanced vertices
 	for (const auto& n : pred)
@@ -166,27 +157,14 @@ unsigned int UnitigGraph::addNeighbours(std::string& curr, const std::vector<cha
 		Sequence s = dbg.getSequence(prev);
 		auto&& nextV = dbg.getVertex(prev);
 		unsigned int coverage = currV->get_in_coverage(n);
-		if (s == prev)
-		{
-			sequence += deBruijnGraph::complement(n);
-			if (!buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg))
-				index++;
-		}
-		else
-		{
-			sequence += n;
-			if (!buildEdge(uv, nextV, prev, sequence, index, coverage, dbg))
-				index++;
-		}
+		sequence += deBruijnGraph::complement(n);
+		buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg);
 	}
-	//}
-	return index;
 }
 
 // go back through the graph until the next unbalanced node is found and add an ("reversed") edge
-bool UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int index, unsigned int coverage, deBruijnGraph& dbg)
+void UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, unsigned int coverage, deBruijnGraph& dbg)
 {
-	bool visited = true;
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
 	// DEBUG
@@ -207,6 +185,11 @@ bool UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 		avg += cov;
 		length++;
 		Sequence tmp = dbg.getSequence(prev);
+		if (sequence == "TTGTTTCTACT")
+		{
+			std::cerr << "Building reverse edge" << std::endl;
+			std::cerr << ((tmp == prev) ? "not rc" : "rc") << std::endl;
+		}
 		if (tmp == prev)
 			prev = c + prev.substr(0,prev.length() - 1);
 		else
@@ -223,14 +206,13 @@ bool UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 	if (!nextV->is_visited())
 	{
 		nextV->visit();
-		addVertex(++index, prev);
-		nextV->set_index(index);
-		visited = false;
+		addVertex(index, prev);
+		nextV->set_index(*index);
 	}
 	// this shouldnt happen (it does though) TODO
 	else if (succ.size() == 1 and pred.size() == 1)
 	{
-		return true;
+		return;
 	}
 	avg /= float(length); // average
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
@@ -242,21 +224,19 @@ bool UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 	if ((sequence.length() <= dbg.getK() and avg < 50) or avg < 30)
 		toAdd = false;
 	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge TODO
-	if (!(sequence.length() == 1 and e.second and boost::get(name,e.first).length() == 1) and toAdd)
+	if (!e.second and toAdd)
 	{
 		e = boost::add_edge(src,trg,g_);
-		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
+		//std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
 		boost::put(name,e.first,sequence);
 		boost::put(cap,e.first,avg);
 		boost::put(len,e.first,sequence.length());
 	}
-	return visited;
 }
 
 // same function like the reverse one, but going forward and finding successors
-bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int index, unsigned int coverage, deBruijnGraph& dbg)
+void UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, unsigned int coverage, deBruijnGraph& dbg)
 {
-	bool visited = true;
 	// with a little effort this can be moved inside the while loop for efficiency reasons
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
@@ -277,6 +257,11 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		avg += cov;
 		length++;
 		Sequence tmp = dbg.getSequence(next);
+		if (sequence == "TTGTTTCTACT")
+		{
+			std::cerr << "Building edge" << std::endl;
+			std::cerr << ((tmp == next) ? "not rc" : "rc") << std::endl;
+		}
 		if (tmp == next)
 			next = next.substr(1) + c;
 		else
@@ -289,6 +274,11 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		succ = nextV->get_successors();
 		sequence += c; 
 	}
+	bool debug = false;
+	if (next == "GCAAAAGCAGGTCAATTATATTCAGTATGGAAAGAATAAAA" or next == "TTTTATTCTTTCCATACTGAATATAATTGACCGCTTTTGC")
+	{
+		debug = true;
+	}
 	/* 
 	if nextV is visited then nextV may either be a junction, in which case it should have been
 	added as a vertex to the graph and will receive an edge. Or the path we are starting to build has already
@@ -298,15 +288,15 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 	if (!nextV->is_visited())
 	{
 		nextV->visit();
-		addVertex(++index, next);
-		nextV->set_index(index);
-		visited = false;
+		addVertex(index, next);
+		nextV->set_index(*index);
 	}
 	else if (succ.size() == 1 and pred.size() == 1) // check how this happens
 	{
-		return true; // path has been found, do not add anything
+		return; // path has been found, do not add anything
 	}
 	avg /= float(length);
+	boost::property_map<UGraph, boost::vertex_name_t>::type vname = boost::get(boost::vertex_name_t(), g_);
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
 	boost::property_map<UGraph, boost::edge_capacity_t>::type cap = boost::get(boost::edge_capacity_t(), g_);
 	boost::property_map<UGraph, boost::edge_residual_capacity_t>::type len = boost::get(boost::edge_residual_capacity_t(), g_);
@@ -323,14 +313,19 @@ bool UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		Vertex* w = dbg.getVertex(next);*/
 		addEdge = false;
 	}
-	if (!(sequence.length() == 1 and e.second and boost::get(name,e.first).length() == 1) and addEdge)
+	if (!e.second and addEdge)
 	{
+		if (debug)
+		{
+			auto&& v = boost::get(vname,src);
+			auto&& w = boost::get(vname,trg);
+			std::cout << v << " -> " << w  << " (" << sequence << ")" << std::endl;
+		}
 		e = boost::add_edge(src,trg,g_);
 		boost::put(name,e.first,sequence);
 		boost::put(cap,e.first,avg);
 		boost::put(len,e.first,sequence.length());
 	}
-	return visited;
 }
 
 void UnitigGraph::cleanGraph()
@@ -338,8 +333,6 @@ void UnitigGraph::cleanGraph()
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	//boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
-  	bool merged = true;
-	// as long as some pathes are merged, continue looping
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next) {
 		++next;
