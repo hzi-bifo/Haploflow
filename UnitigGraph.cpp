@@ -146,7 +146,10 @@ void UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ
 		Sequence s = dbg.getSequence(next);
 		auto&& nextV = dbg.getVertex(next);
 		unsigned int coverage = currV->get_out_coverage(n);
-		sequence += n;
+		if (s == next)
+			sequence += n;
+		else
+			sequence += deBruijnGraph::complement(n);
 		buildEdge(uv, nextV, next, sequence, index, coverage, dbg);
 	}
 	// finding the predecessing unbalanced vertices
@@ -155,9 +158,12 @@ void UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ
 		std::string sequence("");
 		std::string prev = n + curr.substr(0,curr.length() - 1);
 		Sequence s = dbg.getSequence(prev);
-		auto&& nextV = dbg.getVertex(prev);
 		unsigned int coverage = currV->get_in_coverage(n);
-		sequence += deBruijnGraph::complement(n);
+		auto&& nextV = dbg.getVertex(prev);
+		if (s == prev)
+			sequence += n; 
+		else
+			sequence += deBruijnGraph::complement(n);
 		buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg);
 	}
 }
@@ -185,22 +191,13 @@ void UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 		avg += cov;
 		length++;
 		Sequence tmp = dbg.getSequence(prev);
-		if (sequence == "TTGTTTCTACT")
-		{
-			std::cerr << "Building reverse edge" << std::endl;
-			std::cerr << ((tmp == prev) ? "not rc" : "rc") << std::endl;
-		}
-		if (tmp == prev)
-			prev = c + prev.substr(0,prev.length() - 1);
-		else
-		{
-			c = succ[0];
-			prev = deBruijnGraph::complement(c) + prev.substr(0,prev.length() - 1);
-		}
+		if (!(tmp == prev))
+			c = deBruijnGraph::complement(succ[0]);
+		prev = c + prev.substr(0,prev.length() - 1);
 		nextV = dbg.getVertex(prev);
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
-		sequence += deBruijnGraph::complement(c);
+		sequence += c;
 	}
 	// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
 	if (!nextV->is_visited())
@@ -257,27 +254,15 @@ void UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		avg += cov;
 		length++;
 		Sequence tmp = dbg.getSequence(next);
-		if (sequence == "TTGTTTCTACT")
+		if (!(tmp == next))
 		{
-			std::cerr << "Building edge" << std::endl;
-			std::cerr << ((tmp == next) ? "not rc" : "rc") << std::endl;
+			c = deBruijnGraph::complement(pred[0]);
 		}
-		if (tmp == next)
-			next = next.substr(1) + c;
-		else
-		{
-			c = pred[0];
-			next = next.substr(1) + deBruijnGraph::complement(c);
-		}
+		next = next.substr(1) + c;
 		nextV = dbg.getVertex(next);
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
 		sequence += c; 
-	}
-	bool debug = false;
-	if (next == "GCAAAAGCAGGTCAATTATATTCAGTATGGAAAGAATAAAA" or next == "TTTTATTCTTTCCATACTGAATATAATTGACCGCTTTTGC")
-	{
-		debug = true;
 	}
 	/* 
 	if nextV is visited then nextV may either be a junction, in which case it should have been
@@ -296,7 +281,6 @@ void UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		return; // path has been found, do not add anything
 	}
 	avg /= float(length);
-	boost::property_map<UGraph, boost::vertex_name_t>::type vname = boost::get(boost::vertex_name_t(), g_);
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
 	boost::property_map<UGraph, boost::edge_capacity_t>::type cap = boost::get(boost::edge_capacity_t(), g_);
 	boost::property_map<UGraph, boost::edge_residual_capacity_t>::type len = boost::get(boost::edge_residual_capacity_t(), g_);
@@ -315,12 +299,6 @@ void UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 	}
 	if (!e.second and addEdge)
 	{
-		if (debug)
-		{
-			auto&& v = boost::get(vname,src);
-			auto&& w = boost::get(vname,trg);
-			std::cout << v << " -> " << w  << " (" << sequence << ")" << std::endl;
-		}
 		e = boost::add_edge(src,trg,g_);
 		boost::put(name,e.first,sequence);
 		boost::put(cap,e.first,avg);
