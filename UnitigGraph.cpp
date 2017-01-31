@@ -19,6 +19,8 @@ namespace std
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
 UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 {
+	std::cerr << "Building unitig graph from deBruijn graph..." << std::endl;
+	clock_t t = clock();
 	// first retrieve all unbalanced vertices in debruijn graph
 	auto&& unbalanced = dbg.getJunctions();
 	auto&& out_unbalanced = unbalanced.first;
@@ -37,17 +39,20 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 		Vertex* sink = dbg.getVertex(curr);
 		connectUnbalanced(sink, &index, curr, dbg);
 	}
+	std::cerr << "Unitig graph succesfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
 	// DEBUG
 	auto&& numV = boost::num_vertices(g_);
 	auto&& numE = boost::num_edges(g_);
-	std::cerr << "Unitig graph has " << numV << " vertices and " << numE << " edges, starting cleaning" << std::endl;
 	
+	std::cerr << "Unitig graph has " << numV << " vertices and " << numE << " edges, starting cleaning" << std::endl;
+	t = clock();
+
 	cleanGraph();
 	
 	numV = boost::num_vertices(g_);
 	numE = boost::num_edges(g_);
-	std::cerr << "Finished cleaning" << std::endl;
-	std::cerr << "Unitig graph has " << numV << " vertices and " << numE << " edges" << std::endl;
+	std::cerr << "Finished cleaning: Unitig graph has " << numV << " vertices and " << numE << " edges" << std::endl;
+	std::cerr << "Cleaning took " << (clock() - t)/1000000. << " seconds." << std::endl;
 
 	typedef std::map<UVertex, int> IndexMap;
 	IndexMap mapIndex;
@@ -64,13 +69,17 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 		auto outdegree = boost::out_degree(*vi,g_);
 		if (indegree == 0)
 		{
-			if (outdegree == 1)
-				std::cerr << "Source: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
+			//if (outdegree == 1)
+			//	std::cerr << "Source: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
+			//else
+			//	std::cerr << "Unreal source: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
 		}
 		else if (outdegree == 0)
 		{
-			if (indegree == 1)
-				std::cerr << "Sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" <<std::endl;
+			//if (indegree == 1)
+			//	std::cerr << "Sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" <<std::endl;
+			//else
+			//	std::cerr << "Unreal sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
 		}
 		else if (indegree == 1 and outdegree == 1)
 			simpletons++;
@@ -138,7 +147,6 @@ void UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ
 	// first, find the successing unbalanced vertices
 	auto&& currV = dbg.getVertex(curr);
 	// check for "real" source/sink property here
-	
 	for (const auto& n : succ)
 	{
 		std::string sequence("");
@@ -161,9 +169,9 @@ void UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ
 		unsigned int coverage = currV->get_in_coverage(n);
 		auto&& nextV = dbg.getVertex(prev);
 		if (s == prev)
-			sequence += n; 
+			sequence += curr.back(); 
 		else
-			sequence += deBruijnGraph::complement(n);
+			sequence += n;//deBruijnGraph::complement(n);
 		buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg);
 	}
 }
@@ -182,8 +190,8 @@ void UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
 		nextV->visit();
-		char c = pred[0];
-		unsigned int cov = nextV->get_in_coverage(c); // should be > 0 (assert)
+		unsigned int cov = nextV->get_in_coverage(pred[0]); // should be > 0 (assert)
+		char c = prev.back();
 		if (cov < min)
 			min = cov;
 		if (cov > max)
@@ -192,8 +200,12 @@ void UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 		length++;
 		Sequence tmp = dbg.getSequence(prev);
 		if (!(tmp == prev))
+		{
 			c = deBruijnGraph::complement(succ[0]);
-		prev = c + prev.substr(0,prev.length() - 1);
+			prev = c + prev.substr(0,prev.length() - 1);
+		}
+		else
+			prev = pred[0] + prev.substr(0,prev.length() - 1);
 		nextV = dbg.getVertex(prev);
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
@@ -220,11 +232,17 @@ void UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 	bool toAdd = true;
 	if ((sequence.length() <= dbg.getK() and avg < 50) or avg < 30)
 		toAdd = false;
+	else if (min < 5)
+	{
+		boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
+		std::cerr << boost::get(vn,src) << " - " << boost::get(vn,trg) << " (" << sequence << ")" << std::endl;
+		//toAdd = false; // this is interesting!
+	}
 	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge TODO
 	if (!e.second and toAdd)
 	{
 		e = boost::add_edge(src,trg,g_);
-		//std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
+		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
 		boost::put(name,e.first,sequence);
 		boost::put(cap,e.first,avg);
 		boost::put(len,e.first,sequence.length());
@@ -296,6 +314,11 @@ void UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		Vertex* v = dbg.getVertex(sstring);
 		Vertex* w = dbg.getVertex(next);*/
 		addEdge = false;
+	}
+	else if (min < 5)
+	{
+		boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
+		std::cerr << boost::get(vn,src) << " - " << boost::get(vn,trg) << " (" << sequence << ")" << std::endl;
 	}
 	if (!e.second and addEdge)
 	{

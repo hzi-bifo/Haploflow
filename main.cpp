@@ -4,11 +4,9 @@
 int main (int argc, char* argv[])
 {
 	clock_t t = clock();
+	std::cerr << "Building deBruijnGraph..." << std::endl;
 	deBruijnGraph dbg = deBruijnGraph(std::string(argv[1]), atoi(argv[2]));
-	std::cerr << (clock() - t)/1000000. << std::endl;
-	dbg.debug();
-	t = clock();
+	std::cerr << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
 	UnitigGraph ug(dbg);
-	std::cerr << (clock() - t)/1000000. << std::endl;
 	return 0;
 }

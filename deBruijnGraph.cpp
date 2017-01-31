@@ -173,7 +173,7 @@ Vertex* deBruijnGraph::getVertex(const std::string& kmer)
 
 void deBruijnGraph::debug()
 {
-	std::cerr << "Vertices: " << getSize() << std::endl;
+	/*std::cerr << "Vertices: " << getSize() << std::endl;
 	clock_t t = clock();
 	std::vector<std::string> sources = getSources();
 	std::vector<std::string> sinks = getSinks();
@@ -181,5 +181,5 @@ void deBruijnGraph::debug()
 	//	std::cerr << s << " (source)" << std::endl;
 	//for (const auto& t : sinks)
 	//	std::cerr << t << " (sink)" << std::endl;
-	std::cerr << (clock() - t)/1000000. << std::endl;
+	std::cerr << (clock() - t)/1000000. << std::endl;*/
 }
