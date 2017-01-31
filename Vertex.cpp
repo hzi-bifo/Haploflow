@@ -162,7 +162,7 @@ unsigned int Vertex::get_total_out_coverage() const
 	return a_out + c_out + g_out + t_out + n_out;
 }
 
-unsigned int Vertex::get_total_out_coverage() const
+unsigned int Vertex::get_total_in_coverage() const
 {
 	return a_in + c_in + g_in + t_in + n_in;
 }
