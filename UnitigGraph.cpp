@@ -98,8 +98,8 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 		}*/
 		boost::put(propmapIndex,*vi,i++);
 	}
-	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
-	//boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -234,8 +234,8 @@ void UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 		toAdd = false;
 	else if (min < 5)
 	{
-		boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
-		std::cerr << boost::get(vn,src) << " - " << boost::get(vn,trg) << " (" << sequence << ")" << std::endl;
+		//boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
+		//std::cerr << boost::get(vn,src) << " - " << boost::get(vn,trg) << " (" << sequence << ")" << std::endl;
 		//toAdd = false; // this is interesting!
 	}
 	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge TODO
@@ -317,8 +317,8 @@ void UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 	}
 	else if (min < 5)
 	{
-		boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
-		std::cerr << boost::get(vn,src) << " - " << boost::get(vn,trg) << " (" << sequence << ")" << std::endl;
+		//boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
+		//std::cerr << boost::get(vn,src) << " - " << boost::get(vn,trg) << " (" << sequence << ")" << std::endl;
 	}
 	if (!e.second and addEdge)
 	{
@@ -344,4 +344,9 @@ void UnitigGraph::cleanGraph()
 			boost::remove_vertex(*vi,g_);
 		}
 	}
+}
+
+void UnitigGraph::calculateFlow() const
+{
+
 }

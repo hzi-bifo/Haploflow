@@ -36,6 +36,8 @@ private:
 	void buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, unsigned int, deBruijnGraph&);
 	UVertex addVertex(unsigned int*, std::string name);
 	void cleanGraph();
+	
+	void calculateFlow() const;	
 
 	UGraph g_;
 	std::unordered_map<unsigned int, UVertex> graph_;
