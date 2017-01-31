@@ -28,6 +28,8 @@ public:
 	unsigned int get_index() const;
 	unsigned int get_out_coverage(const char) const;
 	unsigned int get_in_coverage(const char) const;
+	unsigned int get_total_in_coverage() const;
+	unsigned int get_total_out_coverage() const;
 	unsigned int get_degree() const;
 
 	const bool isSource () const;

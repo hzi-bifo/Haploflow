@@ -157,6 +157,16 @@ unsigned int Vertex::get_in_coverage(const char c) const
 	else return n_in;
 }
 
+unsigned int Vertex::get_total_out_coverage() const
+{
+	return a_out + c_out + g_out + t_out + n_out;
+}
+
+unsigned int Vertex::get_total_out_coverage() const
+{
+	return a_in + c_in + g_in + t_in + n_in;
+}
+
 const bool Vertex::isSource() const
 {
 	bool source = !(a_in + c_in + g_in + t_in + n_in); // all 0 ("real" source)
