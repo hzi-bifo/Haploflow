@@ -132,7 +132,7 @@ std::pair<std::vector<Sequence>, std::vector<Sequence> > deBruijnGraph::getJunct
 		else if (pred == succ and pred > 1)
 		{
 			out_unbalanced.push_back(p.first);
-			in_unbalanced.push_back(p.first); // otherwise some sequences might be lost
+			//in_unbalanced.push_back(p.first); TODO oBdA?
 		}
 	}
 	return std::make_pair(out_unbalanced,in_unbalanced);
@@ -148,6 +148,7 @@ const Sequence& deBruijnGraph::getSequence(const std::string& kmer)
 		return ret->first;
 	else
 	{
+		std::cerr << "kmer not in graph: " << kmer << std::endl;
 		throw;
 	}
 }

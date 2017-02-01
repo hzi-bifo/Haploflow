@@ -23,6 +23,7 @@ public:
 	bool is_junction() const;
 	bool is_conflicting() const;
 	bool is_visited() const;
+	bool is_flagged() const;
 	std::vector<char> get_successors() const;
 	std::vector<char> get_predecessors() const; 
 	unsigned int get_index() const;

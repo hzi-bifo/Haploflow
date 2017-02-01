@@ -82,6 +82,11 @@ void Vertex::flag()
 	flagged = true; // what is flagged may never ... be unflagged
 }
 
+bool Vertex::is_flagged() const
+{
+	return flagged;
+}
+
 void Vertex::set_index(unsigned int i)
 {
 	index = i;

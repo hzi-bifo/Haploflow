@@ -146,18 +146,30 @@ void UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ
 	// this means the index can be increased by at most one in every step of the for loop
 	// first, find the successing unbalanced vertices
 	auto&& currV = dbg.getVertex(curr);
-	// check for "real" source/sink property here
+	if (currV->is_flagged())
+	{
+		return; // the neighbours for this vertex have been added
+	}
+	Sequence src = dbg.getSequence(curr);
+	bool reverse = false;
+	if (!(src == curr))
+	{
+		reverse = true; //TODO
+		//std::cerr << std::endl << src.get_kmer() << "!=" << curr << std::endl;
+	}
+	// check for "real" source/sink property here?
 	for (const auto& n : succ)
 	{
 		std::string sequence("");
 		std::string next = curr.substr(1) + n;
 		Sequence s = dbg.getSequence(next);
+		if (!(s == next))
+			std::cerr << s.get_kmer() << "!=" << next << std::endl;
+		else
+			std::cerr << s.get_kmer() << "==" << next << std::endl;
 		auto&& nextV = dbg.getVertex(next);
 		unsigned int coverage = currV->get_out_coverage(n);
-		if (s == next)
-			sequence += n;
-		else
-			sequence += deBruijnGraph::complement(n);
+		sequence += n;
 		buildEdge(uv, nextV, next, sequence, index, coverage, dbg);
 	}
 	// finding the predecessing unbalanced vertices
@@ -166,14 +178,16 @@ void UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ
 		std::string sequence("");
 		std::string prev = n + curr.substr(0,curr.length() - 1);
 		Sequence s = dbg.getSequence(prev);
+		if (!(s == prev))
+			std::cerr << s.get_kmer() << "!=" << prev << std::endl;
+		else
+			std::cerr << s.get_kmer() << "==" << prev << std::endl;
 		unsigned int coverage = currV->get_in_coverage(n);
 		auto&& nextV = dbg.getVertex(prev);
-		if (s == prev)
-			sequence += curr.back(); 
-		else
-			sequence += n;//deBruijnGraph::complement(n);
+		sequence += n;
 		buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg);
 	}
+	currV->flag(); // this vertex is done
 }
 
 // go back through the graph until the next unbalanced node is found and add an ("reversed") edge
@@ -190,22 +204,30 @@ void UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
 		nextV->visit();
-		unsigned int cov = nextV->get_in_coverage(pred[0]); // should be > 0 (assert)
-		char c = prev.back();
+		Sequence tmp = dbg.getSequence(prev); // check for reverse complimentarity
+		char c;
+		unsigned int cov;
+		if (!(tmp == prev)) // we are a reverse complement
+		{
+			std::cerr << tmp.get_kmer() << "!=" << prev << std::endl;
+			/* if Z<-Y, Y on the complementary strand of Z and Y->X with character c:
+			then \overline{Y}<-\overline{X} with character \overline{c} */
+			c = deBruijnGraph::complement(succ[0]);
+			cov = nextV->get_out_coverage(succ[0]);
+		}
+		else
+		{
+			std::cerr << tmp.get_kmer() << "==" << prev << std::endl;
+			c = pred[0];
+			cov = nextV->get_in_coverage(pred[0]);
+		}
+		prev = c + prev.substr(0, prev.length() - 1);
 		if (cov < min)
 			min = cov;
 		if (cov > max)
 			max = cov;
 		avg += cov;
 		length++;
-		Sequence tmp = dbg.getSequence(prev);
-		if (!(tmp == prev))
-		{
-			c = deBruijnGraph::complement(succ[0]);
-			prev = c + prev.substr(0,prev.length() - 1);
-		}
-		else
-			prev = pred[0] + prev.substr(0,prev.length() - 1);
 		nextV = dbg.getVertex(prev);
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
@@ -239,7 +261,7 @@ void UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 		//toAdd = false; // this is interesting!
 	}
 	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge TODO
-	if (!e.second and toAdd)
+	if ((!e.second or (e.second and (boost::get(name,e.first)) != sequence)) and toAdd)
 	{
 		e = boost::add_edge(src,trg,g_);
 		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
@@ -247,6 +269,7 @@ void UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev,
 		boost::put(cap,e.first,avg);
 		boost::put(len,e.first,sequence.length());
 	}
+	addNeighbours(prev,succ,pred,dbg,index,src);
 }
 
 // same function like the reverse one, but going forward and finding successors
@@ -263,19 +286,29 @@ void UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
 		nextV->visit();
-		char c = succ[0];
-		unsigned int cov = nextV->get_out_coverage(c); // should be > 0 (assert)
+		Sequence tmp = dbg.getSequence(next);
+		unsigned int cov;
+		char c;
+		if (!(tmp == next)) // we are a reverse complement
+		{
+			std::cerr << tmp.get_kmer() << "!=" << next << std::endl;
+			/* if X->Y, Y on the complementary strand of X and Y<-Z with character c:
+			then \overline{Y}->\overline{Z} with character \overline{c} */
+			c = deBruijnGraph::complement(pred[0]);
+			cov = nextV->get_in_coverage(pred[0]);
+		}
+		else
+		{
+			std::cerr << tmp.get_kmer() << "==" << next << std::endl;
+			c = succ[0];
+			cov = nextV->get_in_coverage(succ[0]);
+		}
 		if (cov < min)
 			min = cov;
 		if (cov > max)
 			max = cov;
 		avg += cov;
 		length++;
-		Sequence tmp = dbg.getSequence(next);
-		if (!(tmp == next))
-		{
-			c = deBruijnGraph::complement(pred[0]);
-		}
 		next = next.substr(1) + c;
 		nextV = dbg.getVertex(next);
 		pred = nextV->get_predecessors();
@@ -305,7 +338,7 @@ void UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 	auto trg = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
 	// error correction, TODO make threshold variable
-	bool addEdge = true;
+	bool toAdd = true;
 	if ((sequence.length() <= dbg.getK() and avg < 50) or avg < 30) // this path is considered illegal
 	{
 		/*boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
@@ -313,20 +346,21 @@ void UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::s
 		std::string sstring = sseq.get_kmer();
 		Vertex* v = dbg.getVertex(sstring);
 		Vertex* w = dbg.getVertex(next);*/
-		addEdge = false;
+		toAdd = false;
 	}
 	else if (min < 5)
 	{
 		//boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
 		//std::cerr << boost::get(vn,src) << " - " << boost::get(vn,trg) << " (" << sequence << ")" << std::endl;
 	}
-	if (!e.second and addEdge)
+	if ((!e.second or (e.second and (boost::get(name,e.first)) != sequence)) and toAdd)
 	{
 		e = boost::add_edge(src,trg,g_);
 		boost::put(name,e.first,sequence);
 		boost::put(cap,e.first,avg);
 		boost::put(len,e.first,sequence.length());
 	}
+	addNeighbours(next,succ,pred,dbg,index,trg);
 }
 
 void UnitigGraph::cleanGraph()
