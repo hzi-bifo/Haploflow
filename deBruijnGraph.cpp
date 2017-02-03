@@ -159,8 +159,8 @@ Vertex* deBruijnGraph::getVertex(const std::string& kmer)
 		return 0;
 	else
 	{
-		//Sequence seq(kmer);
-		Sequence seq = getSequence(kmer);
+		Sequence seq(kmer);
+		//Sequence seq = getSequence(kmer); //will be the same vertex but constructor is faster
 		try
 		{
 			auto&& v = graph_.at(seq);
