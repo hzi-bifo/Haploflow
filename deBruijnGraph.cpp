@@ -175,6 +175,14 @@ Vertex* deBruijnGraph::getVertex(const std::string& kmer)
 
 void deBruijnGraph::debug()
 {
+	for (auto&& v : graph_)
+	{
+		if (v.first == "AGATAGAGTGATGGTATCACCTTTGGCTGTGACATGGTGGA"
+		or v.first == "TCCACCATGTCACAGCCAAAGGTGATACCATCACTCTATCT")
+		{
+			v.second.print(true);
+		}
+	}
 	/*std::cerr << "Vertices: " << getSize() << std::endl;
 	clock_t t = clock();
 	std::vector<std::string> sources = getSources();

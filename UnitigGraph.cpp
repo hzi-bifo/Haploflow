@@ -155,13 +155,12 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 		}
 		if (!junction->is_visited() and junction->get_total_out_coverage() > 30 and junction->get_total_in_coverage() > 30)
 		{
-			uv = addVertex(index, curr);
+			uv = addVertex(index, seq);
 			junction->set_index(*index);
 			//dfs for all neighbours
 		}
 		else if (!junction->is_visited())
 		{
-			junction->visit();
 			junction->flag();
 			continue;
 		}
@@ -174,7 +173,8 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 		auto&& following = addNeighbours(seq, succ, pred, dbg, index, uv); // finding the next unbalanced vertices
 		for (auto v : following)
 		{
-			todo.push(v);
+			if (v.second != "")
+				todo.push(v);
 		}
 	} while (!todo.empty());
 }
@@ -208,6 +208,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		{
 			next = curr.substr(1) + n;
 			auto&& nextV = dbg.getVertex(next);
+			Sequence s = dbg.getSequence(next);
 			sequence += n;
 			if (!nextV->is_flagged())
 				following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, dbg));
@@ -216,6 +217,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		{
 			next = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
 			auto&& nextV = dbg.getVertex(next);
+			Sequence s = dbg.getSequence(next);
 			sequence += curr.back();//deBruijnGraph::complement(n);
 			if (!nextV->is_flagged())
 				following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, dbg));
@@ -231,6 +233,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		{
 			prev = n + curr.substr(0,curr.length() - 1);
 			auto&& nextV = dbg.getVertex(prev);
+			Sequence s = dbg.getSequence(prev);
 			sequence += curr.back();//n;
 			if (!nextV->is_flagged())
 				following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg));
@@ -239,6 +242,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		{
 			prev = curr.substr(1) + deBruijnGraph::complement(n);
 			auto&& nextV = dbg.getVertex(prev);
+			Sequence s = dbg.getSequence(prev);
 			sequence += deBruijnGraph::complement(n);
 			if (!nextV->is_flagged())
 				following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, dbg));
@@ -292,7 +296,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	}
 	avg /= float(length); // average
 	// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
-	if (!nextV->is_visited() and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30)
+	if (!nextV->is_visited() and ((avg > 50 or sequence.length() > dbg.getK()) and avg > 30))//and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30)
 	{
 		nextV->visit();
 		addVertex(index, prev);
@@ -300,17 +304,15 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	}
 	else if (!nextV->is_visited())
 	{
-		nextV->visit();
-		nextV->flag();
-		return std::make_pair(nextV,prev);
+		return std::make_pair(nextV,"");
 	}
 	// this shouldnt happen (it does though) TODO
 	else if (succ.size() == 1 and pred.size() == 1)
 	{
-		return std::make_pair(nextV,prev);
+		return std::make_pair(nextV,"");
 	}
 	if (nextV->get_index() == 0)
-		return std::make_pair(nextV,prev);
+		return std::make_pair(nextV,"");
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
 	boost::property_map<UGraph, boost::edge_capacity_t>::type cap = boost::get(boost::edge_capacity_t(), g_);
 	boost::property_map<UGraph, boost::edge_residual_capacity_t>::type len = boost::get(boost::edge_residual_capacity_t(), g_);
@@ -387,7 +389,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited() and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30) 
+	if (!nextV->is_visited() and ((avg > 50 or sequence.length() > dbg.getK()) and avg > 30))//and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30) 
 	{
 		nextV->visit();
 		addVertex(index, next);
@@ -395,18 +397,16 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	}
 	else if (!nextV->is_visited())
 	{
-		nextV->visit();
-		nextV->flag();
-		return std::make_pair(nextV,next);
+		return std::make_pair(nextV,"");
 	}
 	else if (succ.size() == 1 and pred.size() == 1) // check else-if case
 	{
 		//TODO
-		return std::make_pair(nextV,next); // path has been found, do not add anything
+		return std::make_pair(nextV,""); // path has been found, do not add anything
 	}
 	// this vertex has been found and considered irrelevant because of insufficient coverage
 	if (nextV->get_index() == 0)
-		return std::make_pair(nextV,next);
+		return std::make_pair(nextV,"");
 	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
 	boost::property_map<UGraph, boost::edge_capacity_t>::type cap = boost::get(boost::edge_capacity_t(), g_);
 	boost::property_map<UGraph, boost::edge_residual_capacity_t>::type len = boost::get(boost::edge_residual_capacity_t(), g_);
