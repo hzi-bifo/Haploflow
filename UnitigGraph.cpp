@@ -72,8 +72,8 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	const auto& vname = boost::get(boost::vertex_name_t(),g_);
 	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
 	{
-		auto indegree = boost::in_degree(*vi,g_);
-		auto outdegree = boost::out_degree(*vi,g_);
+		unsigned int indegree = boost::in_degree(*vi,g_);
+		unsigned int outdegree = boost::out_degree(*vi,g_);
 		if (false)
 		{
 			if (indegree == 0)
@@ -187,12 +187,16 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 	// this means the index can be increased by at most one in every step of the for loop
 	// first, find the successing unbalanced vertices
 	std::vector<std::pair<Vertex*,std::string> > following;
-	auto&& currV = dbg.getVertex(curr);
-	if (currV->is_flagged() or currV->get_total_out_coverage() < 30 or currV->get_total_in_coverage() < 30)
+	Vertex* currV = dbg.getVertex(curr);
+	unsigned int total_out = currV->get_total_out_coverage();
+	unsigned int total_in = currV->get_total_in_coverage();
+	unsigned int threshold = 30; // make variable, based on e.g. median coverage
+	if (currV->is_flagged() or total_out < threshold or total_in < threshold)
 	{
 		return following; // the neighbours for this vertex have been added
 	}
 	Sequence src = dbg.getSequence(curr);
+	// this is for checking whether the reverse complement is in the debruijn graph
 	bool reverse = false;
 	if (src != curr)
 	{
@@ -204,10 +208,11 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		std::string sequence("");
 		std::string next;
 		unsigned int coverage = currV->get_out_coverage(n);
+		float pcov = coverage/total_out; // percentage of coverage
 		if (!reverse)
 		{
 			next = curr.substr(1) + n;
-			auto&& nextV = dbg.getVertex(next);
+			Vertex* nextV = dbg.getVertex(next);
 			Sequence s = dbg.getSequence(next);
 			sequence += n;
 			if (!nextV->is_flagged())
@@ -216,9 +221,9 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		else
 		{
 			next = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
-			auto&& nextV = dbg.getVertex(next);
+			Vertex* nextV = dbg.getVertex(next);
 			Sequence s = dbg.getSequence(next);
-			sequence += curr.back();//deBruijnGraph::complement(n);
+			sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr (by definition)
 			if (!nextV->is_flagged())
 				following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, dbg));
 		}
@@ -229,19 +234,20 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		std::string sequence("");
 		std::string prev; 
 		unsigned int coverage = currV->get_in_coverage(n);
+		float pcov = coverage/total_in; // percentage of coverage
 		if (!reverse)
 		{
 			prev = n + curr.substr(0,curr.length() - 1);
-			auto&& nextV = dbg.getVertex(prev);
+			Vertex* nextV = dbg.getVertex(prev);
 			Sequence s = dbg.getSequence(prev);
-			sequence += curr.back();//n;
+			sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr
 			if (!nextV->is_flagged())
 				following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg));
 		}
 		else
 		{
 			prev = curr.substr(1) + deBruijnGraph::complement(n);
-			auto&& nextV = dbg.getVertex(prev);
+			Vertex* nextV = dbg.getVertex(prev);
 			Sequence s = dbg.getSequence(prev);
 			sequence += deBruijnGraph::complement(n);
 			if (!nextV->is_flagged())
@@ -253,13 +259,13 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 }
 
 // go back through the graph until the next unbalanced node is found and add an ("reversed") edge
-std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, unsigned int coverage, deBruijnGraph& dbg)
+std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, float coverage, deBruijnGraph& dbg)
 {
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
 	// DEBUG
-	unsigned int min = coverage; // TODO
-	unsigned int max = coverage;
+	float min = coverage; // TODO
+	float max = coverage;
 	float avg = coverage;
 	unsigned int length = 1;
 	// loop until the next unbalanced node is found, which is either visited (has been added) or will be added
@@ -269,18 +275,18 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		Sequence tmp = dbg.getSequence(prev); // check for reverse complimentarity
 		char c;
 		unsigned int cov;
-		char lastchar = prev.back();
+		char lastchar = prev.back(); // this will be added to the sequence
 		if (tmp != prev) // we are a reverse complement
 		{
 			/* if Z<-Y, Y on the complementary strand of Z and Y->X with character c:
 			then \overline{Y}<-\overline{X} with character \overline{c} */
 			c = deBruijnGraph::complement(succ[0]);
-			cov = nextV->get_out_coverage(succ[0]);
+			cov = nextV->get_out_coverage(succ[0]); //percentage will always be 100% on single path
 		}
 		else
 		{
 			c = pred[0];
-			cov = nextV->get_in_coverage(pred[0]);
+			cov = nextV->get_in_coverage(pred[0]); // see above
 		}
 		prev = c + prev.substr(0, prev.length() - 1);
 		if (cov < min)
@@ -288,52 +294,60 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		if (cov > max)
 			max = cov;
 		avg += cov;
-		length++;
+		length++; // used for the coverage caluclations of the path later on
 		nextV = dbg.getVertex(prev);
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
 		sequence += lastchar;
 	}
-	avg /= float(length); // average
+	avg /= float(length); // average coverage over the path
 	// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
-	if (!nextV->is_visited() and ((avg > 50 or sequence.length() > dbg.getK()) and avg > 30))//and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30)
+	unsigned int threshold = 50;
+	unsigned int long_thresh = 30; // if the path is longer than e.g. read length, the coverage is allowed to be lower for detecting lowly abundant strains
+	if (!nextV->is_visited() and ((avg > threshold or sequence.length() > dbg.getK()) and avg > long_thresh))//and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30)
 	{
 		nextV->visit();
-		addVertex(index, prev);
+		addVertex(index, prev); // the vertex is new and found to be relevant
 		nextV->set_index(*index);
 	}
 	else if (!nextV->is_visited())
 	{
-		return std::make_pair(nextV,"");
+		return std::make_pair(nextV,""); // path has too low coverage
 	}
-	// this shouldnt happen (it does though) TODO
 	else if (succ.size() == 1 and pred.size() == 1)
 	{
-		return std::make_pair(nextV,"");
+		return std::make_pair(nextV,""); // TODO
+		// this vertex has been found on another path
 	}
+	// if the vertex has not been added, dont try to add an edge to it
 	if (nextV->get_index() == 0)
 		return std::make_pair(nextV,"");
-	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
-	boost::property_map<UGraph, boost::edge_capacity_t>::type cap = boost::get(boost::edge_capacity_t(), g_);
-	boost::property_map<UGraph, boost::edge_residual_capacity_t>::type len = boost::get(boost::edge_residual_capacity_t(), g_);
-	auto src = graph_[nextV->get_index()];
+	
+	auto name = boost::get(boost::edge_name_t(), g_);
+	auto cap = boost::get(boost::edge_capacity_t(), g_);
+	auto len = boost::get(boost::edge_residual_capacity_t(), g_);
+	
+	UVertex src = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
 	bool toAdd = true;
-	if ((sequence.length() <= dbg.getK() and avg < 50) or avg < 30)
+	float min_pass = 5; // minimal coverage allowed on edge
+	// path will not be added
+	// TODO we should not end up here with avg < threshold etc.
+	if ((sequence.length() <= dbg.getK() and avg < threshold) or avg < long_thresh)
 	{
 		toAdd = false;
 	}
-	else if (min < 5)
+	else if (min < min_pass)
 	{
-		//boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
-		//std::cerr << boost::get(vn,src) << " - " << boost::get(vn,trg) << " (" << sequence << ")" << std::endl;
+		// the path has a high enough average, but some edges on it had a low coverage
+		// TODO indel detected?
 		//toAdd = false; // this is interesting!
 	}
 	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge TODO
 	if ((!e.second or (e.second and (boost::get(name,e.first)) != sequence)) and toAdd)
 	{
 		e = boost::add_edge(src,trg,g_);
-		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg
+		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg, the sequence was added in reverse order
 		boost::put(name,e.first,sequence);
 		boost::put(cap,e.first,avg);
 		boost::put(len,e.first,sequence.length());
@@ -342,14 +356,14 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 }
 
 // same function like the reverse one, but going forward and finding successors
-std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, unsigned int coverage, deBruijnGraph& dbg)
+std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, float coverage, deBruijnGraph& dbg)
 {
 	// with a little effort this can be moved inside the while loop for efficiency reasons
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
 	// DEBUG, coverage information
-	unsigned int min = coverage; // TODO
-	unsigned int max = coverage;
+	float min = coverage; // TODO
+	float max = coverage;
 	float avg = coverage;
 	unsigned int length = 1;
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
@@ -389,7 +403,9 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited() and ((avg > 50 or sequence.length() > dbg.getK()) and avg > 30))//and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30) 
+	unsigned int threshold = 50;
+	unsigned int long_thresh = 30; // if the path is longer than e.g. read length, the coverage is allowed to be lower for detecting lowly abundant strains
+	if (!nextV->is_visited() and ((avg > threshold or sequence.length() > dbg.getK()) and avg > long_thresh)) // TODO dbg.getK() should e.g. be dbg.readLength() 
 	{
 		nextV->visit();
 		addVertex(index, next);
@@ -407,14 +423,14 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	// this vertex has been found and considered irrelevant because of insufficient coverage
 	if (nextV->get_index() == 0)
 		return std::make_pair(nextV,"");
-	boost::property_map<UGraph, boost::edge_name_t>::type name = boost::get(boost::edge_name_t(), g_);
-	boost::property_map<UGraph, boost::edge_capacity_t>::type cap = boost::get(boost::edge_capacity_t(), g_);
-	boost::property_map<UGraph, boost::edge_residual_capacity_t>::type len = boost::get(boost::edge_residual_capacity_t(), g_);
-	auto trg = graph_[nextV->get_index()];
+	auto name = boost::get(boost::edge_name_t(), g_);
+	auto cap = boost::get(boost::edge_capacity_t(), g_);
+	auto len = boost::get(boost::edge_residual_capacity_t(), g_);
+	UVertex trg = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
 	// error correction, TODO make threshold variable
 	bool toAdd = true;
-	if ((sequence.length() <= dbg.getK() and avg < 50) or avg < 30) // this path is considered illegal
+	if ((sequence.length() <= dbg.getK() and avg < threshold) or avg < long_thresh) // this path is considered illegal
 	{
 		/*boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
 		auto& sseq = boost::get(vn, uv);
@@ -425,8 +441,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	}
 	else if (min < 5)
 	{
-		//boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
-		//std::cerr << boost::get(vn,src) << " - " << boost::get(vn,trg) << " (" << sequence << ")" << std::endl;
+		// TODO
 	}
 	if ((!e.second or (e.second and (boost::get(name,e.first)) != sequence)) and toAdd)
 	{
@@ -438,6 +453,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	return std::make_pair(nextV,next);
 }
 
+// the graph might contain some unconnected vertices, clean up
 void UnitigGraph::cleanGraph()
 {
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
@@ -446,8 +462,8 @@ void UnitigGraph::cleanGraph()
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next) {
 		++next;
-		auto indegree = boost::in_degree(*vi, g_);
-		auto outdegree = boost::out_degree(*vi,g_);
+		unsigned int indegree = boost::in_degree(*vi, g_);
+		unsigned int outdegree = boost::out_degree(*vi,g_);
 		if (outdegree == 0 and indegree == 0)
 		{
 			boost::remove_vertex(*vi,g_);

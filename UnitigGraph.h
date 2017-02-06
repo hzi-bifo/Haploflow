@@ -32,8 +32,8 @@ public:
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
-	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, unsigned int, deBruijnGraph&);
-	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, unsigned int, deBruijnGraph&);
+	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, deBruijnGraph&);
+	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, deBruijnGraph&);
 	UVertex addVertex(unsigned int*, std::string name);
 	void cleanGraph();
 	
