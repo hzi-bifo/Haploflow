@@ -23,6 +23,8 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	clock_t t = clock();
 	// first retrieve all unbalanced vertices in debruijn graph
 	auto&& unbalanced = dbg.getJunctions();
+	// since we perform a dfs anyways, it should be enough to only consider all sources/all sinks
+	// fails to find "perfect cycles", those should be really unlikely though
 	auto&& out_unbalanced = unbalanced.first;
 	auto&& in_unbalanced = unbalanced.second;
 	unsigned int index = 1;
@@ -38,7 +40,6 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	}
 	for (auto& w: in_unbalanced)
 	{
-		break;
 		std::string curr = w.get_kmer();
 		Vertex* sink = dbg.getVertex(curr);
 		if (!sink->is_flagged() and sink->get_total_out_coverage() > 30 and sink->get_total_in_coverage() > 30)
@@ -68,56 +69,50 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	int i = 1;
 	int simpletons = 0;
 	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-	const auto& name = boost::get(boost::edge_name_t(),g_);
+	//const auto& name = boost::get(boost::edge_name_t(),g_);
 	const auto& vname = boost::get(boost::vertex_name_t(),g_);
 	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
 	{
 		unsigned int indegree = boost::in_degree(*vi,g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
-		if (false)
+		
+		float total_out = 0.;
+		float total_in = 0.;
+		
+		for (auto&& oe : boost::out_edges(*vi,g_))
 		{
-			if (indegree == 0)
-			{
-				if (outdegree == 1)
-					std::cerr << "Source: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
-				//else
-				//	std::cerr << "Unreal source: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
-			}
-			else if (outdegree == 0)
+			auto&& e = boost::edge(*vi,boost::target(oe,g_),g_);
+			total_out += boost::get(cap,e.first);
+		}
+
+		for (auto&& ie : boost::in_edges(*vi,g_))
+		{
+			auto&& e = boost::edge(boost::source(ie,g_),*vi,g_);
+			total_in += boost::get(cap,e.first);
+		}
+		float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
+		unsigned int delta = std::abs(total_out - total_in);
+
+		if (false) //DEBUG
+		{
+			if (outdegree == 0)
 			{
 				if (indegree == 1)
 					std::cerr << "Sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" <<std::endl;
-				//else
-				//	std::cerr << "Unreal sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
+				else
+					std::cerr << "Unreal sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
 			}
 			else if (indegree == 1 and outdegree == 1)
 				simpletons++;
-			else
+			if ((epsilon > 1.2 or epsilon < 0.8) and delta > 10 and indegree > 0 and outdegree > 0)
 			{
-				if (outdegree > 1)
-				{
-					for (const auto& out : boost::out_edges(*vi,g_))
-					{
-						auto e = boost::edge(*vi,boost::target(out,g_),g_);
-						std::cerr << boost::get(name,e.first) << ": " << boost::get(cap,e.first) << std::endl;
-					}
-					std::cerr << "___" << std::endl;
-				}
-				if (indegree > 1)
-				{
-					for (const auto& out : boost::in_edges(*vi,g_))
-					{
-						auto e = boost::edge(boost::source(out,g_),*vi,g_);
-						std::cerr << boost::get(name,e.first) << ": " << boost::get(cap,e.first) << std::endl;
-					}
-					std::cerr << "____" <<std::endl;
-				}
+				std::cerr << boost::get(vname,*vi) << " (" << epsilon << "(" << total_out << ")/" << i << ")" << std::endl;
 			}
 		}
 		boost::put(propmapIndex,*vi,i++);
 	}
-	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
-	//boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -137,6 +132,7 @@ UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
 // function for connecting a given source/sink vertex to all its unbalanced successors/predecessors
 void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::string curr, deBruijnGraph& dbg)
 {
+	// FIFO queue for the vertices, so we do not find a reverse complement before the original vertex
 	std::queue<std::pair<Vertex*,std::string> > todo;
 	todo.push(std::make_pair(source,curr));
 	do 
@@ -147,32 +143,55 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 		std::string seq = next.second;
 		std::vector<char> succ = junction->get_successors();
 		std::vector<char> pred = junction->get_predecessors();
+		bool to_search = false;
+		// check if there might be valid paths
+		for (const char& c : succ)
+		{
+			if (junction->get_out_coverage(c) > 30)
+			{
+				to_search = true; break;
+			}
+		}
+		if (!to_search)
+		{
+			for (const char& c : pred)
+			{
+				if (junction->get_in_coverage(c) > 30)
+				{
+					to_search = true; break;
+				}
+			}
+		}
 		UVertex uv;
-		// if the source is not yet a vertex of the graph, add it
+		// a junction is flagged if it has been on the stack before and does not need to be searched again
 		if (junction->is_flagged())
 		{
 			continue;
 		}
-		if (!junction->is_visited() and junction->get_total_out_coverage() > 30 and junction->get_total_in_coverage() > 30)
+		// if the source is not yet a vertex of the graph, add it
+		if (!junction->is_visited() and to_search) 
 		{
+			junction->visit();
 			uv = addVertex(index, seq);
 			junction->set_index(*index);
 			//dfs for all neighbours
 		}
-		else if (!junction->is_visited())
+		else if (!junction->is_visited()) // this vertex is considered to be an erroneous kmer
 		{
+			junction->visit();
 			junction->flag();
 			continue;
 		}
 		else
-		{
+		{ //this vertex has already been found as the next junction of some other vertex, do not add again
 			unsigned int idx = junction->get_index();
 			uv = graph_[idx];
 		}
 		junction->visit(); // make sure the next time we find it we dont add it another time
 		auto&& following = addNeighbours(seq, succ, pred, dbg, index, uv); // finding the next unbalanced vertices
 		for (auto v : following)
-		{
+		{	
+			// if no sequence is returned, no vertex was added, so we do not need to continue on this vertex
 			if (v.second != "")
 				todo.push(v);
 		}
@@ -195,6 +214,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 	{
 		return following; // the neighbours for this vertex have been added
 	}
+	float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
 	Sequence src = dbg.getSequence(curr);
 	// this is for checking whether the reverse complement is in the debruijn graph
 	bool reverse = false;
@@ -202,7 +222,6 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 	{
 		reverse = true; 
 	}
-	// check for "real" source/sink property here?
 	for (const auto& n : succ)
 	{
 		std::string sequence("");
@@ -218,6 +237,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 			if (!nextV->is_flagged())
 				following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, dbg));
 		}
+		// if we are a reverse complement, we actually want to add the path in reverse order
 		else
 		{
 			next = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
@@ -289,6 +309,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 			cov = nextV->get_in_coverage(pred[0]); // see above
 		}
 		prev = c + prev.substr(0, prev.length() - 1);
+		// update the coverage of the path
 		if (cov < min)
 			min = cov;
 		if (cov > max)
@@ -302,9 +323,10 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	}
 	avg /= float(length); // average coverage over the path
 	// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
-	unsigned int threshold = 50;
+	unsigned int threshold = 50; //TODO variable/based on mean/median/... coverage?
 	unsigned int long_thresh = 30; // if the path is longer than e.g. read length, the coverage is allowed to be lower for detecting lowly abundant strains
-	if (!nextV->is_visited() and ((avg > threshold or sequence.length() > dbg.getK()) and avg > long_thresh))//and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30)
+	
+	if (!nextV->is_visited() and ((avg >= threshold or sequence.length() > dbg.getK()) and avg >= long_thresh))//and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30)
 	{
 		nextV->visit();
 		addVertex(index, prev); // the vertex is new and found to be relevant
@@ -321,12 +343,14 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	}
 	// if the vertex has not been added, dont try to add an edge to it
 	if (nextV->get_index() == 0)
+	{
 		return std::make_pair(nextV,"");
-	
+	}
+
 	auto name = boost::get(boost::edge_name_t(), g_);
 	auto cap = boost::get(boost::edge_capacity_t(), g_);
 	auto len = boost::get(boost::edge_residual_capacity_t(), g_);
-	
+
 	UVertex src = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
 	bool toAdd = true;
@@ -405,7 +429,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	avg /= float(length);
 	unsigned int threshold = 50;
 	unsigned int long_thresh = 30; // if the path is longer than e.g. read length, the coverage is allowed to be lower for detecting lowly abundant strains
-	if (!nextV->is_visited() and ((avg > threshold or sequence.length() > dbg.getK()) and avg > long_thresh)) // TODO dbg.getK() should e.g. be dbg.readLength() 
+	if (!nextV->is_visited() and ((avg >= threshold or sequence.length() > dbg.getK()) and avg >= long_thresh)) // TODO dbg.getK() should e.g. be dbg.readLength() 
 	{
 		nextV->visit();
 		addVertex(index, next);
@@ -422,7 +446,9 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	}
 	// this vertex has been found and considered irrelevant because of insufficient coverage
 	if (nextV->get_index() == 0)
+	{
 		return std::make_pair(nextV,"");
+	}
 	auto name = boost::get(boost::edge_name_t(), g_);
 	auto cap = boost::get(boost::edge_capacity_t(), g_);
 	auto len = boost::get(boost::edge_residual_capacity_t(), g_);
@@ -430,6 +456,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	auto e = boost::edge(src,trg,g_);
 	// error correction, TODO make threshold variable
 	bool toAdd = true;
+	float min_pass = 5; // minimal coverage allowed on edge
 	if ((sequence.length() <= dbg.getK() and avg < threshold) or avg < long_thresh) // this path is considered illegal
 	{
 		/*boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
@@ -439,7 +466,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		Vertex* w = dbg.getVertex(next);*/
 		toAdd = false;
 	}
-	else if (min < 5)
+	else if (min < min_pass)
 	{
 		// TODO
 	}
@@ -454,11 +481,42 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 }
 
 // the graph might contain some unconnected vertices, clean up
+// TODO maybe some more cleaning (e.g. long, simple paths)
 void UnitigGraph::cleanGraph()
 {
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
-	boost::tie(vi, vi_end) = boost::vertices(g_);
 	//boost::property_map<UGraph, boost::vertex_name_t>::type name = boost::get(boost::vertex_name_t(), g_);
+	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
+	const auto& name = boost::get(boost::edge_name_t(),g_);
+	boost::tie(vi, vi_end) = boost::vertices(g_);
+	for (next = vi; vi != vi_end; vi = next)
+	{
+		++next;
+		unsigned int indegree = boost::in_degree(*vi, g_);
+		unsigned int outdegree = boost::out_degree(*vi,g_);
+		
+		// if in and outdegree is 1, we are on a simple path and can contract again
+		if (outdegree == 1 and indegree == 1)
+		{
+			auto&& ie = boost::in_edges(*vi,g_);
+			auto&& oe = boost::out_edges(*vi,g_);
+			auto&& new_source = boost::source(*ie.first,g_);
+			auto&& new_target = boost::target(*oe.first,g_);
+			auto&& e = boost::edge(new_source,*vi,g_);
+			std::string seq = boost::get(name,e.first);
+			unsigned int w = seq.length();
+			float capacity = boost::get(cap,e.first) * w;
+			e = boost::edge(*vi,new_target,g_);
+			seq += boost::get(name,e.first);
+			capacity += (boost::get(cap,e.first) * (seq.length() - w));
+			capacity /= seq.length();
+			e = boost::add_edge(new_source,new_target,g_);
+			boost::put(name,e.first,seq);
+			boost::put(cap,e.first,capacity);
+			boost::clear_vertex(*vi,g_);
+			boost::remove_vertex(*vi,g_);
+		}
+	}
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next) {
 		++next;
@@ -471,7 +529,8 @@ void UnitigGraph::cleanGraph()
 	}
 }
 
+// calculates the flows and corresponding paths through the graph
 void UnitigGraph::calculateFlow() const
 {
-
+	
 }
