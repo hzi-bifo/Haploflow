@@ -14,6 +14,7 @@ Vertex::Vertex() :
 										n_out(0),
 										degree(0),
 										visited(false),
+										flagged(false),
 										index(0)
 {
 }
@@ -31,6 +32,7 @@ Vertex::Vertex(const Vertex& v) :
 	n_out(v.n_out),
 	degree(v.degree),
 	visited(v.visited),
+	flagged(v.flagged),
 	index(v.index)
 {
 }
