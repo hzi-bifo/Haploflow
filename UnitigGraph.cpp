@@ -82,13 +82,13 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 		for (auto&& oe : boost::out_edges(*vi,g_))
 		{
 			auto&& e = boost::edge(*vi,boost::target(oe,g_),g_);
-			total_out += boost::get(cap,e.first);
+			total_out += boost::get(cap,e.first).first;
 		}
 
 		for (auto&& ie : boost::in_edges(*vi,g_))
 		{
 			auto&& e = boost::edge(boost::source(ie,g_),*vi,g_);
-			total_in += boost::get(cap,e.first);
+			total_in += boost::get(cap,e.first).first;
 		}
 		float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
 		unsigned int delta = std::abs(total_out - total_in);
@@ -112,7 +112,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 		boost::put(propmapIndex,*vi,i++);
 	}
 	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
-	boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::make_label_writer(boost::get(boost::edge_residual_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -201,10 +201,6 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 // iterating over all neighbours of current node, build the different sequences to the next unbalanced node
 std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int* index, UVertex& uv)
 {
-	//bool rc = false;
-	// since the source or the sink node has been created before, every edge can at least add one new vertex
-	// this means the index can be increased by at most one in every step of the for loop
-	// first, find the successing unbalanced vertices
 	std::vector<std::pair<Vertex*,std::string> > following;
 	Vertex* currV = dbg.getVertex(curr);
 	unsigned int total_out = currV->get_total_out_coverage();
@@ -226,8 +222,8 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 	{
 		std::string sequence("");
 		std::string next;
-		unsigned int coverage = currV->get_out_coverage(n);
-		float pcov = coverage/total_out; // percentage of coverage
+		float coverage = currV->get_out_coverage(n);
+		float pcov = coverage/float(total_out);// TODO /total_out; // percentage of coverage
 		if (!reverse)
 		{
 			next = curr.substr(1) + n;
@@ -235,7 +231,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 			Sequence s = dbg.getSequence(next);
 			sequence += n;
 			if (!nextV->is_flagged())
-				following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, dbg));
+				following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, pcov, dbg));
 		}
 		// if we are a reverse complement, we actually want to add the path in reverse order
 		else
@@ -245,7 +241,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 			Sequence s = dbg.getSequence(next);
 			sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr (by definition)
 			if (!nextV->is_flagged())
-				following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, dbg));
+				following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, pcov, dbg));
 		}
 	}
 	// finding the predecessing unbalanced vertices
@@ -253,8 +249,8 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 	{
 		std::string sequence("");
 		std::string prev; 
-		unsigned int coverage = currV->get_in_coverage(n);
-		float pcov = coverage/total_in; // percentage of coverage
+		float coverage = currV->get_in_coverage(n);
+		float pcov = coverage/float(total_in); 
 		if (!reverse)
 		{
 			prev = n + curr.substr(0,curr.length() - 1);
@@ -262,7 +258,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 			Sequence s = dbg.getSequence(prev);
 			sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr
 			if (!nextV->is_flagged())
-				following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, dbg));
+				following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, pcov, dbg));
 		}
 		else
 		{
@@ -271,7 +267,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 			Sequence s = dbg.getSequence(prev);
 			sequence += deBruijnGraph::complement(n);
 			if (!nextV->is_flagged())
-				following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, dbg));
+				following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, pcov, dbg));
 		}
 	}
 	currV->flag(); // this vertex is done
@@ -279,8 +275,9 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 }
 
 // go back through the graph until the next unbalanced node is found and add an ("reversed") edge
-std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, float coverage, deBruijnGraph& dbg)
+std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg)
 {
+	float frac = pcov; // the amount of flow for certain char divided by total flow towards this vertex
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
 	// DEBUG
@@ -349,7 +346,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 
 	auto name = boost::get(boost::edge_name_t(), g_);
 	auto cap = boost::get(boost::edge_capacity_t(), g_);
-	auto len = boost::get(boost::edge_residual_capacity_t(), g_);
+	auto rcap = boost::get(boost::edge_residual_capacity_t(),g_);
 
 	UVertex src = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
@@ -373,15 +370,16 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		e = boost::add_edge(src,trg,g_);
 		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg, the sequence was added in reverse order
 		boost::put(name,e.first,sequence);
-		boost::put(cap,e.first,avg);
-		boost::put(len,e.first,sequence.length());
+		boost::put(cap,e.first,std::make_pair(avg,frac));
+		boost::put(rcap,e.first,frac);
 	}
 	return std::make_pair(nextV,prev);
 }
 
 // same function like the reverse one, but going forward and finding successors
-std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, float coverage, deBruijnGraph& dbg)
+std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg)
 {
+	float frac = pcov;// the amount of flow for certain char divided by total flow towards this vertex
 	// with a little effort this can be moved inside the while loop for efficiency reasons
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
@@ -449,9 +447,11 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	{
 		return std::make_pair(nextV,"");
 	}
+	
 	auto name = boost::get(boost::edge_name_t(), g_);
 	auto cap = boost::get(boost::edge_capacity_t(), g_);
-	auto len = boost::get(boost::edge_residual_capacity_t(), g_);
+	auto rcap = boost::get(boost::edge_residual_capacity_t(),g_);
+	
 	UVertex trg = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
 	// error correction, TODO make threshold variable
@@ -474,8 +474,8 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	{
 		e = boost::add_edge(src,trg,g_);
 		boost::put(name,e.first,sequence);
-		boost::put(cap,e.first,avg);
-		boost::put(len,e.first,sequence.length());
+		boost::put(cap,e.first,std::make_pair(avg,frac));
+		boost::put(rcap,e.first,frac);
 	}
 	return std::make_pair(nextV,next);
 }
@@ -487,6 +487,7 @@ void UnitigGraph::cleanGraph()
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
 	//boost::property_map<UGraph, boost::vertex_name_t>::type name = boost::get(boost::vertex_name_t(), g_);
 	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
+	const auto& rcap = boost::get(boost::edge_residual_capacity_t(),g_);
 	const auto& name = boost::get(boost::edge_name_t(),g_);
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next)
@@ -495,6 +496,7 @@ void UnitigGraph::cleanGraph()
 		unsigned int indegree = boost::in_degree(*vi, g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
+		//if (false) // this might be too strict, capacity information is not really preserved
 		// if in and outdegree is 1, we are on a simple path and can contract again
 		if (outdegree == 1 and indegree == 1)
 		{
@@ -505,14 +507,15 @@ void UnitigGraph::cleanGraph()
 			auto&& e = boost::edge(new_source,*vi,g_);
 			std::string seq = boost::get(name,e.first);
 			unsigned int w = seq.length();
-			float capacity = boost::get(cap,e.first) * w;
+			float capacity = boost::get(cap,e.first).second * w;
 			e = boost::edge(*vi,new_target,g_);
 			seq += boost::get(name,e.first);
-			capacity += (boost::get(cap,e.first) * (seq.length() - w));
+			capacity += (boost::get(cap,e.first).second * (seq.length() - w));
 			capacity /= seq.length();
 			e = boost::add_edge(new_source,new_target,g_);
 			boost::put(name,e.first,seq);
-			boost::put(cap,e.first,capacity);
+			boost::put(cap,e.first,std::make_pair(capacity,capacity)); // TODO
+			boost::put(rcap,e.first,capacity);
 			boost::clear_vertex(*vi,g_);
 			boost::remove_vertex(*vi,g_);
 		}

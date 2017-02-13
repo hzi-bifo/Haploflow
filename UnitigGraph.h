@@ -17,8 +17,8 @@ typedef boost::adjacency_list<boost::listS, boost::listS, boost::bidirectionalS,
 						boost::property<boost::vertex_index1_t, unsigned int,
 						boost::property<boost::vertex_name_t, std::string> >,
 							boost::property<boost::edge_name_t, std::string,
-							boost::property<boost::edge_capacity_t, float,
-							boost::property<boost::edge_residual_capacity_t, unsigned int> > > > UGraph;
+							boost::property<boost::edge_capacity_t, std::pair<float,float>,
+							boost::property<boost::edge_residual_capacity_t, float> > > > UGraph;
 
 typedef typename boost::graph_traits<UGraph>::vertex_descriptor UVertex;
 typedef typename boost::graph_traits<UGraph>::edge_descriptor UEdge;
@@ -32,8 +32,8 @@ public:
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
-	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, deBruijnGraph&);
-	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, deBruijnGraph&);
+	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
+	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
 	UVertex addVertex(unsigned int*, std::string name);
 	void cleanGraph();
 	
