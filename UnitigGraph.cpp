@@ -285,14 +285,16 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	float max = coverage;
 	float avg = coverage;
 	unsigned int length = 1;
+	auto vn = boost::get(boost::vertex_name_t(), g_);
+	char lastchar = boost::get(vn,trg).back(); //char with which we are pointing to trg
 	// loop until the next unbalanced node is found, which is either visited (has been added) or will be added
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
 		nextV->visit();
 		Sequence tmp = dbg.getSequence(prev); // check for reverse complimentarity
-		char c;
 		unsigned int cov;
-		char lastchar = prev.back(); // this will be added to the sequence
+		char c;
+		lastchar = prev.back(); // this will be added to the sequence
 		if (tmp != prev) // we are a reverse complement
 		{
 			/* if Z<-Y, Y on the complementary strand of Z and Y->X with character c:
@@ -371,7 +373,19 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg, the sequence was added in reverse order
 		boost::put(name,e.first,sequence);
 		boost::put(cap,e.first,std::make_pair(avg,frac));
-		boost::put(rcap,e.first,frac);
+		Sequence s = dbg.getSequence(prev);
+		if (s != prev)
+		{
+			float in = nextV->get_in_coverage(deBruijnGraph::complement(lastchar));
+			float tot_in = nextV->get_total_in_coverage();
+			boost::put(rcap,e.first,in/tot_in);
+		}
+		else
+		{
+			float out = nextV->get_out_coverage(lastchar);
+			float tot_out = nextV->get_total_out_coverage();
+			boost::put(rcap,e.first,out/tot_out);
+		}
 	}
 	return std::make_pair(nextV,prev);
 }
@@ -496,7 +510,7 @@ void UnitigGraph::cleanGraph()
 		unsigned int indegree = boost::in_degree(*vi, g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
-		//if (false) // this might be too strict, capacity information is not really preserved
+		if (false) // this might be too strict, capacity information is not really preserved
 		// if in and outdegree is 1, we are on a simple path and can contract again
 		if (outdegree == 1 and indegree == 1)
 		{
