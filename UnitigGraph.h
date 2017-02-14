@@ -15,7 +15,8 @@
 
 typedef boost::adjacency_list<boost::listS, boost::listS, boost::bidirectionalS,
 						boost::property<boost::vertex_index1_t, unsigned int,
-						boost::property<boost::vertex_name_t, std::string> >,
+						boost::property<boost::vertex_index2_t, unsigned int,
+						boost::property<boost::vertex_name_t, std::string> > >,
 							boost::property<boost::edge_name_t, std::string,
 							boost::property<boost::edge_capacity_t, std::pair<float,float>,
 							boost::property<boost::edge_residual_capacity_t, float> > > > UGraph;
@@ -37,8 +38,9 @@ private:
 	UVertex addVertex(unsigned int*, std::string name);
 	void cleanGraph();
 	
-	void calculateFlow() const;	
+	void calculateFlow();
 
+	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
 	UGraph g_;
 	std::unordered_map<unsigned int, UVertex> graph_;
 };

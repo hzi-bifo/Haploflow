@@ -17,34 +17,35 @@ namespace std
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 {
 	std::cerr << "Building unitig graph from deBruijn graph..." << std::endl;
 	clock_t t = clock();
-	// first retrieve all unbalanced vertices in debruijn graph
-	auto&& unbalanced = dbg.getJunctions();
-	// since we perform a dfs anyways, it should be enough to only consider all sources/all sinks
-	// fails to find "perfect cycles", those should be really unlikely though
-	auto&& out_unbalanced = unbalanced.first;
-	auto&& in_unbalanced = unbalanced.second;
+	auto&& junc = dbg.getJunctions();
 	unsigned int index = 1;
-	// the functions for connecting them does not differ
+	auto&& out_unbalanced = junc.first;
+	auto&& in_unbalanced = junc.second;
+	// starting from the sources, we build the unitig graph
 	for (auto& v : out_unbalanced)
 	{
 		std::string curr = v.get_kmer();
 		Vertex* source = dbg.getVertex(curr);
-		if (!source->is_flagged() and source->get_total_out_coverage() > 30 and source->get_total_in_coverage() > 30)
+		// make a guess whether we are relevant already (in_coverage should always be 0 though)
+		if (!source->is_flagged() and (source->get_total_out_coverage() > 30 or source->get_total_in_coverage() > 30))
 		{
-			connectUnbalanced(source, &index, curr, dbg);
+			connectUnbalanced(source, &index, curr, dbg); 
+			cc_++; // new connected component found
 		}
 	}
-	for (auto& w: in_unbalanced)
+	for (auto& v : in_unbalanced)
 	{
-		std::string curr = w.get_kmer();
-		Vertex* sink = dbg.getVertex(curr);
-		if (!sink->is_flagged() and sink->get_total_out_coverage() > 30 and sink->get_total_in_coverage() > 30)
+		std::string curr = v.get_kmer();
+		Vertex* source = dbg.getVertex(curr);
+		// make a guess whether we are relevant already (in_coverage should always be 0 though)
+		if (!source->is_flagged() and (source->get_total_out_coverage() > 30 or source->get_total_in_coverage() > 30))
 		{
-			connectUnbalanced(sink, &index, curr, dbg);
+			connectUnbalanced(source, &index, curr, dbg); 
+			cc_++; // new connected component found
 		}
 	}
 	std::cerr << "Unitig graph succesfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
@@ -55,6 +56,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	std::cerr << "Unitig graph has " << numV << " vertices and " << numE << " edges, starting cleaning" << std::endl;
 	t = clock();
 
+	//TODO move this out
 	cleanGraph();
 	
 	numV = boost::num_vertices(g_);
@@ -113,17 +115,20 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg)
 	}
 	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
 	boost::write_graphviz(std::cout, g_, boost::default_writer(), boost::make_label_writer(boost::get(boost::edge_residual_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index2_t(),g_)), boost::make_label_writer(boost::get(boost::edge_residual_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
 UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
 {
 	UVertex uv = boost::add_vertex(g_);
-	boost::property_map<UGraph, boost::vertex_name_t>::type n = boost::get(boost::vertex_name_t(), g_);
+	auto n = boost::get(boost::vertex_name_t(), g_);
 	boost::put(n, uv, name);
-	boost::property_map<UGraph, boost::vertex_index1_t>::type idx = boost::get(boost::vertex_index1_t(), g_);
+	auto idx = boost::get(boost::vertex_index1_t(), g_);
 	(*index)++;
 	boost::put(idx, uv, *index);
+	auto cc = boost::get(boost::vertex_index2_t(), g_);
+	boost::put(cc, uv, cc_);
 	auto&& ins = std::make_pair(*index,uv);
 	graph_.insert(ins);
 	return uv;
@@ -510,7 +515,7 @@ void UnitigGraph::cleanGraph()
 		unsigned int indegree = boost::in_degree(*vi, g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
-		if (false) // this might be too strict, capacity information is not really preserved
+		//if (false) // this might be too strict, capacity information is not really preserved
 		// if in and outdegree is 1, we are on a simple path and can contract again
 		if (outdegree == 1 and indegree == 1)
 		{
@@ -521,10 +526,10 @@ void UnitigGraph::cleanGraph()
 			auto&& e = boost::edge(new_source,*vi,g_);
 			std::string seq = boost::get(name,e.first);
 			unsigned int w = seq.length();
-			float capacity = boost::get(cap,e.first).second * w;
+			float capacity = boost::get(cap,e.first).first * w;
 			e = boost::edge(*vi,new_target,g_);
 			seq += boost::get(name,e.first);
-			capacity += (boost::get(cap,e.first).second * (seq.length() - w));
+			capacity += (boost::get(cap,e.first).first * (seq.length() - w));
 			capacity /= seq.length();
 			e = boost::add_edge(new_source,new_target,g_);
 			boost::put(name,e.first,seq);
@@ -533,6 +538,14 @@ void UnitigGraph::cleanGraph()
 			boost::clear_vertex(*vi,g_);
 			boost::remove_vertex(*vi,g_);
 		}
+	}
+	// DEBUG
+	boost::graph_traits<UGraph>::edge_iterator ei, ei_end;
+	boost::tie(ei, ei_end) = boost::edges(g_);
+	for (; ei != ei_end; ei++)
+	{
+		float c = boost::get(cap,*ei).first;
+		boost::put(rcap,*ei,c);
 	}
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next) {
@@ -547,7 +560,7 @@ void UnitigGraph::cleanGraph()
 }
 
 // calculates the flows and corresponding paths through the graph
-void UnitigGraph::calculateFlow() const
+void UnitigGraph::calculateFlow()
 {
 	
 }
