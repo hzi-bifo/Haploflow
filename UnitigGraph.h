@@ -37,7 +37,8 @@ private:
 	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
 	UVertex addVertex(unsigned int*, std::string name);
 	void cleanGraph();
-	
+
+	std::vector<std::vector<UVertex> > getSources() const;
 	void calculateFlow();
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's

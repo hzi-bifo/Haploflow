@@ -500,7 +500,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 }
 
 // the graph might contain some unconnected vertices, clean up
-// TODO maybe some more cleaning (e.g. long, simple paths)
 void UnitigGraph::cleanGraph()
 {
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
@@ -515,7 +514,7 @@ void UnitigGraph::cleanGraph()
 		unsigned int indegree = boost::in_degree(*vi, g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
-		//if (false) // this might be too strict, capacity information is not really preserved
+		if (false) // this might be too strict, capacity information is not really preserved
 		// if in and outdegree is 1, we are on a simple path and can contract again
 		if (outdegree == 1 and indegree == 1)
 		{
@@ -559,8 +558,37 @@ void UnitigGraph::cleanGraph()
 	}
 }
 
+// returns the sources of the graph sorted by their connected components
+std::vector<std::vector<UVertex> > UnitigGraph::getSources() const
+{
+	auto cc = boost::get(boost::vertex_index2_t(), g_);
+	unsigned int cc_count = 0; // "real" number of ccs
+	std::vector<std::vector<UVertex> > sources;
+	std::unordered_map<unsigned int,unsigned int> cc_map;
+	for (auto&& v : boost::vertices(g_))
+	{
+		if (boost::in_degree(v,g_) == 0)
+		{
+			unsigned int curr_cc = boost::get(cc,v);
+			auto miter = cc_map.find(curr_cc);
+			if (miter == cc_map.end())
+			{
+				std::vector<UVertex> cc_i({v});
+				sources.push_back(cc_i);
+				cc_map.insert(std::make_pair(curr_cc,cc_count++));
+			}
+			else
+			{
+				sources[miter->second].push_back(v);
+			}
+		}
+	}
+	return sources;
+}
+
 // calculates the flows and corresponding paths through the graph
 void UnitigGraph::calculateFlow()
 {
+	auto sources = getSources();
 	
 }
