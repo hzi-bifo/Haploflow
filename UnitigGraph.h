@@ -12,24 +12,28 @@
 #include <boost/graph/filtered_graph.hpp>
 #include "deBruijnGraph.h"
 #include <unordered_set>
+#include <queue>
 
 typedef boost::adjacency_list<boost::listS, boost::listS, boost::bidirectionalS,
 						boost::property<boost::vertex_index1_t, unsigned int,
 						boost::property<boost::vertex_index2_t, unsigned int,
 						boost::property<boost::vertex_name_t, std::string> > >,
 							boost::property<boost::edge_name_t, std::string,
-							boost::property<boost::edge_capacity_t, std::pair<float,float>,
+							boost::property<boost::edge_capacity_t, float,
 							boost::property<boost::edge_residual_capacity_t, float> > > > UGraph;
 
 typedef typename boost::graph_traits<UGraph>::vertex_descriptor UVertex;
 typedef typename boost::graph_traits<UGraph>::edge_descriptor UEdge;
 typedef boost::graph_traits<UGraph>::vertex_iterator uvertex_iter;
 
+typedef std::vector<UVertex> Connected_Component; // to distinguish from regular std::vector<UVertex>
+
 // wrapper around the unitig graph defined above
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
 	UnitigGraph(deBruijnGraph&);
+	void calculateFlow();
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
@@ -39,11 +43,11 @@ private:
 	void cleanGraph();
 
 	std::vector<std::vector<UVertex> > getSources() const;
-	void calculateFlow();
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
 	UGraph g_;
 	std::unordered_map<unsigned int, UVertex> graph_;
+	
 };
 
 #endif
