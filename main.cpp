@@ -9,5 +9,6 @@ int main (int argc, char* argv[])
 	std::cerr << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
 	//dbg.debug();
 	UnitigGraph ug(dbg);
+	ug.calculateFlow();
 	return 0;
 }
