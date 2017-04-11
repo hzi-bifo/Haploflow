@@ -52,6 +52,8 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 			cc_++; // new connected component found
 		}
 	}
+	// TODO everything down here is debug information! TODO
+
 	std::cerr << "Unitig graph succesfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
 	// DEBUG
 	auto&& numV = boost::num_vertices(g_);
@@ -350,6 +352,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 
 	auto name = boost::get(boost::edge_name_t(), g_);
 	auto cap = boost::get(boost::edge_capacity_t(), g_);
+	auto visit = boost::get(boost::edge_index_t(), g_);
 
 	UVertex src = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
@@ -373,6 +376,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg, the sequence was added in reverse order
 		boost::put(name,e.first,sequence);
 		boost::put(cap,e.first,avg);
+		boost::put(visit,e.first,false);
 	}
 	return std::make_pair(nextV,prev);
 }
@@ -448,6 +452,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	
 	auto name = boost::get(boost::edge_name_t(), g_);
 	auto cap = boost::get(boost::edge_capacity_t(), g_);
+	auto visit = boost::get(boost::edge_index_t(), g_);
 	
 	UVertex trg = graph_[nextV->get_index()];
 	auto e = boost::edge(src,trg,g_);
@@ -471,6 +476,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		e = boost::add_edge(src,trg,g_);
 		boost::put(name,e.first,sequence);
 		boost::put(cap,e.first,avg);
+		boost::put(visit,e.first,false);
 	}
 	return std::make_pair(nextV,next);
 }
@@ -482,6 +488,7 @@ void UnitigGraph::cleanGraph()
 	//boost::property_map<UGraph, boost::vertex_name_t>::type name = boost::get(boost::vertex_name_t(), g_);
 	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
 	const auto& name = boost::get(boost::edge_name_t(),g_);
+	const auto& visit = boost::get(boost::edge_index_t(), g_);
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next)
 	{
@@ -489,7 +496,7 @@ void UnitigGraph::cleanGraph()
 		unsigned int indegree = boost::in_degree(*vi, g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
-		if (false) //TODO if (debug) this might be too strict, capacity information is not really preserved
+		//if (false) //TODO this might be too strict, capacity information is not really preserved
 		// if in and outdegree is 1, we are on a simple path and can contract again
 		if (outdegree == 1 and indegree == 1)
 		{
@@ -508,7 +515,8 @@ void UnitigGraph::cleanGraph()
 			capacity /= seq.length(); 											// <-
 			e = boost::add_edge(new_source,new_target,g_);
 			boost::put(name,e.first,seq);
-			boost::put(cap,e.first,capacity); // TODO
+			boost::put(cap,e.first,capacity);
+			boost::put(visit,e.first,false);
 			boost::clear_vertex(*vi,g_);
 			boost::remove_vertex(*vi,g_);
 		}
@@ -560,38 +568,99 @@ std::vector<Connected_Component> UnitigGraph::getSources() const
 	return sources;
 }
 
+// the vector should be a heap!
+void UnitigGraph::add_sorted_edges(std::vector<UEdge>& q, const UVertex& source)
+{
+	auto edgeCompare = [&](UEdge e1, UEdge e2){
+		const auto& cap = boost::get(boost::edge_capacity_t(),g_);
+		return boost::get(cap, e1) < boost::get(cap, e2); // highest capacity first
+	}; //lambda for comparing to edges based on their capacity
+	
+	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
+	auto out_edges = boost::out_edges(source, g_);
+	for (const auto& oe : out_edges)
+	{
+		if (boost::get(cap, oe) > THRESHOLD) // TODO (this should never fail)
+		{
+			q.push_back(oe);
+			std::push_heap(q.begin(), q.end(), edgeCompare);
+		}
+	}
+}
+
 // calculates the flows and corresponding paths through the graph
 void UnitigGraph::calculateFlow()
 {
 	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-	
+	const auto& vname = boost::get(boost::vertex_name_t(), g_);
+	const auto& ename = boost::get(boost::edge_name_t(), g_);
+	const auto& visit = boost::get(boost::edge_index_t(), g_);
+
 	// sources is a vector of all sources of a certain connected component
 	auto sources = getSources();
 	
+	unsigned int j = 0; // contig number
 	for (const Connected_Component& cc : sources)
 	{
-		auto edgeCompare = [&](UEdge e1, UEdge e2){
-			const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-			return boost::get(cap, e1) < boost::get(cap, e2);
-		}; //lambda for comparing to edges based on their capacity
-		std::priority_queue<UEdge, std::vector<UEdge>, decltype(edgeCompare)> q(edgeCompare);
+		std::vector<UEdge> q;
+		std::make_heap(q.begin(), q.end());
 		// sort all first edges by their capacity
 		for (const auto& source : cc)
 		{
-			int max_capacity = 0; // start with the source having the highest out_capacity
-			auto out_edges = boost::out_edges(source, g_);
-			for (const auto& oe : out_edges)
-			{
-				auto target = boost::target(oe, g_);
-				auto real_edge = boost::edge(source,target,g_); // capacity is stored in edge not out- or inedge
-				if (boost::get(cap, real_edge.first) > THRESHOLD)
-				{
-				}
-				q.push(real_edge.first);
-			}
+			add_sorted_edges(q,source); //creates a heap
 		}
-		auto first_edge = q.top(); q.pop();
-		
-	}
+		std::sort_heap(q.begin(), q.end());
+		auto first_edge = q.back(); std::pop_heap(q.begin(), q.end()); q.pop_back();
+		auto source = boost::source(first_edge, g_);
+		auto target = boost::target(first_edge, g_);
+		std::string sequence = boost::get(vname, source);
+		std::vector<float> coverage_fraction; // fraction of the path
+		std::vector<UEdge> visited_edges; // edges on the fattest path
 
+		int outdegree = boost::out_degree(target, g_);
+		UEdge next_edge;
+
+		while (outdegree) // not a sink
+		{
+			std::vector<UEdge> fattest_edges;
+			std::make_heap(fattest_edges.begin(), fattest_edges.end());
+			add_sorted_edges(fattest_edges, target);
+			std::sort_heap(fattest_edges.begin(), fattest_edges.end());
+			// if next_edge is visited, we found a cycle, break it by following the second fattest edge
+			float total_coverage = 0.;
+			for (const auto& e : fattest_edges)
+			{
+				total_coverage += boost::get(cap, e);
+			}
+			next_edge = fattest_edges.back();
+			if (boost::get(visit, next_edge))
+			{
+				while (!fattest_edges.empty() and boost::get(visit, next_edge))
+				{
+					next_edge = fattest_edges.back();
+					std::pop_heap(fattest_edges.begin(), fattest_edges.end());
+					fattest_edges.pop_back();
+				}
+			}
+			else
+			{
+				std::pop_heap(fattest_edges.begin(), fattest_edges.end());
+				fattest_edges.pop_back();
+			}
+			target = boost::target(next_edge, g_);
+			sequence += boost::get(ename, next_edge); // add to current sequence
+			coverage_fraction.push_back(boost::get(cap,next_edge)/total_coverage); // fraction of outflow
+			visited_edges.push_back(next_edge); // has already been updated here
+			boost::put(visit, next_edge, true); // mark edge as visited
+			outdegree = boost::out_degree(target, g_);
+		}
+		sequence += boost::get(vname, target);
+		for (unsigned int i = 0; i < coverage_fraction.size(); i++)
+		{
+			std::cerr << coverage_fraction[i]*100 << "%";
+			std::cerr << " out of total " << boost::get(cap, visited_edges[i]) << std::endl;
+		}
+		std::cout << "Contig_" << j++ << std::endl;
+		std::cout << sequence << std::endl;
+	}
 }
