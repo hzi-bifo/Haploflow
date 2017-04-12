@@ -17,6 +17,7 @@ namespace std
 // TODO this is only temporary!
 #define THRESHOLD 30
 #define LONG_THRESH 50 // threshold if path is not long enough
+#define CONTIG_THRESH 150 // if contigs are longer than this they are produced
 
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
@@ -576,14 +577,78 @@ void UnitigGraph::add_sorted_edges(std::vector<UEdge>& q, const UVertex& source)
 		return boost::get(cap, e1) < boost::get(cap, e2); // highest capacity first
 	}; //lambda for comparing to edges based on their capacity
 	
-	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
 	auto out_edges = boost::out_edges(source, g_);
-	for (const auto& oe : out_edges)
+	for (const auto& oe : out_edges) // we dont do coverage checks here TODO?
 	{
-		if (boost::get(cap, oe) > THRESHOLD) // TODO (this should never fail)
+		q.push_back(oe);
+		std::push_heap(q.begin(), q.end(), edgeCompare);
+	}
+}
+
+// Tests whether two percentages "belong together" TODO this is quite arbitrary
+bool UnitigGraph::test_hypothesis(float to_test, float h0)
+{
+	return (std::abs(to_test - h0) < 0.05); // they differ by less than 5%
+	// this probably is not bad for values significantly larger than 5%
+}
+
+void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::vector<float>& coverage_fraction, std::vector<UEdge>& visited_edges)
+{
+	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
+	const auto& ename = boost::get(boost::edge_name_t(), g_);
+	const auto& visit = boost::get(boost::edge_index_t(), g_);
+	
+	int outdegree = boost::out_degree(target, g_);
+	UEdge next_edge;
+
+	while (outdegree) // not a sink
+	{
+		std::vector<UEdge> fattest_edges;
+		std::make_heap(fattest_edges.begin(), fattest_edges.end());
+		add_sorted_edges(fattest_edges, target);
+		std::sort_heap(fattest_edges.begin(), fattest_edges.end());
+
+		float total_coverage = 0.;
+		
+		for (const auto& e : fattest_edges)
 		{
-			q.push_back(oe);
-			std::push_heap(q.begin(), q.end(), edgeCompare);
+			total_coverage += boost::get(cap, e);
+		}
+		next_edge = fattest_edges.back();
+		// if next_edge is visited, we found a cycle, break it by following the second fattest edge
+		if (boost::get(visit, next_edge))
+		{
+			while (!fattest_edges.empty() and boost::get(visit, next_edge))
+			{
+				next_edge = fattest_edges.back();
+				std::pop_heap(fattest_edges.begin(), fattest_edges.end());
+				fattest_edges.pop_back();
+			}
+		}
+		else
+		{
+			std::pop_heap(fattest_edges.begin(), fattest_edges.end());
+			fattest_edges.pop_back();
+		}
+		target = boost::target(next_edge, g_);
+		sequence += boost::get(ename, next_edge); // add to current sequence
+		coverage_fraction.push_back(boost::get(cap,next_edge)/total_coverage); // fraction of outflow
+		visited_edges.push_back(next_edge); // has already been updated here
+		boost::put(visit, next_edge, true); // mark edge as visited
+		outdegree = boost::out_degree(target, g_);
+	}
+	float min_fraction = *std::min_element(coverage_fraction.begin(), coverage_fraction.end());
+	for (unsigned int i = 0; i < coverage_fraction.size(); i++)
+	{
+		if (!test_hypothesis(coverage_fraction[i],min_fraction)) // significantly higher, some flow remains
+		{
+			float new_cov = boost::get(cap, visited_edges[i]) * (1 - min_fraction);
+			boost::put(cap, visited_edges[i], new_cov); // reduce by min_fraction percent
+			boost::put(visit, visited_edges[i], false); // all edges with reamining coverage > 0 might be visited again
+		}
+		else // they belong to the same genome, use all flow
+		{
+			boost::put(cap, visited_edges[i], 0.);
 		}
 	}
 }
@@ -594,7 +659,6 @@ void UnitigGraph::calculateFlow()
 	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
 	const auto& vname = boost::get(boost::vertex_name_t(), g_);
 	const auto& ename = boost::get(boost::edge_name_t(), g_);
-	const auto& visit = boost::get(boost::edge_index_t(), g_);
 
 	// sources is a vector of all sources of a certain connected component
 	auto sources = getSources();
@@ -610,57 +674,39 @@ void UnitigGraph::calculateFlow()
 			add_sorted_edges(q,source); //creates a heap
 		}
 		std::sort_heap(q.begin(), q.end());
-		auto first_edge = q.back(); std::pop_heap(q.begin(), q.end()); q.pop_back();
-		auto source = boost::source(first_edge, g_);
-		auto target = boost::target(first_edge, g_);
-		std::string sequence = boost::get(vname, source);
-		std::vector<float> coverage_fraction; // fraction of the path
-		std::vector<UEdge> visited_edges; // edges on the fattest path
-
-		int outdegree = boost::out_degree(target, g_);
-		UEdge next_edge;
-
-		while (outdegree) // not a sink
+		
+		UEdge first_edge;
+		while (!q.empty())
 		{
-			std::vector<UEdge> fattest_edges;
-			std::make_heap(fattest_edges.begin(), fattest_edges.end());
-			add_sorted_edges(fattest_edges, target);
-			std::sort_heap(fattest_edges.begin(), fattest_edges.end());
-			// if next_edge is visited, we found a cycle, break it by following the second fattest edge
+			first_edge = q.back(); //
+
+			std::vector<float> coverage_fraction; // fraction of the path
+			std::vector<UEdge> visited_edges; // edges on the fattest path, TODO store pointers?
+
+			auto source = boost::source(first_edge, g_);
+			auto target = boost::target(first_edge, g_);
+			std::string sequence = boost::get(vname, source) + boost::get(ename,first_edge);
 			float total_coverage = 0.;
-			for (const auto& e : fattest_edges)
+			for (const auto& e : boost::out_edges(source, g_))
 			{
-				total_coverage += boost::get(cap, e);
+				total_coverage += boost::get(cap,e);
 			}
-			next_edge = fattest_edges.back();
-			if (boost::get(visit, next_edge))
+			coverage_fraction.push_back(boost::get(cap,first_edge)/total_coverage);
+			visited_edges.push_back(first_edge);
+		
+			find_fattest_path(target, sequence, coverage_fraction, visited_edges);
+		
+			if (sequence.length() > CONTIG_THRESH) // i.e. readsize
 			{
-				while (!fattest_edges.empty() and boost::get(visit, next_edge))
-				{
-					next_edge = fattest_edges.back();
-					std::pop_heap(fattest_edges.begin(), fattest_edges.end());
-					fattest_edges.pop_back();
-				}
+				std::cout << ">Contig_" << j++ << std::endl;
+				std::cout << sequence << std::endl;
 			}
-			else
+			
+			if (boost::get(cap, first_edge) == 0)
 			{
-				std::pop_heap(fattest_edges.begin(), fattest_edges.end());
-				fattest_edges.pop_back();
+				q.pop_back(); std::pop_heap(q.begin(), q.end()); // source flow has been depleted
 			}
-			target = boost::target(next_edge, g_);
-			sequence += boost::get(ename, next_edge); // add to current sequence
-			coverage_fraction.push_back(boost::get(cap,next_edge)/total_coverage); // fraction of outflow
-			visited_edges.push_back(next_edge); // has already been updated here
-			boost::put(visit, next_edge, true); // mark edge as visited
-			outdegree = boost::out_degree(target, g_);
+			std::sort_heap(q.begin(), q.end()); // capacity of first_edge has changed
 		}
-		sequence += boost::get(vname, target);
-		for (unsigned int i = 0; i < coverage_fraction.size(); i++)
-		{
-			std::cerr << coverage_fraction[i]*100 << "%";
-			std::cerr << " out of total " << boost::get(cap, visited_edges[i]) << std::endl;
-		}
-		std::cout << "Contig_" << j++ << std::endl;
-		std::cout << sequence << std::endl;
 	}
 }
