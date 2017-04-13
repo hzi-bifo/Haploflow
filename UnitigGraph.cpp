@@ -120,7 +120,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 		}
 		boost::put(propmapIndex,*vi,i++);
 	}
-	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -497,7 +497,7 @@ void UnitigGraph::cleanGraph()
 		unsigned int indegree = boost::in_degree(*vi, g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
-		//if (false) //TODO this might be too strict, capacity information is not really preserved
+		if (false) //TODO this might be too strict, capacity information is not really preserved
 		// if in and outdegree is 1, we are on a simple path and can contract again
 		if (outdegree == 1 and indegree == 1)
 		{
@@ -588,7 +588,7 @@ void UnitigGraph::add_sorted_edges(std::vector<UEdge>& q, const UVertex& source)
 // Tests whether two percentages "belong together" TODO this is quite arbitrary
 bool UnitigGraph::test_hypothesis(float to_test, float h0)
 {
-	return (std::abs(to_test - h0) < 0.05); // they differ by less than 5%
+	return (std::abs(to_test - h0) < 0.06); // they differ by less than 6%
 	// this probably is not bad for values significantly larger than 5%
 }
 
@@ -680,6 +680,8 @@ void UnitigGraph::calculateFlow()
 		{
 			first_edge = q.back(); //
 
+			float first_capacity = boost::get(cap, first_edge);
+
 			std::vector<float> coverage_fraction; // fraction of the path
 			std::vector<UEdge> visited_edges; // edges on the fattest path, TODO store pointers?
 
@@ -698,7 +700,7 @@ void UnitigGraph::calculateFlow()
 		
 			if (sequence.length() > CONTIG_THRESH) // i.e. readsize
 			{
-				std::cout << ">Contig_" << j++ << std::endl;
+				std::cout << ">Contig_" << j++ << " (" << *std::min_element(coverage_fraction.begin(), coverage_fraction.end()) << " of " << first_capacity << ")" << std::endl;
 				std::cout << sequence << std::endl;
 			}
 			
