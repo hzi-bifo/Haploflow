@@ -649,6 +649,7 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 		else // they belong to the same genome, use all flow
 		{
 			boost::put(cap, visited_edges[i], 0.);
+			boost::put(visit, visited_edges[i], false); // "unvisit" edges
 		}
 	}
 }
@@ -656,6 +657,7 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 // calculates the flows and corresponding paths through the graph
 void UnitigGraph::calculateFlow()
 {
+	std::cerr << "Calculating flow..." << std::endl;
 	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
 	const auto& vname = boost::get(boost::vertex_name_t(), g_);
 	const auto& ename = boost::get(boost::edge_name_t(), g_);
@@ -695,9 +697,9 @@ void UnitigGraph::calculateFlow()
 			}
 			coverage_fraction.push_back(boost::get(cap,first_edge)/total_coverage);
 			visited_edges.push_back(first_edge);
-		
+			
 			find_fattest_path(target, sequence, coverage_fraction, visited_edges);
-		
+
 			if (sequence.length() > CONTIG_THRESH) // i.e. readsize
 			{
 				std::cout << ">Contig_" << j++ << " (" << *std::min_element(coverage_fraction.begin(), coverage_fraction.end()) << " of " << first_capacity << ")" << std::endl;
