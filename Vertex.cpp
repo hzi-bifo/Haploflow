@@ -71,6 +71,11 @@ void Vertex::add_predecessor(const char& letter)
 	if (!is_set) degree++;
 }
 
+void Vertex::read_start()
+{
+	starts_with++;
+}
+
 void Vertex::visit()
 {
 	visited = true;
