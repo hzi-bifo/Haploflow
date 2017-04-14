@@ -62,6 +62,7 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 	{
 		v.first->second.add_successor(line[k_]); // add the k+1st letter as neighbour
 	}
+	v.first->second.read_start(); // the read started with vertex v
 
 	for (unsigned int i = k_ + 1; i < line.length(); i++)
 	{
