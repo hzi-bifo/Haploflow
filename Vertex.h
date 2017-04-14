@@ -15,6 +15,7 @@ public:
 	
 	void add_successor(const char& letter);
 	void add_predecessor(const char& letter);
+	void read_start();
 	void visit();
 	void unvisit();
 	void set_index(unsigned int);
@@ -26,6 +27,7 @@ public:
 	bool is_flagged() const;
 	std::vector<char> get_successors() const;
 	std::vector<char> get_predecessors() const; 
+	unsigned int get_read_starts() const;
 	unsigned int get_index() const;
 	unsigned int get_out_coverage(const char) const;
 	unsigned int get_in_coverage(const char) const;
@@ -52,6 +54,7 @@ private:
 	bool visited;
 	bool flagged; // flagged for delete
 	unsigned int index; // to possibly identify this vertex in the unitig graph
+	unsigned int starts_with; // number of reads starting with *this
 };
 
 #endif

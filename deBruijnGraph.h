@@ -42,6 +42,7 @@ private:
 	std::unordered_map<Sequence,Vertex> graph_;
 	
 	unsigned int k_; //kmer size
+	unsigned int read_length_; // length of longest read
 };
 
 #endif

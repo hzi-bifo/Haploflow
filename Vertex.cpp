@@ -15,7 +15,8 @@ Vertex::Vertex() :
 										degree(0),
 										visited(false),
 										flagged(false),
-										index(0)
+										index(0),
+										starts_with(0)
 {
 }
 
@@ -33,7 +34,8 @@ Vertex::Vertex(const Vertex& v) :
 	degree(v.degree),
 	visited(v.visited),
 	flagged(v.flagged),
-	index(v.index)
+	index(v.index),
+	starts_with(v.starts_with)
 {
 }
 
@@ -144,6 +146,11 @@ std::vector<char> Vertex::get_predecessors() const
 	if (t_in) ret.push_back('T');
 	if (n_in) ret.push_back('N');
 	return ret;
+}
+
+unsigned int Vertex::get_read_starts() const
+{
+	return starts_with;
 }
 
 unsigned int Vertex::get_out_coverage(const char c) const
