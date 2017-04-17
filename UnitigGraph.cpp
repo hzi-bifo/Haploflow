@@ -121,6 +121,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 		boost::put(propmapIndex,*vi,i++);
 	}
 	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -482,14 +483,14 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	return std::make_pair(nextV,next);
 }
 
-// the graph might contain some unconnected vertices, clean up
-void UnitigGraph::cleanGraph()
+// contracts all simple paths in graph to a single source-sink connection
+void UnitigGraph::contractPaths()
 {
+	auto cap = boost::get(boost::edge_capacity_t(),g_);
+	auto name = boost::get(boost::edge_name_t(),g_);
+	auto visit = boost::get(boost::edge_index_t(), g_);
+	
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
-	//boost::property_map<UGraph, boost::vertex_name_t>::type name = boost::get(boost::vertex_name_t(), g_);
-	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-	const auto& name = boost::get(boost::edge_name_t(),g_);
-	const auto& visit = boost::get(boost::edge_index_t(), g_);
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next)
 	{
@@ -497,7 +498,6 @@ void UnitigGraph::cleanGraph()
 		unsigned int indegree = boost::in_degree(*vi, g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
-		if (false) //TODO this might be too strict, capacity information is not really preserved
 		// if in and outdegree is 1, we are on a simple path and can contract again
 		if (outdegree == 1 and indegree == 1)
 		{
@@ -522,13 +522,16 @@ void UnitigGraph::cleanGraph()
 			boost::remove_vertex(*vi,g_);
 		}
 	}
-	// DEBUG
-	boost::graph_traits<UGraph>::edge_iterator ei, ei_end;
-	boost::tie(ei, ei_end) = boost::edges(g_);
-	for (; ei != ei_end; ei++)
+}
+
+// the graph might contain some unconnected vertices, clean up
+void UnitigGraph::cleanGraph()
+{
+	if (false) //TODO this might be too strict, capacity information is not really preserved
 	{
-		float c = boost::get(cap,*ei);									// <-
+		contractPaths(); // this can be done in cycles
 	}
+	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next) {
 		++next;
