@@ -121,7 +121,6 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 		boost::put(propmapIndex,*vi,i++);
 	}
 	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
-	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -572,19 +571,50 @@ std::vector<Connected_Component> UnitigGraph::getSources() const
 	return sources;
 }
 
-// the vector should be a heap!
-void UnitigGraph::add_sorted_edges(std::vector<UEdge>& q, const UVertex& source)
+// add edges of source to heap
+void UnitigGraph::add_sorted_edges(std::vector<UEdge>& q, const UVertex& source, bool addAll)
 {
+	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
+	
 	auto edgeCompare = [&](UEdge e1, UEdge e2){
-		const auto& cap = boost::get(boost::edge_capacity_t(),g_);
 		return boost::get(cap, e1) < boost::get(cap, e2); // highest capacity first
 	}; //lambda for comparing to edges based on their capacity
 	
 	auto out_edges = boost::out_edges(source, g_);
 	for (const auto& oe : out_edges) // we dont do coverage checks here TODO?
 	{
-		q.push_back(oe);
-		std::push_heap(q.begin(), q.end(), edgeCompare);
+		auto target = boost::target(oe,g_);
+		unsigned int cov = 0;
+		bool add = addAll;// whether we want to add this source or not
+		if (!addAll)
+		{
+			while (boost::in_degree(target,g_) == 1 and boost::out_degree(target,g_) == 1)
+			{
+				auto o_edges = boost::out_edges(target, g_);
+				auto o_edge = *(o_edges.first);
+				target = boost::target(o_edge,g_);
+				cov = boost::get(cap,o_edge);
+			}
+			if (boost::in_degree(target,g_) > 1)
+			{
+				unsigned int total_cov = 0;
+				auto i_edges = boost::in_edges(target, g_);
+				for (const auto& e : i_edges)
+				{
+					total_cov += boost::get(cap, e);
+				}
+				add = (float(cov)/total_cov > 0.25); // TODO arbitrary
+			}
+			else
+			{
+				add = true;
+			}
+		}
+		if (add)
+		{
+			q.push_back(oe);
+			std::push_heap(q.begin(), q.end(), edgeCompare);
+		}
 	}
 }
 
@@ -608,7 +638,9 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 	{
 		std::vector<UEdge> fattest_edges;
 		std::make_heap(fattest_edges.begin(), fattest_edges.end());
-		add_sorted_edges(fattest_edges, target);
+		
+		add_sorted_edges(fattest_edges, target, true);
+		
 		std::sort_heap(fattest_edges.begin(), fattest_edges.end());
 
 		float total_coverage = 0.;
@@ -676,10 +708,10 @@ void UnitigGraph::calculateFlow()
 		// sort all first edges by their capacity
 		for (const auto& source : cc)
 		{
-			add_sorted_edges(q,source); //creates a heap
+			add_sorted_edges(q, source, false); //creates a heap
 		}
 		std::sort_heap(q.begin(), q.end());
-		
+
 		UEdge first_edge;
 		while (!q.empty())
 		{
@@ -700,7 +732,7 @@ void UnitigGraph::calculateFlow()
 			}
 			coverage_fraction.push_back(boost::get(cap,first_edge)/total_coverage);
 			visited_edges.push_back(first_edge);
-			
+		
 			find_fattest_path(target, sequence, coverage_fraction, visited_edges);
 
 			if (sequence.length() > CONTIG_THRESH) // i.e. readsize
