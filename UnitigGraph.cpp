@@ -18,6 +18,7 @@ namespace std
 #define THRESHOLD 30
 #define LONG_THRESH 50 // threshold if path is not long enough
 #define CONTIG_THRESH 150 // if contigs are longer than this they are produced
+#define FRAC_THRESH 0.06 // threshold of total coverage from which something is treated significant
 
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
@@ -497,7 +498,7 @@ void UnitigGraph::contractPaths()
 		unsigned int indegree = boost::in_degree(*vi, g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
-		// if in and outdegree is 1, we are on a simple path and can contract again
+		// if in and outdegree is 1, we are on a simple path and can contract again TODO coverage calculation
 		if (outdegree == 1 and indegree == 1)
 		{
 			auto&& ie = boost::in_edges(*vi,g_);
@@ -507,12 +508,11 @@ void UnitigGraph::contractPaths()
 			auto&& e = boost::edge(new_source,*vi,g_);
 			std::string seq = boost::get(name,e.first);
 			unsigned int w = seq.length();
-			float capacity = boost::get(cap,e.first)* w; 				// <-
-			//float capacity = boost::get(cap,e.first).second; 					// <-
+			float capacity = boost::get(cap,e.first) * w;
 			e = boost::edge(*vi,new_target,g_);
-			seq += boost::get(name,e.first);
-			capacity += (boost::get(cap,e.first) * (seq.length() - w)); 	// <-
-			capacity /= seq.length(); 											// <-
+			seq += boost::get(name,e.first); // append the sequence
+			capacity += (boost::get(cap,e.first) * (seq.length() - w));
+			capacity /= seq.length(); // currently using the average coverage on the contracted path
 			e = boost::add_edge(new_source,new_target,g_);
 			boost::put(name,e.first,seq);
 			boost::put(cap,e.first,capacity);
@@ -523,13 +523,105 @@ void UnitigGraph::contractPaths()
 	}
 }
 
-// the graph might contain some unconnected vertices, clean up
-void UnitigGraph::cleanGraph()
+// checks for a path source/sink to junction whether it is assumed to be siginifcant and returns the path if it isnt
+std::vector<UVertex> UnitigGraph::flagDanglingEnd(UVertex& v, bool source)
 {
-	if (false) //TODO this might be too strict, capacity information is not really preserved
+	auto cap = boost::get(boost::edge_capacity_t(),g_);
+	
+	std::vector<UVertex> pathToJunction{v};
+	auto vertex = v;
+
+	int indegree = boost::in_degree(v,g_);
+	int outdegree = boost::out_degree(v,g_);
+	int coverage = 
+		source ? boost::get(cap, *(boost::out_edges(vertex, g_).first)) // coverage of outgoing edge
+				: boost::get(cap, *(boost::in_edges(vertex, g_).first)); //coverage of ingoing edge
+
+	while (outdegree <= 1 and indegree <= 1)
 	{
-		contractPaths(); // this can be done in cycles
+		if ((source and outdegree == 0) or (!source and indegree == 0)) // simple path (maybe they will be deleted later on)
+		{
+			std::vector<UVertex> noDelete{};
+			return noDelete;
+		}
+		auto e = source ? *(boost::out_edges(vertex, g_).first) : *(boost::in_edges(vertex, g_).first);
+		vertex = source ? boost::target(e,g_) : boost::source(e,g_);
+		pathToJunction.push_back(vertex);
+		outdegree = boost::out_degree(vertex,g_);
+		indegree = boost::in_degree(vertex,g_);
+	} // follow path until next junction
+	pathToJunction.pop_back(); // remove the junction itself again, so it doesnt get deleted
+	if ((source and indegree > 1 and outdegree == 1) or (!source and indegree == 1 and outdegree > 1)) // next junction
+	{
+		if (pathToJunction.size() > LONG_THRESH) // path is long enough (TODO)
+		{
+			std::vector<UVertex> noDelete{};
+			return noDelete;
+		}
+		float total_coverage = 0.;
+		if (source)
+		{
+			for (const auto& edge : boost::in_edges(vertex, g_))
+			{
+				total_coverage += boost::get(cap, edge);
+			}
+		}
+		else
+		{
+			for (const auto& edge : boost::out_edges(vertex, g_))
+			{
+				total_coverage += boost::get(cap, edge);
+			}
+		}
+		if (coverage/total_coverage < std::min(4*FRAC_THRESH, 0.5)) //TODO since the path is really short, we can be quite strict!
+		{
+			return pathToJunction;
+		}
+		else // fraction is okay, we are considered a real source/sink
+		{
+			std::vector<UVertex> noDelete{};
+			return noDelete;
+		}
 	}
+	else
+	{
+		std::vector<UVertex> noDelete{};
+		return noDelete;
+	}
+}
+
+void UnitigGraph::filterTerminals()
+{
+	auto vertices = boost::vertices(g_);
+	std::vector<UVertex> toDelete;
+
+	for (auto& v : vertices)
+	{
+		int indegree = boost::in_degree(v,g_);
+		int outdegree = boost::out_degree(v,g_);
+		if (indegree == 0 or outdegree == 0)
+		{
+			if (indegree == 0 and outdegree <= 1) // TODO if we are a real junction ourselves, we are assumed to be valid
+			{
+				std::vector<UVertex> pathToJunction = flagDanglingEnd(v, true);
+				toDelete.insert(toDelete.end(), pathToJunction.begin(), pathToJunction.end());
+			}
+			else if (indegree <= 1 and outdegree == 0)
+			{
+				std::vector<UVertex> pathToJunction = flagDanglingEnd(v, false);
+				toDelete.insert(toDelete.end(), pathToJunction.begin(), pathToJunction.end());
+			}
+		}
+	}
+	for (auto& v : toDelete)
+	{
+		boost::clear_vertex(v, g_);
+		boost::remove_vertex(v, g_);
+	}
+}
+
+void UnitigGraph::removeStableSets()
+{
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next) {
@@ -540,6 +632,22 @@ void UnitigGraph::cleanGraph()
 		{
 			boost::remove_vertex(*vi,g_);
 		}
+	}
+}
+
+// the graph might contain some unconnected vertices, clean up
+void UnitigGraph::cleanGraph()
+{
+	std::cerr << "Removing stable sets..." << std::endl;
+	removeStableSets();
+	if (true) //TODO make this parametrized if results isnt always strictly improved
+	{
+		std::cerr << "Filtering terminal paths..." << std::endl;
+		filterTerminals(); // this can be done in cycles (filter - contract - remove)
+		std::cerr << "Contracting simple paths.." << std::endl;
+		contractPaths(); 
+		std::cerr << "Removing stable sets (again)..." << std::endl;
+		removeStableSets();
 	}
 }
 
@@ -583,45 +691,15 @@ void UnitigGraph::add_sorted_edges(std::vector<UEdge>& q, const UVertex& source,
 	auto out_edges = boost::out_edges(source, g_);
 	for (const auto& oe : out_edges) // we dont do coverage checks here TODO?
 	{
-		auto target = boost::target(oe,g_);
-		unsigned int cov = 0;
-		bool add = addAll;// whether we want to add this source or not
-		if (!addAll)
-		{
-			while (boost::in_degree(target,g_) == 1 and boost::out_degree(target,g_) == 1)
-			{
-				auto o_edges = boost::out_edges(target, g_);
-				auto o_edge = *(o_edges.first);
-				target = boost::target(o_edge,g_);
-				cov = boost::get(cap,o_edge);
-			}
-			if (boost::in_degree(target,g_) > 1)
-			{
-				unsigned int total_cov = 0;
-				auto i_edges = boost::in_edges(target, g_);
-				for (const auto& e : i_edges)
-				{
-					total_cov += boost::get(cap, e);
-				}
-				add = (float(cov)/total_cov > 0.25); // TODO arbitrary
-			}
-			else
-			{
-				add = true;
-			}
-		}
-		if (add)
-		{
-			q.push_back(oe);
-			std::push_heap(q.begin(), q.end(), edgeCompare);
-		}
+		q.push_back(oe);
+		std::push_heap(q.begin(), q.end(), edgeCompare);
 	}
 }
 
 // Tests whether two percentages "belong together" TODO this is quite arbitrary
 bool UnitigGraph::test_hypothesis(float to_test, float h0)
 {
-	return (std::abs(to_test - h0) < 0.06); // they differ by less than 6%
+	return (std::abs(to_test - h0) < FRAC_THRESH); // they differ by less than 6%
 	// this probably is not bad for values significantly larger than 5%
 }
 

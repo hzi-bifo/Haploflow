@@ -44,8 +44,11 @@ private:
 	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
 	UVertex addVertex(unsigned int*, std::string name);
 	void cleanGraph();
+	void removeStableSets();
 	void contractPaths();
-	
+	void filterTerminals();
+	std::vector<UVertex> flagDanglingEnd(UVertex&, bool source);
+
 	void find_fattest_path(UVertex target, std::string& sequence, std::vector<float>& coverage_fraction, std::vector<UEdge>& visited_edges);
 	void add_sorted_edges(std::vector<UEdge>& q, const UVertex& source, bool addAll);
 	bool test_hypothesis(float to_test, float h0);
