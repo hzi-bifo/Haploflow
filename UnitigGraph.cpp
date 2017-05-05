@@ -18,7 +18,7 @@ namespace std
 #define THRESHOLD 30
 #define LONG_THRESH 50 // threshold if path is not long enough
 #define CONTIG_THRESH 150 // if contigs are longer than this they are produced
-#define FRAC_THRESH 0.06 // threshold of total coverage from which something is treated significant
+#define FRAC_THRESH 0.08 // threshold of total coverage from which something is treated significant
 
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
@@ -122,6 +122,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 		boost::put(propmapIndex,*vi,i++);
 	}
 	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -553,10 +554,9 @@ std::vector<UVertex> UnitigGraph::flagDanglingEnd(UVertex& v, bool source)
 	pathToJunction.pop_back(); // remove the junction itself again, so it doesnt get deleted
 	if ((source and indegree > 1 and outdegree == 1) or (!source and indegree == 1 and outdegree > 1)) // next junction
 	{
-		if (pathToJunction.size() > LONG_THRESH) // path is long enough (TODO)
+		if (pathToJunction.size() < LONG_THRESH) // path is long enough (TODO make this parameter as well?)
 		{
-			std::vector<UVertex> noDelete{};
-			return noDelete;
+			return pathToJunction;
 		}
 		float total_coverage = 0.;
 		if (source)
@@ -777,7 +777,9 @@ void UnitigGraph::calculateFlow()
 
 	// sources is a vector of all sources of a certain connected component
 	auto sources = getSources();
-	
+
+	std::cerr << sources.size() << " connected components found." << std::endl;
+
 	unsigned int j = 0; // contig number
 	for (const Connected_Component& cc : sources)
 	{
