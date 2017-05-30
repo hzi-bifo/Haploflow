@@ -223,11 +223,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 	float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
 	Sequence src = dbg.getSequence(curr);
 	// this is for checking whether the reverse complement is in the debruijn graph
-	bool reverse = false;
-	if (src != curr)
-	{
-		reverse = true; 
-	}
+	bool reverse = (src != curr); // true, if reverse complement, i.e. src and curr are not the same
 	for (const auto& n : succ)
 	{
 		std::string sequence("");
@@ -377,7 +373,15 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	{
 		e = boost::add_edge(src,trg,g_);
 		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg, the sequence was added in reverse order
-		boost::put(name,e.first,sequence);
+		std::string old_name = boost::get(name, e.first);
+		if (e.second) // TODO v-S->w-T->v is treated like v<-S-w<-T-v (should be ST self-loop and TS self-loop)
+		{
+			boost::put(name,e.first,old_name + sequence);
+		}
+		else
+		{
+			boost::put(name,e.first,sequence);
+		}
 		boost::put(cap,e.first,avg);
 		boost::put(visit,e.first,false);
 	}
@@ -477,7 +481,15 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	if ((!e.second or (e.second and (boost::get(name,e.first)) != sequence)) and toAdd)
 	{
 		e = boost::add_edge(src,trg,g_);
-		boost::put(name,e.first,sequence);
+		auto old_name = boost::get(name, e.first);
+		if (e.second) // TODO v-S->w-T->v is treated like v<-S-w<-T-v (should be ST self-loop and TS self-loop)
+		{
+			boost::put(name,e.first,sequence + old_name);
+		}
+		else
+		{
+			boost::put(name,e.first,sequence);
+		}
 		boost::put(cap,e.first,avg);
 		boost::put(visit,e.first,false);
 	}
@@ -731,6 +743,7 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 		// if next_edge is visited, we found a cycle, break it by following the second fattest edge
 		if (boost::get(visit, next_edge))
 		{
+			break;
 			while (!fattest_edges.empty() and boost::get(visit, next_edge))
 			{
 				next_edge = fattest_edges.back();
