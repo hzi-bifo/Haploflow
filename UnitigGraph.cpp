@@ -125,6 +125,12 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
+// dfs, finding cycles and marking CCs
+void UnitigGraph::findCycles(deBruijnGraph& dbg) // implementation of tarjan's algorithm
+{
+	
+}
+
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
 UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
 {

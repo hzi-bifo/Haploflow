@@ -16,7 +16,8 @@ Vertex::Vertex() :
 										visited(false),
 										flagged(false),
 										index(0),
-										starts_with(0)
+										starts_with(0),
+										cycle(false)
 {
 }
 
@@ -35,7 +36,8 @@ Vertex::Vertex(const Vertex& v) :
 	visited(v.visited),
 	flagged(v.flagged),
 	index(v.index),
-	starts_with(v.starts_with)
+	starts_with(v.starts_with),
+	cycle(v.cycle)
 {
 }
 
@@ -84,6 +86,16 @@ void Vertex::visit()
 void Vertex::unvisit()
 {
 	visited = false;
+}
+
+void Vertex::mark_as_cycle()
+{
+	cycle = true;
+}
+
+bool Vertex::is_cycle() const
+{
+	return cycle;
 }
 
 void Vertex::flag()
