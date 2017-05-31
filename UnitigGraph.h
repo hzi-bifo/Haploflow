@@ -49,7 +49,6 @@ private:
 	void filterTerminals();
 	std::vector<UVertex> flagDanglingEnd(UVertex&, bool source);
 
-	void findCycles(deBruijnGraph& dbg);
 	void find_fattest_path(UVertex target, std::string& sequence, std::vector<float>& coverage_fraction, std::vector<UEdge>& visited_edges);
 	void add_sorted_edges(std::vector<UEdge>& q, const UVertex& source, bool addAll);
 	bool test_hypothesis(float to_test, float h0);

@@ -2,6 +2,8 @@
 #include "deBruijnGraph.h"
 
 Vertex::Vertex() : 	
+										scc(0),
+										index(0),
 										a_in(0),
 										a_out(0),
 										c_in(0),
@@ -15,13 +17,13 @@ Vertex::Vertex() :
 										degree(0),
 										visited(false),
 										flagged(false),
-										index(0),
-										starts_with(0),
-										cycle(false)
+										starts_with(0)
 {
 }
 
 Vertex::Vertex(const Vertex& v) : 
+	scc(v.scc),
+	index(v.index),
 	a_in(v.a_in),
 	a_out(v.a_out),
 	c_in(v.c_in),
@@ -35,9 +37,7 @@ Vertex::Vertex(const Vertex& v) :
 	degree(v.degree),
 	visited(v.visited),
 	flagged(v.flagged),
-	index(v.index),
-	starts_with(v.starts_with),
-	cycle(v.cycle)
+	starts_with(v.starts_with)
 {
 }
 
@@ -88,16 +88,6 @@ void Vertex::unvisit()
 	visited = false;
 }
 
-void Vertex::mark_as_cycle()
-{
-	cycle = true;
-}
-
-bool Vertex::is_cycle() const
-{
-	return cycle;
-}
-
 void Vertex::flag()
 {
 	flagged = true; // what is flagged may never ... be unflagged
@@ -106,16 +96,6 @@ void Vertex::flag()
 bool Vertex::is_flagged() const
 {
 	return flagged;
-}
-
-void Vertex::set_index(unsigned int i)
-{
-	index = i;
-}
-
-unsigned int Vertex::get_index() const
-{
-	return index;
 }
 
 bool Vertex::is_visited() const

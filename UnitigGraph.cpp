@@ -125,12 +125,6 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
-// dfs, finding cycles and marking CCs
-void UnitigGraph::findCycles(deBruijnGraph& dbg) // implementation of tarjan's algorithm
-{
-	
-}
-
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
 UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
 {
@@ -191,7 +185,7 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 		{
 			junction->visit();
 			uv = addVertex(index, seq);
-			junction->set_index(*index);
+			junction->index = *index;
 		}
 		else if (!junction->is_visited()) // this vertex is considered to be an erroneous kmer
 		{
@@ -201,7 +195,7 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 		}
 		else
 		{ //this vertex has already been found as the next junction of some other vertex, do not add again
-			unsigned int idx = junction->get_index();
+			unsigned int idx = junction->index;
 			uv = graph_[idx];
 		}
 		junction->visit(); // make sure the next time we find it we dont add it another time
@@ -338,7 +332,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	{
 		nextV->visit();
 		addVertex(index, prev); // the vertex is new and found to be relevant
-		nextV->set_index(*index);
+		nextV->index = *index;
 	}
 	else if (!nextV->is_visited())
 	{
@@ -350,7 +344,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		// this vertex has been found on another path
 	}
 	// if the vertex has not been added, dont try to add an edge to it
-	if (nextV->get_index() == 0)
+	if (nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
@@ -359,7 +353,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	auto cap = boost::get(boost::edge_capacity_t(), g_);
 	auto visit = boost::get(boost::edge_index_t(), g_);
 
-	UVertex src = graph_[nextV->get_index()];
+	UVertex src = graph_[nextV->index];
 	auto e = boost::edge(src,trg,g_);
 	bool toAdd = true;
 	float min_pass = 5; // minimal coverage allowed on edge
@@ -446,7 +440,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	{
 		nextV->visit();
 		addVertex(index, next);
-		nextV->set_index(*index);
+		nextV->index = *index;
 	}
 	else if (!nextV->is_visited())
 	{
@@ -458,7 +452,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		return std::make_pair(nextV,""); // path has been found, do not add anything
 	}
 	// this vertex has been found and considered irrelevant because of insufficient coverage
-	if (nextV->get_index() == 0)
+	if (nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
@@ -467,7 +461,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	auto cap = boost::get(boost::edge_capacity_t(), g_);
 	auto visit = boost::get(boost::edge_index_t(), g_);
 	
-	UVertex trg = graph_[nextV->get_index()];
+	UVertex trg = graph_[nextV->index];
 	auto e = boost::edge(src,trg,g_);
 	bool toAdd = true;
 	float min_pass = 5; // minimal coverage allowed on edge

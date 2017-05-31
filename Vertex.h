@@ -18,11 +18,11 @@ public:
 	void read_start();
 	void visit();
 	void unvisit();
-	void set_index(unsigned int);
 	void flag();
-	void mark_as_cycle(); 
+	
+	unsigned int scc; // strongly connected component, to immediately filter cycles
+	unsigned int index; // to possibly identify this vertex in the unitig graph
 
-	bool is_cycle() const;
 	bool is_junction() const;
 	bool is_conflicting() const;
 	bool is_visited() const;
@@ -30,7 +30,6 @@ public:
 	std::vector<char> get_successors() const;
 	std::vector<char> get_predecessors() const; 
 	unsigned int get_read_starts() const;
-	unsigned int get_index() const;
 	unsigned int get_out_coverage(const char) const;
 	unsigned int get_in_coverage(const char) const;
 	unsigned int get_total_in_coverage() const;
@@ -55,9 +54,7 @@ private:
 	unsigned int degree; // in_degree + out_degree
 	bool visited;
 	bool flagged; // flagged for delete
-	unsigned int index; // to possibly identify this vertex in the unitig graph
 	unsigned int starts_with; // number of reads starting with *this
-	bool cycle; // is "start/end" of a cycle (yeah, you got that right, I went there)
 };
 
 #endif
