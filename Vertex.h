@@ -22,6 +22,7 @@ public:
 	
 	unsigned int scc; // strongly connected component, to immediately filter cycles
 	unsigned int index; // to possibly identify this vertex in the unitig graph
+	bool onStack; // dfs-specific variable
 
 	bool is_junction() const;
 	bool is_conflicting() const;

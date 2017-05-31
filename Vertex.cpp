@@ -4,6 +4,7 @@
 Vertex::Vertex() : 	
 										scc(0),
 										index(0),
+										onStack(false),
 										a_in(0),
 										a_out(0),
 										c_in(0),
@@ -24,6 +25,7 @@ Vertex::Vertex() :
 Vertex::Vertex(const Vertex& v) : 
 	scc(v.scc),
 	index(v.index),
+	onStack(v.onStack),
 	a_in(v.a_in),
 	a_out(v.a_out),
 	c_in(v.c_in),
