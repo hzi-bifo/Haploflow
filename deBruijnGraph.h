@@ -19,7 +19,6 @@
 
 class deBruijnGraph
 {
-friend Vertex;
 public:
 	deBruijnGraph(unsigned int k); // creates empty graph
 	deBruijnGraph(std::string filename, unsigned int k); // builds the deBruijn graph from file
@@ -28,6 +27,7 @@ public:
 	std::vector<std::string> getSources() const; // returns all sources
 	std::vector<std::string> getSinks() const; // returns all sinks in graph
 	std::pair<std::vector<Sequence>, std::vector<Sequence> > getJunctions() const;
+	void markCycles();
 	const Sequence& getSequence(const std::string&);
 	Vertex* getVertex(const std::string&); // return the vertex corresponding to kmer, 0 if not found
 

@@ -100,6 +100,78 @@ int deBruijnGraph::getSize() const
 	return graph_.size();
 }
 
+void deBruijnGraph::markCycles()
+{
+	std::stack<std::pair<std::pair<std::pair<Sequence,Vertex>,unsigned int>,bool> > recursion_stack;
+	std::stack<Sequence> visit_stack;
+	unsigned int index = 1;
+	for (auto& p : graph_)
+	{
+		Vertex& v = p.second;
+		if (v.scc == 0) // scc hasnt been set
+			recursion_stack.push(std::make_pair(std::make_pair(p,0),false));
+		while (recursion_stack.size() > 0)
+		{
+			auto& p = recursion_stack.top();
+			Sequence& seq = p.first.first.first;
+			v = p.first.first.second;
+			auto successors = v.get_successors();
+			unsigned int succIndex = p.first.second;
+			std::string next = seq.get_kmer().substr(1) + successors[succIndex];
+			Sequence succ = Sequence(next);
+			Vertex& w = graph_[succ];
+			bool returned = p.second;
+			recursion_stack.pop();
+			if (!returned)
+			{
+				v.scc = index; // this is tarjan's index
+				v.index = index; // this is tarjan's lowlink
+				index++;
+				visit_stack.push(seq);
+				v.onStack = true;
+				succIndex = 0;
+				successors = v.get_successors();
+loop:				
+				if (succIndex >= successors.size())
+				{
+					if (v.scc == v.index)
+					{
+						Sequence& v_prime = visit_stack.top();
+						do
+						{ 
+							v_prime = visit_stack.top();
+							graph_[v_prime].onStack = false;
+							visit_stack.pop();
+						} while (v_prime != seq);
+					}
+				}
+				else
+				{
+					next = seq.get_kmer().substr(1) + successors[succIndex];
+					succ = Sequence(next);
+					w = graph_[succ];
+					if (w.index == 0)
+					{
+						recursion_stack.push(std::make_pair(std::make_pair(p.first.first,succIndex), true));
+						recursion_stack.push(std::make_pair(std::make_pair(std::make_pair(succ,w),succIndex), false));
+						continue;
+done:					
+						v.index = std::min(v.index, w.index);
+					}
+					else if (v.onStack)
+					{
+						v.index = std::min(v.index, w.scc);
+					}
+					succIndex++;
+					goto loop; // dont do this at home, kids
+				}
+			}
+			else
+				goto done;
+		}
+	}
+}
+
 std::vector<std::string> deBruijnGraph::getSources() const
 {
 	std::vector<std::string> sources;
