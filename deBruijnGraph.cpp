@@ -117,6 +117,7 @@ void deBruijnGraph::markCycles()
 			v = p.first.first.second;
 			auto successors = v.get_successors();
 			unsigned int succIndex = p.first.second;
+			// TODO fix seq.get_kmer() being empty
 			std::string next = seq.get_kmer().substr(1) + successors[succIndex];
 			Sequence succ = Sequence(next);
 			Vertex& w = graph_[succ];
