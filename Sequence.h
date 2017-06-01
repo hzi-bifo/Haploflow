@@ -8,12 +8,14 @@ public:
 	bool operator==(const std::string& s) const;
 	bool operator!=(const Sequence& seq) const;
 	bool operator!=(const std::string& s) const;
+	friend std::ostream& operator<<(std::ostream& os, const Sequence& s){return os << s.get_kmer();};
 	std::string rc() const;
 	const std::string get_kmer() const;
 private:
 	inline static char complement(char c){switch(c){ case 'A': return 'T'; case 'C': return 'G'; case 'G': return 'C'; case 'T' : return 'A'; default : return 'N';};}
 	std::string kmer_;
 };
+
 
 namespace std 
 {
