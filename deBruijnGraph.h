@@ -28,7 +28,7 @@ public:
 	std::vector<std::string> getSinks() const; // returns all sinks in graph
 	std::pair<std::vector<Sequence>, std::vector<Sequence> > getJunctions() const;
 	void markCycles();
-	const Sequence& getSequence(const std::string&);
+	const Sequence* getSequence(const std::string&);
 	Vertex* getVertex(const std::string&); // return the vertex corresponding to kmer, 0 if not found
 
 	unsigned int getK() const; // return the value of k

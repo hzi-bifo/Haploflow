@@ -100,76 +100,114 @@ int deBruijnGraph::getSize() const
 	return graph_.size();
 }
 
-void deBruijnGraph::markCycles()
+void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 {
-	std::stack<std::pair<std::pair<std::pair<Sequence,Vertex>,unsigned int>,bool> > recursion_stack;
+	std::stack<std::pair<std::string, int> > recursion_stack;
 	std::stack<Sequence> visit_stack;
 	unsigned int index = 1;
 	for (auto& p : graph_)
 	{
+		Sequence s = p.first;
 		Vertex& v = p.second;
 		if (v.scc == 0) // scc hasnt been set
-			recursion_stack.push(std::make_pair(std::make_pair(p,0),false));
+			recursion_stack.push(std::make_pair(s.get_kmer(),0));
 		while (recursion_stack.size() > 0)
 		{
-			auto& p = recursion_stack.top();
-			Sequence& seq = p.first.first.first;
-			v = p.first.first.second;
-			auto successors = v.get_successors();
-			unsigned int succIndex = p.first.second;
-			// TODO fix seq.get_kmer() being empty
-			std::string next = seq.get_kmer().substr(1) + successors[succIndex];
-			Sequence succ = Sequence(next);
-			Vertex& w = graph_[succ];
-			bool returned = p.second;
+			auto next_element = recursion_stack.top();
 			recursion_stack.pop();
-			if (!returned)
+			
+			std::string curr = next_element.first;
+			const Sequence* cseq = getSequence(curr);
+			Vertex& v = graph_[*cseq];
+			bool reverse = (*cseq != curr);
+			
+			int child = next_element.second;
+			
+			if (child != -1)
 			{
-				v.scc = index; // this is tarjan's index
-				v.index = index; // this is tarjan's lowlink
-				index++;
-				visit_stack.push(seq);
+				v.scc = index;
+				v.index = index;
 				v.onStack = true;
-				succIndex = 0;
-				successors = v.get_successors();
-loop:				
-				if (succIndex >= successors.size())
+				visit_stack.push(*cseq);
+				index++;
+
+				std::string next("");
+				const Sequence* succ = nullptr;
+
+				if (!reverse)
 				{
-					if (v.scc == v.index)
+					auto successors = v.get_successors();
+					if (child >= successors.size()) // sink, is its own scc automatically
 					{
-						Sequence& v_prime = visit_stack.top();
-						do
-						{ 
-							v_prime = visit_stack.top();
-							graph_[v_prime].onStack = false;
-							visit_stack.pop();
-						} while (v_prime != seq);
+						recursion_stack.push(std::make_pair(curr,-1)); // all children have been visited
+						continue;
+					}
+					next = curr.substr(1) + successors[child];
+					succ = getSequence(next);
+				}
+				else
+				{
+					auto predecessors = v.get_predecessors();
+					if (child >= predecessors.size())
+					{
+						recursion_stack.push(std::make_pair(curr,-1)); // all children have been visited
+						continue;
+					}
+					next = curr.substr(1) + complement(predecessors[child]); // TODO
+					succ = getSequence(next);
+				}
+				Vertex& w = graph_[*succ];
+
+				recursion_stack.push(std::make_pair(curr,++child)); // visit the next child
+				if (w.scc == 0)
+				{
+					recursion_stack.push(std::make_pair(next,0));
+				}
+				else if (w.onStack)
+				{
+					v.index = std::min(v.index, w.scc);
+				}
+			}
+			else  // all children have been visited in the stack
+			{
+				if (!reverse)
+				{
+					auto successors = v.get_successors();
+					for (auto& s : successors) // slightly less memory/time efficient than recursive check
+					{
+						std::string next = curr.substr(1) + s;
+						const Sequence* succ = getSequence(next);
+						Vertex w = graph_[*succ];
+						v.index = std::min(v.index, w.index);
 					}
 				}
 				else
 				{
-					next = seq.get_kmer().substr(1) + successors[succIndex];
-					succ = Sequence(next);
-					w = graph_[succ];
-					if (w.index == 0)
+					auto predecessors = v.get_predecessors();
+					for (auto& s : predecessors) // slightly less memory/time efficient than recursive check
 					{
-						recursion_stack.push(std::make_pair(std::make_pair(p.first.first,succIndex), true));
-						recursion_stack.push(std::make_pair(std::make_pair(std::make_pair(succ,w),succIndex), false));
-						continue;
-done:					
+						std::string next = curr.substr(1) + complement(s);
+						const Sequence* succ = getSequence(next);
+						Vertex w = graph_[*succ];
 						v.index = std::min(v.index, w.index);
 					}
-					else if (v.onStack)
+				}
+				if (v.index == v.scc)
+				{
+					Sequence scc = visit_stack.top();
+					do
 					{
-						v.index = std::min(v.index, w.scc);
-					}
-					succIndex++;
-					goto loop; // dont do this at home, kids
+						visit_stack.pop();
+						Vertex& w = graph_[scc];
+						w.onStack = false;
+					} while (scc != *cseq);
 				}
 			}
-			else
-				goto done;
 		}
+	}
+	for (auto& p : graph_)
+	{
+		std::cout << p.first << " " << p.second.scc << std::endl;
 	}
 }
 
@@ -213,24 +251,23 @@ std::pair<std::vector<Sequence>, std::vector<Sequence> > deBruijnGraph::getJunct
 
 }
 
-// returns Sequence in graph, throws exception if not in graph
-const Sequence& deBruijnGraph::getSequence(const std::string& kmer)
+// returns Sequence in graph, returns nullptr if not in graph
+const Sequence* deBruijnGraph::getSequence(const std::string& kmer)
 {
 	Sequence seq(kmer);
 	auto&& ret = graph_.find(seq);
 	if (ret != graph_.end())
-		return ret->first;
+		return &(ret->first);
 	else
 	{
-		std::cerr << "kmer not in graph: " << kmer << std::endl;
-		throw;
+		return nullptr;
 	}
 }
 
 Vertex* deBruijnGraph::getVertex(const std::string& kmer)
 {
 	if (kmer.length() != k_)
-		return 0;
+		return nullptr;
 	else
 	{
 		Sequence seq(kmer);

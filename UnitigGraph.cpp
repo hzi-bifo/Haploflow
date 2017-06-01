@@ -221,7 +221,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		return following; // the neighbours for this vertex have been added
 	}
 	float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
-	Sequence src = dbg.getSequence(curr);
+	Sequence src = *dbg.getSequence(curr);
 	// this is for checking whether the reverse complement is in the debruijn graph
 	bool reverse = (src != curr); // true, if reverse complement, i.e. src and curr are not the same
 	for (const auto& n : succ)
@@ -234,7 +234,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		{
 			next = curr.substr(1) + n;
 			Vertex* nextV = dbg.getVertex(next);
-			Sequence s = dbg.getSequence(next);
+			Sequence s = *dbg.getSequence(next);
 			sequence += n;
 			if (!nextV->is_flagged())
 				following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, pcov, dbg));
@@ -244,7 +244,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		{
 			next = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
 			Vertex* nextV = dbg.getVertex(next);
-			Sequence s = dbg.getSequence(next);
+			Sequence s = *dbg.getSequence(next);
 			sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr (by definition)
 			if (!nextV->is_flagged())
 				following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, pcov, dbg));
@@ -261,7 +261,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		{
 			prev = n + curr.substr(0,curr.length() - 1);
 			Vertex* nextV = dbg.getVertex(prev);
-			Sequence s = dbg.getSequence(prev);
+			Sequence s = *dbg.getSequence(prev);
 			sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr
 			if (!nextV->is_flagged())
 				following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, pcov, dbg));
@@ -270,7 +270,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 		{
 			prev = curr.substr(1) + deBruijnGraph::complement(n);
 			Vertex* nextV = dbg.getVertex(prev);
-			Sequence s = dbg.getSequence(prev);
+			Sequence s = *dbg.getSequence(prev);
 			sequence += deBruijnGraph::complement(n);
 			if (!nextV->is_flagged())
 				following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, pcov, dbg));
@@ -296,7 +296,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
 		nextV->visit();
-		Sequence tmp = dbg.getSequence(prev); // check for reverse complimentarity
+		Sequence tmp = *dbg.getSequence(prev); // check for reverse complimentarity
 		unsigned int cov;
 		char c;
 		lastchar = prev.back(); // this will be added to the sequence
@@ -402,7 +402,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
 		nextV->visit();
-		Sequence tmp = dbg.getSequence(next);
+		Sequence tmp = *dbg.getSequence(next);
 		unsigned int cov;
 		char c;
 		if (tmp != next) // we are a reverse complement
