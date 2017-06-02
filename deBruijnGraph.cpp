@@ -102,112 +102,97 @@ int deBruijnGraph::getSize() const
 
 void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 {
-	std::stack<std::pair<std::string, int> > recursion_stack;
+	std::stack<std::pair<std::pair<std::string, std::string>, unsigned int> > recursion_stack;
 	std::stack<Sequence> visit_stack;
 	unsigned int index = 1;
 	for (auto& p : graph_)
 	{
 		Sequence s = p.first;
 		Vertex& v = p.second;
-		if (v.scc == 0) // scc hasnt been set
-			recursion_stack.push(std::make_pair(s.get_kmer(),0));
+		if (v.index == 0) // scc hasnt been set
+		{
+			recursion_stack.push(std::make_pair(std::make_pair("",s.get_kmer()),0));
+		}
 		while (recursion_stack.size() > 0)
 		{
 			auto next_element = recursion_stack.top();
 			recursion_stack.pop();
 			
-			std::string curr = next_element.first;
+			std::string prev = next_element.first.first; // where we came from
+			std::string curr = next_element.first.second;
 			const Sequence* cseq = getSequence(curr);
 			Vertex& v = graph_[*cseq];
 			bool reverse = (*cseq != curr);
 			
-			int child = next_element.second;
+			unsigned int child = next_element.second;
+			unsigned int children = reverse ? v.get_predecessors().size() : v.get_successors().size();
 			
-			if (child != -1)
+			if (!child) // this vertex is visited the first time this run
 			{
-				v.scc = index;
 				v.index = index;
+				v.scc = index;
+				index++;
 				v.onStack = true;
 				visit_stack.push(*cseq);
-				index++;
+			}
 
+			if (child < children)
+			{
 				std::string next("");
 				const Sequence* succ = nullptr;
-
+				
 				if (!reverse)
 				{
 					auto successors = v.get_successors();
-					if (child >= successors.size()) // sink, is its own scc automatically
-					{
-						recursion_stack.push(std::make_pair(curr,-1)); // all children have been visited
-						continue;
-					}
 					next = curr.substr(1) + successors[child];
 					succ = getSequence(next);
 				}
 				else
 				{
 					auto predecessors = v.get_predecessors();
-					if (child >= predecessors.size())
-					{
-						recursion_stack.push(std::make_pair(curr,-1)); // all children have been visited
-						continue;
-					}
 					next = curr.substr(1) + complement(predecessors[child]); // TODO
 					succ = getSequence(next);
 				}
 				Vertex& w = graph_[*succ];
 
-				recursion_stack.push(std::make_pair(curr,++child)); // visit the next child
-				if (w.scc == 0)
+				recursion_stack.push(std::make_pair(std::make_pair(prev,curr),++child)); // visit the next child
+				if (w.index == 0)
 				{
-					recursion_stack.push(std::make_pair(next,0));
+					recursion_stack.push(std::make_pair(std::make_pair(curr,next),0));
 				}
 				else if (w.onStack)
 				{
-					v.index = std::min(v.index, w.scc);
+					v.scc = std::min(v.scc, w.index);
 				}
 			}
 			else  // all children have been visited in the stack
 			{
-				if (!reverse)
+				if (prev != "") // is not the first searched
 				{
-					auto successors = v.get_successors();
-					for (auto& s : successors) // slightly less memory/time efficient than recursive check
+					const Sequence* pseq = getSequence(prev);
+					Vertex& w = graph_[*pseq];
+					w.scc = std::min(w.scc, v.scc);
+					if (w.index == w.scc)
 					{
-						std::string next = curr.substr(1) + s;
-						const Sequence* succ = getSequence(next);
-						Vertex w = graph_[*succ];
-						v.index = std::min(v.index, w.index);
+						Sequence scc = visit_stack.top();
+						do
+						{
+							visit_stack.pop();
+							Vertex& path = graph_[scc];
+							path.onStack = false;
+							scc = visit_stack.top();
+						} while (scc != *pseq);
 					}
 				}
 				else
 				{
-					auto predecessors = v.get_predecessors();
-					for (auto& s : predecessors) // slightly less memory/time efficient than recursive check
-					{
-						std::string next = curr.substr(1) + complement(s);
-						const Sequence* succ = getSequence(next);
-						Vertex w = graph_[*succ];
-						v.index = std::min(v.index, w.index);
-					}
-				}
-				if (v.index == v.scc)
-				{
-					Sequence scc = visit_stack.top();
-					do
-					{
-						visit_stack.pop();
-						Vertex& w = graph_[scc];
-						w.onStack = false;
-					} while (scc != *cseq);
+					Sequence top = visit_stack.top();
+					Vertex& tv = graph_[top];
+					tv.onStack = false;
+					visit_stack.pop();
 				}
 			}
 		}
-	}
-	for (auto& p : graph_)
-	{
-		std::cout << p.first << " " << p.second.scc << std::endl;
 	}
 }
 
