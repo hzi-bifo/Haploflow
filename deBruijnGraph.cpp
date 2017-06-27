@@ -136,7 +136,7 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 				visit_stack.push(*cseq);
 			}
 
-			if (child < children)
+			if (child < children) // still have to search at leat one child
 			{
 				std::string next("");
 				const Sequence* succ = nullptr;
@@ -158,7 +158,7 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 				recursion_stack.push(std::make_pair(std::make_pair(prev,curr),++child)); // visit the next child
 				if (w.index == 0)
 				{
-					recursion_stack.push(std::make_pair(std::make_pair(curr,next),0));
+					recursion_stack.push(std::make_pair(std::make_pair(curr,next),0)); // "recurse" on current child
 				}
 				else if (w.onStack)
 				{
@@ -194,6 +194,26 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 			}
 		}
 	}
+}
+
+// calculates some metrics on the de bruijn graph used for estimating cutoffs etc
+std::unordered_map<unsigned int, unsigned int> deBruijnGraph::coverageDistribution() const
+{
+	std::unordered_map<unsigned int, unsigned int> cov_dist;
+	for (const auto& p : graph_)
+	{
+		auto& v = p.second;
+		unsigned int coverage = std::max(v.get_total_in_coverage(), v.get_total_out_coverage());
+		if (cov_dist.find(coverage) != cov_dist.end())
+		{
+			cov_dist[coverage]++;
+		}
+		else
+		{
+			cov_dist[coverage] = 1;
+		}
+	}
+	return cov_dist;
 }
 
 std::vector<std::string> deBruijnGraph::getSources() const
@@ -271,14 +291,43 @@ Vertex* deBruijnGraph::getVertex(const std::string& kmer)
 
 void deBruijnGraph::debug()
 {
-	for (auto&& v : graph_)
+	std::cerr << "Vertices: " << getSize() << std::endl;
+	std::unordered_map<unsigned int, unsigned int> sccs;
+	for (auto& p : graph_)
 	{
-		if (v.first == "AGATAGAGTGATGGTATCACCTTTGGCTGTGACATGGTGGA"
-		or v.first == "TCCACCATGTCACAGCCAAAGGTGATACCATCACTCTATCT")
+		unsigned int scc = p.second.scc;
+		if (sccs.find(scc) != sccs.end())
 		{
-			v.second.print(true);
+			sccs[scc]++;
+			//std::cout << p.first << " (" << scc << ")" << std::endl;
+		}
+		else
+		{
+			sccs[scc] = 2;
 		}
 	}
+	std::cout << sccs.size() << " SCCs" << std::endl;
+	unsigned int small_sccs = 0;
+	for (const auto& p : sccs)
+	{
+		if (p.second > 2 )
+			std::cout << p.first << " size " << p.second << std::endl;
+		else
+			small_sccs++;
+	}
+	std::cout << small_sccs << " SCCs of size 2" << std::endl;
+	auto cov_dist = coverageDistribution();
+	
+	float mean = 0.;
+	unsigned int num = 0;
+	for (auto& elem : cov_dist)
+	{
+		std::cout << elem.second << " vertices with coverage " << elem.first << std::endl;
+		num += elem.second;
+		mean += elem.first;
+	}
+	mean /= num;
+	std::cout << mean << std::endl;
 	/*std::cerr << "Vertices: " << getSize() << std::endl;
 	clock_t t = clock();
 	std::vector<std::string> sources = getSources();

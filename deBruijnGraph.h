@@ -2,6 +2,7 @@
 #define DBG_H
 
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 #include <vector>
 #include <queue>
@@ -24,10 +25,12 @@ public:
 	deBruijnGraph(std::string filename, unsigned int k); // builds the deBruijn graph from file
 	inline static char complement(const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};}
 
+	void markCycles();
+	std::unordered_map<unsigned int, unsigned int> coverageDistribution() const;
+	
 	std::vector<std::string> getSources() const; // returns all sources
 	std::vector<std::string> getSinks() const; // returns all sinks in graph
 	std::pair<std::vector<Sequence>, std::vector<Sequence> > getJunctions() const;
-	void markCycles();
 	const Sequence* getSequence(const std::string&);
 	Vertex* getVertex(const std::string&); // return the vertex corresponding to kmer, 0 if not found
 

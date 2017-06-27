@@ -10,7 +10,7 @@ int main (int argc, char* argv[])
 	t = clock();
 	dbg.markCycles();
 	std::cerr << "Cycle detection took " << (clock() - t)/1000000. << " seconds." << std::endl;
-	//dbg.debug();
+	dbg.debug();
 	//UnitigGraph ug(dbg);
 	//t = clock();
 	//ug.calculateFlow();
