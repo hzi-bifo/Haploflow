@@ -15,9 +15,9 @@ namespace std
 }
 
 // TODO this is only temporary!
-#define THRESHOLD 30
-#define LONG_THRESH 50 // threshold if path is not long enough
-#define CONTIG_THRESH 150 // if contigs are longer than this they are produced
+#define THRESHOLD 0
+#define LONG_THRESH 0 // threshold if path is not long enough
+#define CONTIG_THRESH 0 // if contigs are longer than this they are produced
 #define FRAC_THRESH 0.08 // threshold of total coverage from which something is treated significant
 
 // constructor of the so-called UnitigGraph
@@ -54,75 +54,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 			cc_++; // new connected component found
 		}
 	}
-	// TODO everything down here is debug information! TODO
-
 	std::cerr << "Unitig graph succesfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
-	// DEBUG
-	auto&& numV = boost::num_vertices(g_);
-	auto&& numE = boost::num_edges(g_);
-	
-	std::cerr << "Unitig graph has " << numV << " vertices and " << numE << " edges, starting cleaning" << std::endl;
-	t = clock();
-
-	//TODO move this out
-	cleanGraph();
-	
-	numV = boost::num_vertices(g_);
-	numE = boost::num_edges(g_);
-	std::cerr << "Finished cleaning: Unitig graph has " << numV << " vertices and " << numE << " edges" << std::endl;
-	std::cerr << "Cleaning took " << (clock() - t)/1000000. << " seconds." << std::endl;
-
-	typedef std::map<UVertex, int> IndexMap;
-	IndexMap mapIndex;
-	boost::associative_property_map<IndexMap> propmapIndex(mapIndex);
-	uvertex_iter vi, vi_end;
-	int i = 1;
-	int simpletons = 0;
-	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-	//const auto& name = boost::get(boost::edge_name_t(),g_);
-	const auto& vname = boost::get(boost::vertex_name_t(),g_);
-	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
-	{
-		unsigned int indegree = boost::in_degree(*vi,g_);
-		unsigned int outdegree = boost::out_degree(*vi,g_);
-		
-		float total_out = 0.;
-		float total_in = 0.;
-		
-		for (auto&& oe : boost::out_edges(*vi,g_))
-		{
-			auto&& e = boost::edge(*vi,boost::target(oe,g_),g_);
-			total_out += boost::get(cap,e.first);
-		}
-
-		for (auto&& ie : boost::in_edges(*vi,g_))
-		{
-			auto&& e = boost::edge(boost::source(ie,g_),*vi,g_);
-			total_in += boost::get(cap,e.first);
-		}
-		float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
-		unsigned int delta = std::abs(total_out - total_in);
-
-		if (false) //DEBUG
-		{
-			if (outdegree == 0)
-			{
-				if (indegree == 1)
-					std::cerr << "Sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" <<std::endl;
-				else
-					std::cerr << "Unreal sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
-			}
-			else if (indegree == 1 and outdegree == 1)
-				simpletons++;
-			if ((epsilon > 1.2 or epsilon < 0.8) and delta > 10 and indegree > 0 and outdegree > 0)
-			{
-				std::cerr << boost::get(vname,*vi) << " (" << epsilon << "(" << total_out << ")/" << i << ")" << std::endl;
-			}
-		}
-		boost::put(propmapIndex,*vi,i++);
-	}
-	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
-	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -135,7 +67,8 @@ UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
 	(*index)++;
 	boost::put(idx, uv, *index);
 	auto cc = boost::get(boost::vertex_index2_t(), g_);
-	boost::put(cc, uv, cc_);
+	boost::put(cc, uv, 0); // sccs are set later
+	//boost::put(cc, uv, cc_);
 	auto&& ins = std::make_pair(*index,uv);
 	graph_.insert(ins);
 	return uv;
@@ -646,6 +579,90 @@ void UnitigGraph::removeStableSets()
 		}
 	}
 }
+void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig graph
+{
+	auto cc = boost::get(boost::vertex_index2_t(), g_); // scc
+	auto i = boost::get(boost::vertex_discover_time_t(), g_); // index
+	auto onStack = boost::get(boost::vertex_finish_time_t(), g_); // onStack
+    // lca, curr, scc
+	std::stack<std::pair<std::pair<UVertex*, UVertex*>, unsigned int> > recursion_stack;
+	std::stack<UVertex*> visit_stack;
+	unsigned int index = 1;
+	for (auto& v : boost::vertices(g_))
+	{
+        if (boost::get(cc,v) == 0) // scc hasnt been set
+		{
+			recursion_stack.push(std::make_pair(std::make_pair(nullptr,&v),0));
+		}
+		while (recursion_stack.size() > 0)
+		{
+			auto next_element = recursion_stack.top();
+			recursion_stack.pop();
+
+			UVertex *prev = next_element.first.first; // where we came from
+			UVertex curr = *(next_element.first.second);
+			
+			unsigned int child = next_element.second;
+			unsigned int children = boost::out_degree(curr,g_);//check reverse complement?
+		    
+			if (!child) // this vertex is visited the first time this run (child is nullptr)
+			{
+				boost::put(i,curr,index);
+				boost::put(cc,curr,index);
+				index++;
+				boost::put(onStack,curr,true);
+				visit_stack.push(&curr);
+			}
+			if (child < children) // still have to search at least one child
+			{
+                // reverse complements? TODO
+                auto successors = boost::out_edges(curr,g_);
+                unsigned int j = 0;
+                UVertex next;
+                for (auto&& ne : successors)
+                {
+                    j++;
+                    next = boost::target(ne,g_);
+                    if (j > child)
+                        break;
+                }
+                ++child;
+				recursion_stack.push(std::make_pair(std::make_pair(prev,&curr),child)); // visit the next child
+				if (boost::get(i,next) == 0)
+				{
+					recursion_stack.push(std::make_pair(std::make_pair(&curr,&next),0)); // "recurse" on current child
+				}
+				else if (boost::get(onStack, next))
+				{
+                    boost::put(cc,curr,std::min(boost::get(cc,curr),boost::get(i,next)));
+				}
+			}
+			else  // all children have been visited in the stack
+			{
+				if (prev) // is not the first searched, prev is not nullptr
+				{
+					boost::put(cc,*prev,std::min(boost::get(cc,*prev),boost::get(cc,curr)));
+					if (boost::get(i,*prev) == boost::get(cc,*prev))
+					{
+						UVertex* scc = visit_stack.top();
+						do
+						{
+							visit_stack.pop();
+							boost::put(onStack,*scc,false);
+							scc = visit_stack.top();
+						} while (*scc != *prev);
+					}
+				}
+				else
+				{
+					UVertex *top = visit_stack.top();
+					boost::put(onStack,*top,false);
+					visit_stack.pop();
+				}
+			}
+		}
+	}
+}
 
 // the graph might contain some unconnected vertices, clean up
 void UnitigGraph::cleanGraph()
@@ -841,4 +858,83 @@ void UnitigGraph::calculateFlow()
 			std::sort_heap(q.begin(), q.end()); // capacity of first_edge has changed
 		}
 	}
+}
+
+void UnitigGraph::debug()
+{
+    //markCycles();
+
+	// DEBUG
+	auto&& numV = boost::num_vertices(g_);
+	auto&& numE = boost::num_edges(g_);
+	
+	std::cerr << "Unitig graph has " << numV << " vertices and " << numE << " edges, starting cleaning" << std::endl;
+	clock_t t = clock();
+
+	//TODO move this out
+	cleanGraph();
+	
+	numV = boost::num_vertices(g_);
+	numE = boost::num_edges(g_);
+	std::cerr << "Finished cleaning: Unitig graph has " << numV << " vertices and " << numE << " edges" << std::endl;
+	std::cerr << "Cleaning took " << (clock() - t)/1000000. << " seconds." << std::endl;
+
+    t = clock();
+    std::cerr << "Finding Strongly Connected Components" << std::endl;
+    markCycles();
+    std::cerr << "Done finding sccs after " << (clock() -t)/100000. << " seconds" << std::endl;
+
+	typedef std::map<UVertex, int> IndexMap;
+	IndexMap mapIndex;
+	boost::associative_property_map<IndexMap> propmapIndex(mapIndex);
+	uvertex_iter vi, vi_end;
+	int i = 1;
+	int simpletons = 0;
+	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
+	//const auto& name = boost::get(boost::edge_name_t(),g_);
+	const auto& vname = boost::get(boost::vertex_name_t(),g_);
+	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
+	{
+		unsigned int indegree = boost::in_degree(*vi,g_);
+		unsigned int outdegree = boost::out_degree(*vi,g_);
+		
+		float total_out = 0.;
+		float total_in = 0.;
+		
+		for (auto&& oe : boost::out_edges(*vi,g_))
+		{
+			auto&& e = boost::edge(*vi,boost::target(oe,g_),g_);
+			total_out += boost::get(cap,e.first);
+		}
+
+		for (auto&& ie : boost::in_edges(*vi,g_))
+		{
+			auto&& e = boost::edge(boost::source(ie,g_),*vi,g_);
+			total_in += boost::get(cap,e.first);
+		}
+		float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
+		unsigned int delta = std::abs(total_out - total_in);
+
+		if (false) //DEBUG
+		{
+			if (outdegree == 0)
+			{
+				if (indegree == 1)
+					std::cerr << "Sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" <<std::endl;
+				else
+					std::cerr << "Unreal sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
+			}
+			else if (indegree == 1 and outdegree == 1)
+				simpletons++;
+			if ((epsilon > 1.2 or epsilon < 0.8) and delta > 10 and indegree > 0 and outdegree > 0)
+			{
+				std::cerr << boost::get(vname,*vi) << " (" << epsilon << "(" << total_out << ")/" << i << ")" << std::endl;
+			}
+		}
+		boost::put(propmapIndex,*vi,i++);
+	}
+
+    //boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index2_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }

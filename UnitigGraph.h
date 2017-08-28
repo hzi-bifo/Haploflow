@@ -19,7 +19,8 @@ typedef boost::adjacency_list<boost::listS, boost::listS, boost::bidirectionalS,
 						boost::property<boost::vertex_index1_t, unsigned int, // index
 						boost::property<boost::vertex_index2_t, unsigned int, // cc
 						boost::property<boost::vertex_name_t, std::string, // kmer
-						boost::property<boost::vertex_discover_time_t, bool> > > >, // visited flag
+						boost::property<boost::vertex_discover_time_t, unsigned int, // index for tarjan
+                        boost::property<boost::vertex_finish_time_t, bool> > > > >, // onStack flag
 							boost::property<boost::edge_name_t, std::string, // edge sequence
 							boost::property<boost::edge_index_t, bool, //edge visited flag
 							boost::property<boost::edge_capacity_t, float, // capacity
@@ -36,14 +37,17 @@ class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
 	UnitigGraph(deBruijnGraph&); // TODO delete dBg after UnititgGraph creation?
-	void calculateFlow();
+	void debug(); // debug information
+    void calculateFlow();
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
 	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
 	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
 	UVertex addVertex(unsigned int*, std::string name);
-	void cleanGraph();
+	
+    void markCycles();
+    void cleanGraph();
 	void removeStableSets();
 	void contractPaths();
 	void filterTerminals();

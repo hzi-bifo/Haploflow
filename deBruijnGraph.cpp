@@ -292,7 +292,7 @@ Vertex* deBruijnGraph::getVertex(const std::string& kmer)
 void deBruijnGraph::debug()
 {
 	std::cerr << "Vertices: " << getSize() << std::endl;
-	std::unordered_map<unsigned int, unsigned int> sccs;
+	/*std::unordered_map<unsigned int, unsigned int> sccs;
 	for (auto& p : graph_)
 	{
 		unsigned int scc = p.second.scc;
@@ -315,14 +315,14 @@ void deBruijnGraph::debug()
 		else
 			small_sccs++;
 	}
-	std::cout << small_sccs << " SCCs of size 2" << std::endl;
+	std::cout << small_sccs << " SCCs of size 2" << std::endl;*/
 	auto cov_dist = coverageDistribution();
 	
 	float mean = 0.;
 	unsigned int num = 0;
 	for (auto& elem : cov_dist)
 	{
-		std::cout << elem.second << " vertices with coverage " << elem.first << std::endl;
+		std::cout << elem.second << "\t" << elem.first << std::endl;
 		num += elem.second;
 		mean += elem.first;
 	}
