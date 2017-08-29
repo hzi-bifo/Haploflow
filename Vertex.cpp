@@ -22,6 +22,27 @@ Vertex::Vertex() :
 {
 }
 
+Vertex::Vertex(int ain, int cin, int gin, int tin, int aout, int cout, int gout, int tout):
+    scc(0),
+    index(0),
+    onStack(false),
+    a_in(ain),
+    a_out(aout),
+    c_in(cin),
+    c_out(cout),
+    g_in(gin),
+    g_out(gout),
+    t_in(tin),
+    t_out(tout),
+    n_in(0),
+    n_out(0), // unused right now
+    degree(8-!ain-!cin-!gin-!tin-!aout-!cout-!gout-!tout), // degree is 8 if all are set (!x returns 0)
+    visited(false),
+    flagged(false),
+    starts_with(0)
+{
+}
+
 Vertex::Vertex(const Vertex& v) : 
 	scc(v.scc),
 	index(v.index),
@@ -47,7 +68,7 @@ std::ostream& operator<<(std::ostream& os, const Vertex& v)
 {
     os << v.a_in << '\t'<< v.c_in << '\t' << v.g_in << '\t' << v.t_in << std::endl;
     os << v.a_out << '\t' << v.c_out << '\t' << v.g_out << '\t' << v.t_out << std::endl;
-    os << v.degree << '\t' << v.visited << '\t' << v.flagged << '\t' << v.starts_with;
+    //os << v.degree << '\t' << v.visited << '\t' << v.flagged << '\t' << v.starts_with;
     return os;
 }
 

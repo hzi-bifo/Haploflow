@@ -10,7 +10,8 @@ class Sequence;
 class Vertex
 {
 public:
-	Vertex();
+    Vertex();
+	Vertex(int ain, int cin, int gin, int tin, int aout, int cout, int gout, int tout);
 	Vertex(const Vertex& v);
     friend std::ostream& operator<<(std::ostream& os, const Vertex& v);
 	

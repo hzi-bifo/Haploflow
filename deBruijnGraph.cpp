@@ -1,5 +1,18 @@
 #include "deBruijnGraph.h"
 
+deBruijnGraph::deBruijnGraph(std::string filename)
+{
+    std::ifstream graph_file;
+    graph_file.open(filename);
+    std::string sequence;
+    int a_in; int c_in; int g_in; int t_in;
+    int a_out; int c_out; int g_out; int t_out;
+    
+    Sequence s(sequence);
+    Vertex v(a_in, c_in, g_in, t_in, a_out, c_out, g_out, t_out);
+    graph_.emplace(s,v);
+}
+
 deBruijnGraph::deBruijnGraph(unsigned int k) : k_ (k)
 {
 }
@@ -32,12 +45,13 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 	}
 }
 
-std::ostream& operator<<(std::ostream& os, const deBruijnGraph& v)
+std::ostream& operator<<(std::ostream& os, const deBruijnGraph& dbg)
 {
-    for (const auto& v : graph_)
+    os << dbg.k_ << '\t' << dbg.read_length_ << std::endl;
+    for (const auto& v : dbg.graph_)
     {
-        os << v << std::endl;
-        os << graph_[v] << std::endl;
+        os << v.first << std::endl;
+        os << v.second << std::endl;
     }
     return os;
 }
