@@ -32,6 +32,16 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 	}
 }
 
+std::ostream& operator<<(std::ostream& os, const deBruijnGraph& v)
+{
+    for (const auto& v : graph_)
+    {
+        os << v << std::endl;
+        os << graph_[v] << std::endl;
+    }
+    return os;
+}
+
 void deBruijnGraph::printGraph() const
 {
 	std::cout << graph_.size() << std::endl;

@@ -43,6 +43,14 @@ Vertex::Vertex(const Vertex& v) :
 {
 }
 
+std::ostream& operator<<(std::ostream& os, const Vertex& v)
+{
+    os << v.a_in << '\t'<< v.c_in << '\t' << v.g_in << '\t' << v.t_in << std::endl;
+    os << v.a_out << '\t' << v.c_out << '\t' << v.g_out << '\t' << v.t_out << std::endl;
+    os << v.degree << '\t' << v.visited << '\t' << v.flagged << '\t' << v.starts_with;
+    return os;
+}
+
 // if A -> B with letter C, then rc(B) -> rc(A) with c(C)
 void Vertex::add_successor(const char& letter)
 {

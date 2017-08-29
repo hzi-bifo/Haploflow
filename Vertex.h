@@ -12,6 +12,7 @@ class Vertex
 public:
 	Vertex();
 	Vertex(const Vertex& v);
+    friend std::ostream& operator<<(std::ostream& os, const Vertex& v);
 	
 	void add_successor(const char& letter);
 	void add_predecessor(const char& letter);
