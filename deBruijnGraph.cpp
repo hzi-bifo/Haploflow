@@ -2,15 +2,55 @@
 
 deBruijnGraph::deBruijnGraph(std::string filename)
 {
-    std::ifstream graph_file;
-    graph_file.open(filename);
+    std::ifstream graph_file(filename);
+    short counter = -2;
+    std::string line;
+        
     std::string sequence;
     int a_in; int c_in; int g_in; int t_in;
     int a_out; int c_out; int g_out; int t_out;
-    
-    Sequence s(sequence);
-    Vertex v(a_in, c_in, g_in, t_in, a_out, c_out, g_out, t_out);
-    graph_.emplace(s,v);
+
+    while (std::getline(graph_file, line))
+    {    
+        if (counter < 0) // read header
+        {
+            std::stringstream ss(line);
+            while(std::getline(ss, line,'\t'))
+            {
+                if (counter == -2)
+                    k_ = stoi(line);
+                else if (counter == -1)
+                    read_length_ = stoi(line);
+                counter++;
+            }
+            continue;
+        }
+        if (line.empty()) // empty lines between vertices
+            continue;
+        std::stringstream ss(line);
+        while (std::getline(ss, line, '\t')) // split the line at tabs
+        {
+            switch(counter){    
+                case 0: sequence = line; break;
+                case 1: a_in = stoi(line); break;
+                case 2: c_in = stoi(line); break;
+                case 3: g_in = stoi(line); break;
+                case 4: t_in = stoi(line); break;
+                case 5: a_out = stoi(line); break;
+                case 6: c_out = stoi(line); break;
+                case 7: g_out = stoi(line); break;
+                case 8: t_out = stoi(line); break;
+                default: counter = 0; break; 
+            }
+            counter++; counter %= 9; 
+        }
+        if (!counter)
+        {
+            Sequence s(sequence);
+            Vertex v(a_in, c_in, g_in, t_in, a_out, c_out, g_out, t_out);
+            graph_.emplace(s,v);
+        }
+    }
 }
 
 deBruijnGraph::deBruijnGraph(unsigned int k) : k_ (k)
