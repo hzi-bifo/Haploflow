@@ -15,11 +15,54 @@ namespace std
 }
 
 // TODO this is only temporary!
-#define THRESHOLD 0
-#define LONG_THRESH 0 // threshold if path is not long enough
-#define CONTIG_THRESH 0 // if contigs are longer than this they are produced
+#define THRESHOLD 30
+#define LONG_THRESH 50 // threshold if path is not long enough
+#define CONTIG_THRESH 150 // if contigs are longer than this they are produced
 #define FRAC_THRESH 0.08 // threshold of total coverage from which something is treated significant
 
+// unitig graph for debugging purposes
+UnitigGraph::UnitigGraph() : cc_(1)
+{
+    std::vector<UVertex> vertices;
+    for (unsigned int i = 1; i < 7; i++)
+    {
+        unsigned int index = 1;
+        vertices.push_back(addVertex(&index, std::to_string(i)));
+    }
+    boost::add_edge(vertices[0],vertices[1],g_);
+    boost::add_edge(vertices[0],vertices[2],g_);
+    boost::add_edge(vertices[1],vertices[3],g_);
+    boost::add_edge(vertices[1],vertices[4],g_);
+    boost::add_edge(vertices[2],vertices[3],g_);
+    boost::add_edge(vertices[2],vertices[4],g_);
+    boost::add_edge(vertices[3],vertices[5],g_);
+    boost::add_edge(vertices[4],vertices[5],g_);
+    /*boost::add_edge(vertices[0],vertices[1],g_);
+    boost::add_edge(vertices[0],vertices[1],g_);
+    boost::add_edge(vertices[1],vertices[2],g_);
+    boost::add_edge(vertices[1],vertices[3],g_);
+    boost::add_edge(vertices[1],vertices[12],g_);
+    boost::add_edge(vertices[2],vertices[3],g_);
+    boost::add_edge(vertices[2],vertices[4],g_);
+    boost::add_edge(vertices[3],vertices[0],g_);
+    boost::add_edge(vertices[4],vertices[5],g_);
+    //boost::add_edge(vertices[4],vertices[5],g_);
+    boost::add_edge(vertices[4],vertices[8],g_);
+    boost::add_edge(vertices[5],vertices[6],g_);
+    boost::add_edge(vertices[6],vertices[7],g_);
+    boost::add_edge(vertices[7],vertices[6],g_);
+    boost::add_edge(vertices[7],vertices[8],g_);
+    boost::add_edge(vertices[8],vertices[9],g_);
+    boost::add_edge(vertices[9],vertices[10],g_);
+    boost::add_edge(vertices[9],vertices[11],g_);
+    boost::add_edge(vertices[10],vertices[14],g_);
+    boost::add_edge(vertices[10],vertices[14],g_);
+    boost::add_edge(vertices[11],vertices[12],g_);
+    boost::add_edge(vertices[11],vertices[13],g_);
+    boost::add_edge(vertices[12],vertices[4],g_);
+    boost::add_edge(vertices[14],vertices[13],g_);
+    //boost::add_edge(vertices[14],vertices[15],g_);*/
+}
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1

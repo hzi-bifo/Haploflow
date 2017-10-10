@@ -37,6 +37,7 @@ class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
 	UnitigGraph(deBruijnGraph&); // TODO delete dBg after UnititgGraph creation?
+	UnitigGraph(); // debug
 	void debug(); // debug information
     void calculateFlow();
 private:
