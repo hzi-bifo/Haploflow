@@ -110,7 +110,7 @@ UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
 	(*index)++;
 	boost::put(idx, uv, *index);
 	auto cc = boost::get(boost::vertex_index2_t(), g_);
-	boost::put(cc, uv, 0); // sccs are set later
+	boost::put(cc, uv, 1); // sccs are set later (at least 1)
 	//boost::put(cc, uv, cc_);
 	auto&& ins = std::make_pair(*index,uv);
 	graph_.insert(ins);
@@ -624,41 +624,43 @@ void UnitigGraph::removeStableSets()
 }
 void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig graph
 {
-	auto cc = boost::get(boost::vertex_index2_t(), g_); // scc
+	auto name = boost::get(boost::vertex_name_t(), g_); // name
+	auto cc = boost::get(boost::vertex_index2_t(), g_); // scc / lowlink
 	auto i = boost::get(boost::vertex_discover_time_t(), g_); // index
 	auto onStack = boost::get(boost::vertex_finish_time_t(), g_); // onStack
     // lca, curr, scc
-	std::stack<std::pair<std::pair<UVertex*, UVertex*>, unsigned int> > recursion_stack;
-	std::stack<UVertex*> visit_stack;
+	std::stack<std::pair<std::pair<UVertex, UVertex>, unsigned int> > recursion_stack;
+	std::stack<UVertex> visit_stack;
+    UVertex dummy = boost::add_vertex(g_); // dummy vertex for starting from
+    boost::put(cc, dummy, 0); // cc for all real vertices is at least 1
 	unsigned int index = 1;
 	for (auto& v : boost::vertices(g_))
 	{
-        if (boost::get(cc,v) == 0) // scc hasnt been set
+        if (boost::get(i,v) == 0) // scc hasnt been set
 		{
-			recursion_stack.push(std::make_pair(std::make_pair(nullptr,&v),0));
+			recursion_stack.push(std::make_pair(std::make_pair(dummy,v),0));
 		}
 		while (recursion_stack.size() > 0)
 		{
 			auto next_element = recursion_stack.top();
 			recursion_stack.pop();
 
-			UVertex *prev = next_element.first.first; // where we came from
-			UVertex curr = *(next_element.first.second);
-			
+			UVertex prev = next_element.first.first; // where we came from
+			UVertex curr = next_element.first.second;
+
 			unsigned int child = next_element.second;
-			unsigned int children = boost::out_degree(curr,g_);//check reverse complement?
-		    
-			if (!child) // this vertex is visited the first time this run (child is nullptr)
+			unsigned int children = boost::out_degree(curr,g_); //check reverse complement?
+			
+            if (!child) // this vertex is visited the first time this run (child is nullptr)
 			{
-				boost::put(i,curr,index);
+                boost::put(i,curr,index);
 				boost::put(cc,curr,index);
 				index++;
 				boost::put(onStack,curr,true);
-				visit_stack.push(&curr);
+				visit_stack.push(curr);
 			}
 			if (child < children) // still have to search at least one child
 			{
-                // reverse complements? TODO
                 auto successors = boost::out_edges(curr,g_);
                 unsigned int j = 0;
                 UVertex next;
@@ -670,41 +672,47 @@ void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig 
                         break;
                 }
                 ++child;
-				recursion_stack.push(std::make_pair(std::make_pair(prev,&curr),child)); // visit the next child
+                
+				recursion_stack.push(std::make_pair(std::make_pair(prev,curr),child)); // visit the next child
 				if (boost::get(i,next) == 0)
 				{
-					recursion_stack.push(std::make_pair(std::make_pair(&curr,&next),0)); // "recurse" on current child
+					recursion_stack.push(std::make_pair(std::make_pair(curr,next),0)); // "recurse" on current child
 				}
 				else if (boost::get(onStack, next))
 				{
-                    boost::put(cc,curr,std::min(boost::get(cc,curr),boost::get(i,next)));
+                    //boost::put(cc,curr,std::min(boost::get(cc,curr),boost::get(i,next)));
+                    boost::put(cc,curr,std::min(boost::get(cc,curr),boost::get(cc,next)));
 				}
 			}
 			else  // all children have been visited in the stack
 			{
-				if (prev) // is not the first searched, prev is not nullptr
+				if (boost::get(cc, prev)) // is not the first searched
 				{
-					boost::put(cc,*prev,std::min(boost::get(cc,*prev),boost::get(cc,curr)));
-					if (boost::get(i,*prev) == boost::get(cc,*prev))
+					boost::put(cc, prev, std::min(boost::get(cc,prev),boost::get(cc,curr)));
+					if (boost::get(cc,curr) == boost::get(i,curr))
 					{
-						UVertex* scc = visit_stack.top();
-						do
+						UVertex scc = visit_stack.top();
+                        boost::put(onStack,scc,false);
+                        visit_stack.pop();
+                        while (boost::get(name, curr) != boost::get(name, scc)) // there should not be two vertices with the same name present
 						{
-							visit_stack.pop();
-							boost::put(onStack,*scc,false);
+                            //boost::put(cc,scc,std::min(boost::get(cc,scc),boost::get(cc,curr))); //set the CC of all vertices on stack
 							scc = visit_stack.top();
-						} while (*scc != *prev);
+							boost::put(onStack,scc,false);
+                            visit_stack.pop();
+						} 
 					}
 				}
 				else
 				{
-					UVertex *top = visit_stack.top();
-					boost::put(onStack,*top,false);
+					UVertex top = visit_stack.top();
+					boost::put(onStack,top,false);
 					visit_stack.pop();
 				}
 			}
 		}
 	}
+    boost::remove_vertex(dummy, g_); // remove the dummy again
 }
 
 // the graph might contain some unconnected vertices, clean up
@@ -925,7 +933,7 @@ void UnitigGraph::debug()
     t = clock();
     std::cerr << "Finding Strongly Connected Components" << std::endl;
     markCycles();
-    std::cerr << "Done finding sccs after " << (clock() -t)/100000. << " seconds" << std::endl;
+    std::cerr << "Done finding sccs after " << (clock() - t)/100000. << " seconds" << std::endl;
 
 	typedef std::map<UVertex, int> IndexMap;
 	IndexMap mapIndex;
@@ -938,7 +946,7 @@ void UnitigGraph::debug()
 	const auto& vname = boost::get(boost::vertex_name_t(),g_);
 	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
 	{
-		unsigned int indegree = boost::in_degree(*vi,g_);
+		/*unsigned int indegree = boost::in_degree(*vi,g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
 		float total_out = 0.;
@@ -957,7 +965,7 @@ void UnitigGraph::debug()
 		}
 		float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
 		unsigned int delta = std::abs(total_out - total_in);
-
+        
 		if (false) //DEBUG
 		{
 			if (outdegree == 0)
@@ -973,11 +981,11 @@ void UnitigGraph::debug()
 			{
 				std::cerr << boost::get(vname,*vi) << " (" << epsilon << "(" << total_out << ")/" << i << ")" << std::endl;
 			}
-		}
+		}*/
 		boost::put(propmapIndex,*vi,i++);
 	}
 
     //boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
-	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
-	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index2_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index2_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
 }
