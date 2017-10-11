@@ -15,16 +15,24 @@
 #include <algorithm> // heap
 #include <queue>
 
+struct VertexProperties {
+    unsigned int index;
+    unsigned int scc;
+    std::string name;
+    unsigned int tarjan_index;
+    bool onStack;
+};
+
+struct EdgeProperties {
+    std::string name;
+    bool visited;
+    float capacity;
+    float residual_capacity;
+};
+
 typedef boost::adjacency_list<boost::listS, boost::listS, boost::bidirectionalS,
-						boost::property<boost::vertex_index1_t, unsigned int, // index
-						boost::property<boost::vertex_index2_t, unsigned int, // cc
-						boost::property<boost::vertex_name_t, std::string, // kmer
-						boost::property<boost::vertex_discover_time_t, unsigned int, // index for tarjan
-                        boost::property<boost::vertex_finish_time_t, bool> > > > >, // onStack flag
-							boost::property<boost::edge_name_t, std::string, // edge sequence
-							boost::property<boost::edge_index_t, bool, //edge visited flag
-							boost::property<boost::edge_capacity_t, float, // capacity
-							boost::property<boost::edge_residual_capacity_t, float> > > > > UGraph;
+							VertexProperties,
+							EdgeProperties> UGraph;
 
 typedef typename boost::graph_traits<UGraph>::vertex_descriptor UVertex;
 typedef typename boost::graph_traits<UGraph>::edge_descriptor UEdge;
@@ -36,7 +44,7 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&); // TODO delete dBg after UnititgGraph creation?
+	UnitigGraph(deBruijnGraph&); // TODO delete dBg after UnitigGraph creation?
 	UnitigGraph(); // debug
 	void debug(); // debug information
     void calculateFlow();
@@ -49,6 +57,7 @@ private:
 	
     void markCycles();
     void cleanGraph();
+    void condenseCycles();
 	void removeStableSets();
 	void contractPaths();
 	void filterTerminals();

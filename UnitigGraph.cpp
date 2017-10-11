@@ -104,15 +104,15 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
 {
 	UVertex uv = boost::add_vertex(g_);
-	auto n = boost::get(boost::vertex_name_t(), g_);
-	boost::put(n, uv, name);
-	auto idx = boost::get(boost::vertex_index1_t(), g_);
 	(*index)++;
-	boost::put(idx, uv, *index);
-	auto cc = boost::get(boost::vertex_index2_t(), g_);
-	boost::put(cc, uv, 1); // sccs are set later (at least 1)
-	//boost::put(cc, uv, cc_);
-	auto&& ins = std::make_pair(*index,uv);
+    // set vertex properties
+    g_[uv].name = name;
+	g_[uv].index = *index;
+    g_[uv].scc = 1;
+    g_[uv].tarjan_index = 0; // needs to be 0 to find out whether it has been set
+    g_[uv].onStack = false;
+	
+    auto&& ins = std::make_pair(*index,uv);
 	graph_.insert(ins);
 	return uv;
 }
@@ -266,8 +266,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	float max = coverage;
 	float avg = coverage;
 	unsigned int length = 1;
-	auto vn = boost::get(boost::vertex_name_t(), g_);
-	char lastchar = boost::get(vn,trg).back(); //char with which we are pointing to trg
+	char lastchar = g_[trg].name.back(); //char with which we are pointing to trg
 	// loop until the next unbalanced node is found, which is either visited (has been added) or will be added
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
@@ -325,10 +324,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		return std::make_pair(nextV,"");
 	}
 
-	auto name = boost::get(boost::edge_name_t(), g_);
-	auto cap = boost::get(boost::edge_capacity_t(), g_);
-	auto visit = boost::get(boost::edge_index_t(), g_);
-
 	UVertex src = graph_[nextV->index];
 	auto e = boost::edge(src,trg,g_);
 	bool toAdd = true;
@@ -345,21 +340,21 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		//toAdd = false; // this is interesting!
 	}
 	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge TODO
-	if ((!e.second or (e.second and (boost::get(name,e.first)) != sequence)) and toAdd)
+	if ((!e.second or (e.second and g_[e.first].name != sequence)) and toAdd)
 	{
 		e = boost::add_edge(src,trg,g_);
 		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg, the sequence was added in reverse order
-		std::string old_name = boost::get(name, e.first);
+		std::string old_name = g_[e.first].name;
 		if (e.second) // TODO v-S->w-T->v is treated like v<-S-w<-T-v (should be ST self-loop and TS self-loop)
 		{
-			boost::put(name,e.first,old_name + sequence);
+            g_[e.first].name = old_name + sequence;
 		}
 		else
 		{
-			boost::put(name,e.first,sequence);
+            g_[e.first].name = sequence;    
 		}
-		boost::put(cap,e.first,avg);
-		boost::put(visit,e.first,false);
+        g_[e.first].capacity = avg;
+        g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,prev);
 }
@@ -433,10 +428,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		return std::make_pair(nextV,"");
 	}
 	
-	auto name = boost::get(boost::edge_name_t(), g_);
-	auto cap = boost::get(boost::edge_capacity_t(), g_);
-	auto visit = boost::get(boost::edge_index_t(), g_);
-	
 	UVertex trg = graph_[nextV->index];
 	auto e = boost::edge(src,trg,g_);
 	bool toAdd = true;
@@ -454,20 +445,20 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	{
 		// TODO
 	}
-	if ((!e.second or (e.second and (boost::get(name,e.first)) != sequence)) and toAdd)
+	if ((!e.second or (e.second and g_[e.first].name != sequence)) and toAdd)
 	{
 		e = boost::add_edge(src,trg,g_);
-		auto old_name = boost::get(name, e.first);
+		auto old_name = g_[e.first].name;
 		if (e.second) // TODO v-S->w-T->v is treated like v<-S-w<-T-v (should be ST self-loop and TS self-loop)
 		{
-			boost::put(name,e.first,sequence + old_name);
+            g_[e.first].name = sequence + old_name;
 		}
 		else
 		{
-			boost::put(name,e.first,sequence);
+            g_[e.first].name = sequence;
 		}
-		boost::put(cap,e.first,avg);
-		boost::put(visit,e.first,false);
+        g_[e.first].capacity = avg;
+        g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,next);
 }
@@ -475,10 +466,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 // contracts all simple paths in graph to a single source-sink connection
 void UnitigGraph::contractPaths()
 {
-	auto cap = boost::get(boost::edge_capacity_t(),g_);
-	auto name = boost::get(boost::edge_name_t(),g_);
-	auto visit = boost::get(boost::edge_index_t(), g_);
-	
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
 	boost::tie(vi, vi_end) = boost::vertices(g_);
 	for (next = vi; vi != vi_end; vi = next)
@@ -495,17 +482,17 @@ void UnitigGraph::contractPaths()
 			auto&& new_source = boost::source(*ie.first,g_);
 			auto&& new_target = boost::target(*oe.first,g_);
 			auto&& e = boost::edge(new_source,*vi,g_);
-			std::string seq = boost::get(name,e.first);
+			std::string seq = g_[e.first].name;
 			unsigned int w = seq.length();
-			float capacity = boost::get(cap,e.first) * w;
+			float capacity = g_[e.first].capacity * w;
 			e = boost::edge(*vi,new_target,g_);
-			seq += boost::get(name,e.first); // append the sequence
-			capacity += (boost::get(cap,e.first) * (seq.length() - w));
+			seq += g_[e.first].name; // append the sequence
+			capacity += g_[e.first].capacity * (seq.length() - w);
 			capacity /= seq.length(); // currently using the average coverage on the contracted path
 			e = boost::add_edge(new_source,new_target,g_);
-			boost::put(name,e.first,seq);
-			boost::put(cap,e.first,capacity);
-			boost::put(visit,e.first,false);
+            g_[e.first].name = seq;
+            g_[e.first].capacity = capacity;
+            g_[e.first].visited = false;
 			boost::clear_vertex(*vi,g_);
 			boost::remove_vertex(*vi,g_);
 		}
@@ -515,16 +502,14 @@ void UnitigGraph::contractPaths()
 // checks for a path source/sink to junction whether it is assumed to be siginifcant and returns the path if it isnt
 std::vector<UVertex> UnitigGraph::flagDanglingEnd(UVertex& v, bool source)
 {
-	auto cap = boost::get(boost::edge_capacity_t(),g_);
-	
 	std::vector<UVertex> pathToJunction{v};
 	auto vertex = v;
 
 	int indegree = boost::in_degree(v,g_);
 	int outdegree = boost::out_degree(v,g_);
 	int coverage = 
-		source ? boost::get(cap, *(boost::out_edges(vertex, g_).first)) // coverage of outgoing edge
-				: boost::get(cap, *(boost::in_edges(vertex, g_).first)); //coverage of ingoing edge
+		source ? g_[*(boost::out_edges(vertex, g_).first)].capacity // coverage of outgoing edge
+				: g_[*(boost::in_edges(vertex, g_).first)].capacity; //coverage of ingoing edge
 
 	while (outdegree <= 1 and indegree <= 1)
 	{
@@ -551,14 +536,14 @@ std::vector<UVertex> UnitigGraph::flagDanglingEnd(UVertex& v, bool source)
 		{
 			for (const auto& edge : boost::in_edges(vertex, g_))
 			{
-				total_coverage += boost::get(cap, edge);
+				total_coverage += g_[edge].capacity;
 			}
 		}
 		else
 		{
 			for (const auto& edge : boost::out_edges(vertex, g_))
 			{
-				total_coverage += boost::get(cap, edge);
+				total_coverage += g_[edge].capacity;
 			}
 		}
 		if (coverage/total_coverage < std::min(4*FRAC_THRESH, 0.5)) //TODO since the path is really short, we can be quite strict!
@@ -624,19 +609,15 @@ void UnitigGraph::removeStableSets()
 }
 void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig graph
 {
-	auto name = boost::get(boost::vertex_name_t(), g_); // name
-	auto cc = boost::get(boost::vertex_index2_t(), g_); // scc / lowlink
-	auto i = boost::get(boost::vertex_discover_time_t(), g_); // index
-	auto onStack = boost::get(boost::vertex_finish_time_t(), g_); // onStack
     // lca, curr, scc
 	std::stack<std::pair<std::pair<UVertex, UVertex>, unsigned int> > recursion_stack;
 	std::stack<UVertex> visit_stack;
     UVertex dummy = boost::add_vertex(g_); // dummy vertex for starting from
-    boost::put(cc, dummy, 0); // cc for all real vertices is at least 1
-	unsigned int index = 1;
+    g_[dummy].scc = 0; // cc for all real vertices is at least 1
+ 	unsigned int index = 1;
 	for (auto& v : boost::vertices(g_))
 	{
-        if (boost::get(i,v) == 0) // scc hasnt been set
+        if (g_[v].tarjan_index == 0) // scc hasnt been set
 		{
 			recursion_stack.push(std::make_pair(std::make_pair(dummy,v),0));
 		}
@@ -653,10 +634,10 @@ void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig 
 			
             if (!child) // this vertex is visited the first time this run (child is nullptr)
 			{
-                boost::put(i,curr,index);
-				boost::put(cc,curr,index);
+                g_[curr].tarjan_index = index;
+                g_[curr].scc = index;
+                g_[curr].onStack = true;
 				index++;
-				boost::put(onStack,curr,true);
 				visit_stack.push(curr);
 			}
 			if (child < children) // still have to search at least one child
@@ -674,31 +655,30 @@ void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig 
                 ++child;
                 
 				recursion_stack.push(std::make_pair(std::make_pair(prev,curr),child)); // visit the next child
-				if (boost::get(i,next) == 0)
+				if (g_[next].tarjan_index == 0)
 				{
 					recursion_stack.push(std::make_pair(std::make_pair(curr,next),0)); // "recurse" on current child
 				}
-				else if (boost::get(onStack, next))
+				else if (g_[next].onStack)
 				{
-                    //boost::put(cc,curr,std::min(boost::get(cc,curr),boost::get(i,next)));
-                    boost::put(cc,curr,std::min(boost::get(cc,curr),boost::get(cc,next)));
+                    //g_[curr].scc = std::min(g_[curr].scc,g_[next].tarjan_index); // doing this seems to find SCCs within SCCs - might also be useful
+                    g_[curr].scc = std::min(g_[curr].scc,g_[next].scc);
 				}
 			}
 			else  // all children have been visited in the stack
 			{
-				if (boost::get(cc, prev)) // is not the first searched
+				if (g_[curr].scc) // is not the first searched
 				{
-					boost::put(cc, prev, std::min(boost::get(cc,prev),boost::get(cc,curr)));
-					if (boost::get(cc,curr) == boost::get(i,curr))
+					g_[prev].scc = std::min(g_[prev].scc,g_[curr].scc);
+					if (g_[curr].scc == g_[curr].tarjan_index)
 					{
 						UVertex scc = visit_stack.top();
-                        boost::put(onStack,scc,false);
+                        g_[scc].onStack = false;
                         visit_stack.pop();
-                        while (boost::get(name, curr) != boost::get(name, scc)) // there should not be two vertices with the same name present
+                        while (g_[curr].name != g_[scc].name) // there should not be two vertices with the same name present
 						{
-                            //boost::put(cc,scc,std::min(boost::get(cc,scc),boost::get(cc,curr))); //set the CC of all vertices on stack
 							scc = visit_stack.top();
-							boost::put(onStack,scc,false);
+                            g_[scc].onStack = false;
                             visit_stack.pop();
 						} 
 					}
@@ -706,13 +686,49 @@ void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig 
 				else
 				{
 					UVertex top = visit_stack.top();
-					boost::put(onStack,top,false);
+                    g_[top].onStack = false;
 					visit_stack.pop();
 				}
 			}
 		}
 	}
     boost::remove_vertex(dummy, g_); // remove the dummy again
+}
+
+// transforms cycles to single vertices and checks cycle separately
+void UnitigGraph::condenseCycles()
+{
+    std::unordered_map<unsigned int,std::vector<UVertex>> sccs;
+	for (auto& v : boost::vertices(g_)) // sort the vertices by their scc
+    {
+        unsigned int scc = g_[v].scc;
+        auto exist = sccs.find(scc);
+        if (exist != sccs.end())
+            exist->second.push_back(v);
+        else
+            sccs[scc] = {v};
+    }
+    for (auto& sorted_scc : sccs)
+    {
+        auto& vertices = sorted_scc.second;
+        if (vertices.size() > 1) // scc with >1 member: cycle
+        {
+            UVertex dummy = boost::add_vertex(g_);
+            for (auto& v : vertices)
+            {
+                auto oe = boost::out_edges(v,g_);
+                auto ie = boost::in_edges(v,g_);
+                for (auto&& out_edge : oe)
+                {
+                    auto w = boost::target(out_edge, g_);
+                    if (g_[w].scc != sorted_scc.first) // different scc
+                    {
+                        
+                    }
+                }
+            }
+        }
+    }
 }
 
 // the graph might contain some unconnected vertices, clean up
@@ -731,10 +747,9 @@ void UnitigGraph::cleanGraph()
 	}
 }
 
-// returns the sources of the graph sorted by their connected components
+// returns the sources of the graph sorted by their connected components TODO change to SCC!
 std::vector<Connected_Component> UnitigGraph::getSources() const
 {
-	auto cc = boost::get(boost::vertex_index2_t(), g_);
 	unsigned int cc_count = 0; // "real" number of ccs
 	std::vector<std::vector<UVertex> > sources;
 	std::unordered_map<unsigned int,unsigned int> cc_map;
@@ -742,7 +757,7 @@ std::vector<Connected_Component> UnitigGraph::getSources() const
 	{
 		if (boost::in_degree(v,g_) == 0)
 		{
-			unsigned int curr_cc = boost::get(cc,v);
+			unsigned int curr_cc = g_[v].scc;
 			auto miter = cc_map.find(curr_cc);
 			if (miter == cc_map.end())
 			{
@@ -762,10 +777,8 @@ std::vector<Connected_Component> UnitigGraph::getSources() const
 // add edges of source to heap
 void UnitigGraph::add_sorted_edges(std::vector<UEdge>& q, const UVertex& source, bool addAll)
 {
-	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-	
 	auto edgeCompare = [&](UEdge e1, UEdge e2){
-		return boost::get(cap, e1) < boost::get(cap, e2); // highest capacity first
+		return g_[e1].capacity < g_[e2].capacity; // highest capacity first
 	}; //lambda for comparing to edges based on their capacity
 	
 	auto out_edges = boost::out_edges(source, g_);
@@ -785,10 +798,6 @@ bool UnitigGraph::test_hypothesis(float to_test, float h0)
 
 void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::vector<float>& coverage_fraction, std::vector<UEdge>& visited_edges)
 {
-	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-	const auto& ename = boost::get(boost::edge_name_t(), g_);
-	const auto& visit = boost::get(boost::edge_index_t(), g_);
-	
 	int outdegree = boost::out_degree(target, g_);
 	UEdge next_edge;
 
@@ -805,14 +814,14 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 		
 		for (const auto& e : fattest_edges)
 		{
-			total_coverage += boost::get(cap, e);
+			total_coverage += g_[e].capacity;
 		}
 		next_edge = fattest_edges.back();
 		// if next_edge is visited, we found a cycle, break it by following the second fattest edge
-		if (boost::get(visit, next_edge))
+		if (g_[next_edge].visited)
 		{
 			break;
-			while (!fattest_edges.empty() and boost::get(visit, next_edge))
+			while (!fattest_edges.empty() and g_[next_edge].visited)
 			{
 				next_edge = fattest_edges.back();
 				std::pop_heap(fattest_edges.begin(), fattest_edges.end());
@@ -825,10 +834,10 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 			fattest_edges.pop_back();
 		}
 		target = boost::target(next_edge, g_);
-		sequence += boost::get(ename, next_edge); // add to current sequence
-		coverage_fraction.push_back(boost::get(cap,next_edge)/total_coverage); // fraction of outflow
+		sequence += g_[next_edge].name; // add to current sequence
+		coverage_fraction.push_back(g_[next_edge].capacity/total_coverage); // fraction of outflow
 		visited_edges.push_back(next_edge); // has already been updated here
-		boost::put(visit, next_edge, true); // mark edge as visited
+        g_[next_edge].visited = true; // mark edge as visited
 		outdegree = boost::out_degree(target, g_);
 	}
 	float min_fraction = *std::min_element(coverage_fraction.begin(), coverage_fraction.end());
@@ -836,14 +845,14 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 	{
 		if (!test_hypothesis(coverage_fraction[i],min_fraction)) // significantly higher, some flow remains
 		{
-			float new_cov = boost::get(cap, visited_edges[i]) * (1 - min_fraction);
-			boost::put(cap, visited_edges[i], new_cov); // reduce by min_fraction percent
-			boost::put(visit, visited_edges[i], false); // all edges with reamining coverage > 0 might be visited again
+			float new_cov = g_[visited_edges[i]].capacity * (1 - min_fraction);
+            g_[visited_edges[i]].capacity = new_cov; // reduce by min_fraction percent
+            g_[visited_edges[i]].visited = false; // all edges with reamining coverage > 0 might be visited again
 		}
 		else // they belong to the same genome, use all flow
 		{
-			boost::put(cap, visited_edges[i], 0.);
-			boost::put(visit, visited_edges[i], false); // "unvisit" edges
+            g_[visited_edges[i]].capacity = 0.;
+            g_[visited_edges[i]].visited = false; // "unvisit" edges
 		}
 	}
 }
@@ -852,10 +861,6 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 void UnitigGraph::calculateFlow()
 {
 	std::cerr << "Calculating flow..." << std::endl;
-	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-	const auto& vname = boost::get(boost::vertex_name_t(), g_);
-	const auto& ename = boost::get(boost::edge_name_t(), g_);
-
 	// sources is a vector of all sources of a certain connected component
 	auto sources = getSources();
 
@@ -878,20 +883,20 @@ void UnitigGraph::calculateFlow()
 		{
 			first_edge = q.back(); //
 
-			float first_capacity = boost::get(cap, first_edge);
+			float first_capacity = g_[first_edge].capacity;
 
 			std::vector<float> coverage_fraction; // fraction of the path
 			std::vector<UEdge> visited_edges; // edges on the fattest path, TODO store pointers?
 
 			auto source = boost::source(first_edge, g_);
 			auto target = boost::target(first_edge, g_);
-			std::string sequence = boost::get(vname, source) + boost::get(ename,first_edge);
+			std::string sequence = g_[source].name + g_[first_edge].name;
 			float total_coverage = 0.;
 			for (const auto& e : boost::out_edges(source, g_))
 			{
-				total_coverage += boost::get(cap,e);
+				total_coverage += g_[e].capacity;
 			}
-			coverage_fraction.push_back(boost::get(cap,first_edge)/total_coverage);
+			coverage_fraction.push_back(g_[first_edge].capacity/total_coverage);
 			visited_edges.push_back(first_edge);
 		
 			find_fattest_path(target, sequence, coverage_fraction, visited_edges);
@@ -902,7 +907,7 @@ void UnitigGraph::calculateFlow()
 				std::cout << sequence << std::endl;
 			}
 			
-			if (boost::get(cap, first_edge) == 0)
+			if (g_[first_edge].capacity == 0)
 			{
 				q.pop_back(); std::pop_heap(q.begin(), q.end()); // source flow has been depleted
 			}
@@ -941,51 +946,12 @@ void UnitigGraph::debug()
 	uvertex_iter vi, vi_end;
 	int i = 1;
 	int simpletons = 0;
-	const auto& cap = boost::get(boost::edge_capacity_t(),g_);
-	//const auto& name = boost::get(boost::edge_name_t(),g_);
-	const auto& vname = boost::get(boost::vertex_name_t(),g_);
 	for (boost::tie(vi,vi_end) = boost::vertices(g_); vi != vi_end; ++vi)
 	{
-		/*unsigned int indegree = boost::in_degree(*vi,g_);
-		unsigned int outdegree = boost::out_degree(*vi,g_);
-		
-		float total_out = 0.;
-		float total_in = 0.;
-		
-		for (auto&& oe : boost::out_edges(*vi,g_))
-		{
-			auto&& e = boost::edge(*vi,boost::target(oe,g_),g_);
-			total_out += boost::get(cap,e.first);
-		}
-
-		for (auto&& ie : boost::in_edges(*vi,g_))
-		{
-			auto&& e = boost::edge(boost::source(ie,g_),*vi,g_);
-			total_in += boost::get(cap,e.first);
-		}
-		float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
-		unsigned int delta = std::abs(total_out - total_in);
-        
-		if (false) //DEBUG
-		{
-			if (outdegree == 0)
-			{
-				if (indegree == 1)
-					std::cerr << "Sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" <<std::endl;
-				else
-					std::cerr << "Unreal sink: " << boost::get(vname,*vi) << " (Vertex " << i << ")" << std::endl;
-			}
-			else if (indegree == 1 and outdegree == 1)
-				simpletons++;
-			if ((epsilon > 1.2 or epsilon < 0.8) and delta > 10 and indegree > 0 and outdegree > 0)
-			{
-				std::cerr << boost::get(vname,*vi) << " (" << epsilon << "(" << total_out << ")/" << i << ")" << std::endl;
-			}
-		}*/
 		boost::put(propmapIndex,*vi,i++);
 	}
 
-    //boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index1_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
-	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_name_t(),g_)), boost::make_label_writer(boost::get(boost::edge_name_t(),g_)), boost::default_writer(), propmapIndex);
-	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(boost::vertex_index2_t(),g_)), boost::make_label_writer(boost::get(boost::edge_capacity_t(),g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(std::cout, g_, boost::make_label_writer(&VertexProperties::index), boost::make_label_writer(&EdgeProperties::capacity), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(&VertexProperties::name), boost::make_label_writer(&EdgeProperties::name), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::scc,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
 }
