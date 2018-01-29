@@ -23,10 +23,24 @@ struct VertexProperties {
     bool onStack;
 };
 
-struct EdgeProperties {
+struct Capacity {
+    float first;
+    float last;
+    float min;
+    float max;
+    float avg;
+    float length;
+    friend std::ostream& operator<<(std::ostream& os, const Capacity& cap)
+    {
+        return os << "(" << cap.avg << ", " << cap.first << "/" << cap.last << ", (" << cap.length << "), (" << cap.min << ", " << cap.max << "))";
+    }
+};
+
+struct EdgeProperties{
     std::string name;
     bool visited;
     float capacity;
+    Capacity cap_info;
     float residual_capacity;
 };
 

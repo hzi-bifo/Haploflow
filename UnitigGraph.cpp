@@ -265,6 +265,8 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	float min = coverage; // TODO
 	float max = coverage;
 	float avg = coverage;
+    float first = coverage; // first out-coverage
+    float last = coverage;
 	unsigned int length = 1;
 	char lastchar = g_[trg].name.back(); //char with which we are pointing to trg
 	// loop until the next unbalanced node is found, which is either visited (has been added) or will be added
@@ -294,6 +296,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		if (cov > max)
 			max = cov;
 		avg += cov;
+        last = cov;
 		length++; // used for the coverage caluclations of the path later on
 		nextV = dbg.getVertex(prev);
 		pred = nextV->get_predecessors();
@@ -354,6 +357,12 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
             g_[e.first].name = sequence;    
 		}
         g_[e.first].capacity = avg;
+        g_[e.first].cap_info.avg = avg;
+        g_[e.first].cap_info.max = max;
+        g_[e.first].cap_info.min = min;
+        g_[e.first].cap_info.first = first;
+        g_[e.first].cap_info.last= last;
+        g_[e.first].cap_info.length = g_[e.first].name.length();
         g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,prev);
@@ -369,6 +378,8 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	float min = coverage; // TODO
 	float max = coverage;
 	float avg = coverage;
+    float first = coverage;
+    float last = coverage;
 	unsigned int length = 1;
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
@@ -393,6 +404,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		if (cov > max)
 			max = cov;
 		avg += cov;
+        last = cov;
 		length++;
 		next = next.substr(1) + c;
 		nextV = dbg.getVertex(next);
@@ -458,6 +470,12 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
             g_[e.first].name = sequence;
 		}
         g_[e.first].capacity = avg;
+        g_[e.first].cap_info.avg = avg;
+        g_[e.first].cap_info.max = max;
+        g_[e.first].cap_info.min = min;
+        g_[e.first].cap_info.first = first;
+        g_[e.first].cap_info.last = last;
+        g_[e.first].cap_info.length = g_[e.first].name.length();
         g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,next);
@@ -482,17 +500,33 @@ void UnitigGraph::contractPaths()
 			auto&& new_source = boost::source(*ie.first,g_);
 			auto&& new_target = boost::target(*oe.first,g_);
 			auto&& e = boost::edge(new_source,*vi,g_);
+            auto&& f = boost::edge(*vi, new_target,g_); // coverage etc of second edge to be contracted
 			std::string seq = g_[e.first].name;
 			unsigned int w = seq.length();
-			float capacity = g_[e.first].capacity * w;
+
+			Capacity cap_info_e = g_[e.first].cap_info;
+			Capacity cap_info_f = g_[f.first].cap_info;
+            float max = std::max(cap_info_e.max, cap_info_f.max);
+            float min = std::min(cap_info_e.min, cap_info_f.min);
+            float first = cap_info_e.first;
+            float last = cap_info_f.last;
+            
+            float capacity = g_[e.first].capacity * w;
 			e = boost::edge(*vi,new_target,g_);
 			seq += g_[e.first].name; // append the sequence
 			capacity += g_[e.first].capacity * (seq.length() - w);
 			capacity /= seq.length(); // currently using the average coverage on the contracted path
-			e = boost::add_edge(new_source,new_target,g_);
-            g_[e.first].name = seq;
-            g_[e.first].capacity = capacity;
-            g_[e.first].visited = false;
+
+			auto&& new_e = boost::add_edge(new_source,new_target,g_);
+            g_[new_e.first].name = seq;
+            g_[new_e.first].capacity = capacity;
+            g_[new_e.first].cap_info.avg = capacity;
+            g_[new_e.first].cap_info.max = max;
+            g_[new_e.first].cap_info.min = min;
+            g_[new_e.first].cap_info.first = first;
+            g_[new_e.first].cap_info.last = last;
+            g_[new_e.first].cap_info.length = g_[new_e.first].name.length();
+            g_[new_e.first].visited = false;
 			boost::clear_vertex(*vi,g_);
 			boost::remove_vertex(*vi,g_);
 		}
@@ -836,6 +870,7 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 		target = boost::target(next_edge, g_);
 		sequence += g_[next_edge].name; // add to current sequence
 		coverage_fraction.push_back(g_[next_edge].capacity/total_coverage); // fraction of outflow
+        std::cout << g_[next_edge].name << ":" << g_[next_edge].capacity << " (" << g_[next_edge].capacity/total_coverage << ")" << std::endl;
 		visited_edges.push_back(next_edge); // has already been updated here
         g_[next_edge].visited = true; // mark edge as visited
 		outdegree = boost::out_degree(target, g_);
@@ -896,14 +931,17 @@ void UnitigGraph::calculateFlow()
 			{
 				total_coverage += g_[e].capacity;
 			}
+            std::cout << g_[first_edge].name << ":" << g_[first_edge].capacity << " (" << g_[first_edge].capacity/total_coverage << ")" << std::endl;
 			coverage_fraction.push_back(g_[first_edge].capacity/total_coverage);
 			visited_edges.push_back(first_edge);
 		
 			find_fattest_path(target, sequence, coverage_fraction, visited_edges);
 
+            float min_fraction = *std::min_element(coverage_fraction.begin(), coverage_fraction.end());
+
 			if (sequence.length() > CONTIG_THRESH) // i.e. readsize
 			{
-				std::cout << ">Contig_" << j++ << " (" << *std::min_element(coverage_fraction.begin(), coverage_fraction.end()) << " of " << first_capacity << ")" << std::endl;
+				std::cout << ">Contig_" << j++ << " (" << min_fraction << " of " << first_capacity << ")" << std::endl;
 				std::cout << sequence << std::endl;
 			}
 			
@@ -911,6 +949,7 @@ void UnitigGraph::calculateFlow()
 			{
 				q.pop_back(); std::pop_heap(q.begin(), q.end()); // source flow has been depleted
 			}
+            /* for statistical evaluation of the resulting pathes*/
 			std::sort_heap(q.begin(), q.end()); // capacity of first_edge has changed
 		}
 	}
@@ -952,6 +991,6 @@ void UnitigGraph::debug()
 	}
 
     //boost::write_graphviz(std::cout, g_, boost::make_label_writer(&VertexProperties::index), boost::make_label_writer(&EdgeProperties::capacity), boost::default_writer(), propmapIndex);
-	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(&VertexProperties::name), boost::make_label_writer(&EdgeProperties::name), boost::default_writer(), propmapIndex);
-	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::scc,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::name, g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
+	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::scc,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
 }

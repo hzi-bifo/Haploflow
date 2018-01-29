@@ -5,8 +5,8 @@ int main (int argc, char* argv[])
 {
 	clock_t t = clock();
 	std::cerr << "Building deBruijnGraph..." << std::endl;
-	//deBruijnGraph dbg = deBruijnGraph(std::string(argv[1]), atoi(argv[2]));
-	deBruijnGraph dbg = deBruijnGraph(std::string(argv[1]));
+	//deBruijnGraph dbg = deBruijnGraph(std::string(argv[1]), atoi(argv[2])); // read file + k
+	deBruijnGraph dbg = deBruijnGraph(std::string(argv[1])); // dump file
     std::cerr << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
 	t = clock();
 	//dbg.markCycles();
