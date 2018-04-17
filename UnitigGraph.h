@@ -18,6 +18,7 @@
 struct VertexProperties {
     unsigned int index;
     unsigned int scc;
+    unsigned int cc;
     std::string name;
     unsigned int tarjan_index;
     bool onStack;
@@ -63,10 +64,10 @@ public:
 	void debug(); // debug information
     void calculateFlow();
 private:
-	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float, float);
-	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&, float);
-	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
-	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
+	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float);
+	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
+	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
+	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
 	UVertex addVertex(unsigned int*, std::string name);
 
 	float calculateThresholds(const deBruijnGraph&, float);
@@ -75,7 +76,7 @@ private:
 	void removeStableSets();
 	void contractPaths();
 
-	void find_fattest_path(UVertex target, std::string& sequence, std::vector<float>& coverage_fraction, std::vector<UEdge>& visited_edges);
+	void find_fattest_path(UVertex target, std::string& sequence, std::vector<std::pair<float,float> >& coverage_fraction, std::vector<UEdge>& visited_edges);
 	void add_sorted_edges(std::vector<UEdge>& q, const UVertex& source, bool addAll);
 	bool test_hypothesis(float to_test, float h0);
 	std::vector<std::vector<UVertex> > getSources() const;
@@ -83,6 +84,7 @@ private:
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
 	UGraph g_;
 	std::unordered_map<unsigned int, UVertex> graph_;
+    float threshold_; // stores a treshold for edges to consider
 	
 };
 
