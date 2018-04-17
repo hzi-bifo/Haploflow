@@ -14,12 +14,6 @@ namespace std
 	}
 }
 
-// TODO this is only temporary!
-#define THRESHOLD 30
-#define LONG_THRESH 50 // threshold if path is not long enough
-#define CONTIG_THRESH 150 // if contigs are longer than this they are produced
-#define FRAC_THRESH 0.08 // threshold of total coverage from which something is treated significant
-
 // unitig graph for debugging purposes
 UnitigGraph::UnitigGraph() : cc_(1)
 {
@@ -66,24 +60,26 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1)
 {
 	std::cerr << "deBruijnGraph has " << dbg.getSize() << " vertices" << std::endl;
 	std::cerr << "Building unitig graph from deBruijn graph..." << std::endl;
+    
 	clock_t t = clock();
 	auto&& junc = dbg.getJunctions();
 	unsigned int index = 1;
 	auto&& out_unbalanced = junc.first;
 	auto&& in_unbalanced = junc.second;
+    float threshold = calculateThresholds(dbg, error_rate);
 	// starting from the sources, we build the unitig graph
 	for (auto& v : out_unbalanced)
 	{
 		std::string curr = v.get_kmer();
 		Vertex* source = dbg.getVertex(curr);
 		// make a guess whether we are relevant already 
-		if (!source->is_flagged() and (source->get_total_out_coverage() > THRESHOLD or source->get_total_in_coverage() > THRESHOLD))
+		if (!source->is_flagged())
 		{
-			connectUnbalanced(source, &index, curr, dbg); 
+			connectUnbalanced(source, &index, curr, dbg, error_rate, threshold); 
 			cc_++; // new connected component found
 		}
 	}
@@ -91,13 +87,29 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg) : cc_(1)
 	{
 		std::string curr = v.get_kmer();
 		Vertex* source = dbg.getVertex(curr);
-		if (!source->is_flagged() and (source->get_total_out_coverage() > THRESHOLD or source->get_total_in_coverage() > THRESHOLD))
+		if (!source->is_flagged())
 		{
-			connectUnbalanced(source, &index, curr, dbg); 
+			connectUnbalanced(source, &index, curr, dbg, error_rate, threshold); 
 			cc_++; // new connected component found
 		}
 	}
 	std::cerr << "Unitig graph succesfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
+}
+
+// TODO
+float UnitigGraph::calculateThresholds(const deBruijnGraph& dbg, float error_rate)
+{
+    auto&& cov_distr = dbg.coverageDistribution();
+    float total_edges = 0.;
+    float avg_coverage = 0.;
+    unsigned int cov_size = cov_distr.size();
+    for (const auto& cov : cov_distr)
+    {
+        total_edges += cov.second; //counts all edges
+        avg_coverage += cov.first * cov.second; // adds up the coverage values
+    }
+    avg_coverage /= total_edges;
+    return avg_coverage;
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -118,7 +130,7 @@ UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
 }
 
 // function for connecting a given source/sink vertex to all its unbalanced successors/predecessors
-void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::string curr, deBruijnGraph& dbg)
+void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::string curr, deBruijnGraph& dbg, float error_rate, float threshold)
 {
 	// FIFO queue for the vertices, so we do not find a reverse complement before the original vertex
 	std::queue<std::pair<Vertex*,std::string> > todo;
@@ -133,9 +145,9 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 		std::vector<char> pred = junction->get_predecessors();
 		bool to_search = false;
 		// check if there might be valid paths
-		for (const char& c : succ)
-		{
-			if (junction->get_out_coverage(c) > THRESHOLD)
+        for (const char& c : succ)
+		{	
+            if (junction->get_out_coverage(c) > error_rate*junction->get_total_out_coverage() and junction->get_out_coverage(c) > threshold)
 			{
 				to_search = true; break;
 			}
@@ -144,7 +156,7 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 		{
 			for (const char& c : pred)
 			{
-				if (junction->get_in_coverage(c) > THRESHOLD)
+				if (junction->get_in_coverage(c) > error_rate * junction->get_total_in_coverage() and junction->get_in_coverage(c) > threshold)
 				{
 					to_search = true; break;
 				}
@@ -175,7 +187,7 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 			uv = graph_[idx];
 		}
 		junction->visit(); // make sure the next time we find it we dont add it another time
-		auto&& following = addNeighbours(seq, succ, pred, dbg, index, uv); // finding the next unbalanced vertices
+		auto&& following = addNeighbours(seq, succ, pred, dbg, index, uv, threshold); // finding the next unbalanced vertices
 		for (auto v : following)
 		{	
 			// if no sequence is returned, no vertex was added, so we do not need to continue on this vertex
@@ -186,78 +198,80 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 }
 
 // iterating over all neighbours of current node, build the different sequences to the next unbalanced node
-std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int* index, UVertex& uv)
+std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int* index, UVertex& uv, float threshold)
 {
 	std::vector<std::pair<Vertex*,std::string> > following;
 	Vertex* currV = dbg.getVertex(curr);
 	unsigned int total_out = currV->get_total_out_coverage();
 	unsigned int total_in = currV->get_total_in_coverage();
-	if (currV->is_flagged() or total_out < THRESHOLD or total_in < THRESHOLD)
-	{
-		return following; // the neighbours for this vertex have been added
-	}
 	float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
 	Sequence src = *dbg.getSequence(curr);
 	// this is for checking whether the reverse complement is in the debruijn graph
 	bool reverse = (src != curr); // true, if reverse complement, i.e. src and curr are not the same
-	for (const auto& n : succ)
-	{
-		std::string sequence("");
-		std::string next;
-		float coverage = currV->get_out_coverage(n);
-		float pcov = coverage/float(total_out);// TODO /total_out; // percentage of coverage
-		if (!reverse)
-		{
-			next = curr.substr(1) + n;
-			Vertex* nextV = dbg.getVertex(next);
-			Sequence s = *dbg.getSequence(next);
-			sequence += n;
-			if (!nextV->is_flagged())
-				following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, pcov, dbg));
-		}
-		// if we are a reverse complement, we actually want to add the path in reverse order
-		else
-		{
-			next = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
-			Vertex* nextV = dbg.getVertex(next);
-			Sequence s = *dbg.getSequence(next);
-			sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr (by definition)
-			if (!nextV->is_flagged())
-				following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, pcov, dbg));
-		}
-	}
+	if (total_out) // out_degree >= 1
+    {
+        for (const auto& n : succ)
+        {
+            std::string sequence("");
+            std::string next;
+            float coverage = currV->get_out_coverage(n);
+            float pcov = coverage/float(total_out); // percentage of coverage
+            if (!reverse)
+            {
+                next = curr.substr(1) + n;
+                Vertex* nextV = dbg.getVertex(next);
+                Sequence s = *dbg.getSequence(next);
+                sequence += n;
+                if (!nextV->is_flagged())
+                    following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, pcov, dbg, threshold));
+            }
+            // if we are a reverse complement, we actually want to add the path in reverse order
+            else
+            {
+                next = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
+                Vertex* nextV = dbg.getVertex(next);
+                Sequence s = *dbg.getSequence(next);
+                sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr (by definition)
+                if (!nextV->is_flagged())
+                    following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, pcov, dbg, threshold));
+            }
+        }
+    }
 	// finding the predecessing unbalanced vertices
-	for (const auto& n : pred)
-	{
-		std::string sequence("");
-		std::string prev; 
-		float coverage = currV->get_in_coverage(n);
-		float pcov = coverage/float(total_in); 
-		if (!reverse)
-		{
-			prev = n + curr.substr(0,curr.length() - 1);
-			Vertex* nextV = dbg.getVertex(prev);
-			Sequence s = *dbg.getSequence(prev);
-			sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr
-			if (!nextV->is_flagged())
-				following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, pcov, dbg));
-		}
-		else
-		{
-			prev = curr.substr(1) + deBruijnGraph::complement(n);
-			Vertex* nextV = dbg.getVertex(prev);
-			Sequence s = *dbg.getSequence(prev);
-			sequence += deBruijnGraph::complement(n);
-			if (!nextV->is_flagged())
-				following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, pcov, dbg));
-		}
-	}
+    if (total_in)
+    {
+        for (const auto& n : pred)
+        {
+            std::string sequence("");
+            std::string prev; 
+            float coverage = currV->get_in_coverage(n);
+            float pcov = coverage/float(total_in); 
+            if (!reverse)
+            {
+                prev = n + curr.substr(0,curr.length() - 1);
+                Vertex* nextV = dbg.getVertex(prev);
+                Sequence s = *dbg.getSequence(prev);
+                sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr
+                if (!nextV->is_flagged())
+                    following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, pcov, dbg, threshold));
+            }
+            else
+            {
+                prev = curr.substr(1) + deBruijnGraph::complement(n);
+                Vertex* nextV = dbg.getVertex(prev);
+                Sequence s = *dbg.getSequence(prev);
+                sequence += deBruijnGraph::complement(n);
+                if (!nextV->is_flagged())
+                    following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, pcov, dbg, threshold));
+            }
+        }
+    }
 	currV->flag(); // this vertex is done
 	return following;
 }
 
 // go back through the graph until the next unbalanced node is found and add an ("reversed") edge
-std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg)
+std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg, float threshold)
 {
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
@@ -304,9 +318,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		sequence += lastchar;
 	}
 	avg /= float(length); // average coverage over the path
-	// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
-	
-	if (!nextV->is_visited() and ((avg >= LONG_THRESH or sequence.length() > dbg.getK()) and avg >= THRESHOLD))//and nextV->get_total_out_coverage() > 30 and nextV->get_total_in_coverage() > 30)
+	if (!nextV->is_visited() and avg >= threshold) // if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
 	{
 		nextV->visit();
 		addVertex(index, prev); // the vertex is new and found to be relevant
@@ -321,29 +333,19 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		return std::make_pair(nextV,""); // TODO
 		// this vertex has been found on another path
 	}
+    else if (avg < threshold)
+    {
+        return std::make_pair(nextV,"");
+    }
 	// if the vertex has not been added, dont try to add an edge to it
 	if (nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
-
 	UVertex src = graph_[nextV->index];
 	auto e = boost::edge(src,trg,g_);
-	bool toAdd = true;
-	float min_pass = 5; // minimal coverage allowed on edge
-	// path will not be added
-	if ((sequence.length() <= dbg.getK() and avg < LONG_THRESH) or avg < THRESHOLD)
-	{
-		toAdd = false;
-	}
-	else if (min < min_pass)
-	{
-		// the path has a high enough average, but some edges on it had a low coverage
-		// TODO indel detected?
-		//toAdd = false; // this is interesting!
-	}
-	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge TODO
-	if ((!e.second or (e.second and g_[e.first].name != sequence)) and toAdd)
+	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge
+	if ((!e.second or (e.second and g_[e.first].name != sequence)))
 	{
 		e = boost::add_edge(src,trg,g_);
 		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg, the sequence was added in reverse order
@@ -369,7 +371,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 }
 
 // same function like the reverse one, but going forward and finding successors
-std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg)
+std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg, float threshold)
 {
 	// with a little effort this can be moved inside the while loop for efficiency reasons
 	auto&& succ = nextV->get_successors();
@@ -419,7 +421,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited() and ((avg >= LONG_THRESH or sequence.length() > dbg.getK()) and avg >= THRESHOLD)) // TODO dbg.getK() should e.g. be dbg.readLength() 
+	if (!nextV->is_visited() and avg >= threshold)
 	{
 		nextV->visit();
 		addVertex(index, next);
@@ -431,9 +433,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	}
 	else if (succ.size() == 1 and pred.size() == 1) // check else-if case
 	{
-		//TODO
+        // TODO this should not happen
 		return std::make_pair(nextV,""); // path has been found, do not add anything
 	}
+    else if (avg < threshold)
+    {
+        return std::make_pair(nextV,"");
+    }
 	// this vertex has been found and considered irrelevant because of insufficient coverage
 	if (nextV->index == 0)
 	{
@@ -442,22 +448,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	
 	UVertex trg = graph_[nextV->index];
 	auto e = boost::edge(src,trg,g_);
-	bool toAdd = true;
-	float min_pass = 5; // minimal coverage allowed on edge
-	if ((sequence.length() <= dbg.getK() and avg < LONG_THRESH) or avg < THRESHOLD) // this path is considered illegal
-	{
-		/*boost::property_map<UGraph, boost::vertex_name_t>::type vn = boost::get(boost::vertex_name_t(), g_);
-		auto& sseq = boost::get(vn, uv);
-		std::string sstring = sseq.get_kmer();
-		Vertex* v = dbg.getVertex(sstring);
-		Vertex* w = dbg.getVertex(next);*/
-		toAdd = false;
-	}
-	else if (min < min_pass)
-	{
-		// TODO
-	}
-	if ((!e.second or (e.second and g_[e.first].name != sequence)) and toAdd)
+	if ((!e.second or (e.second and g_[e.first].name != sequence)))
 	{
 		e = boost::add_edge(src,trg,g_);
 		auto old_name = g_[e.first].name;
@@ -533,100 +524,6 @@ void UnitigGraph::contractPaths()
 	}
 }
 
-// checks for a path source/sink to junction whether it is assumed to be siginifcant and returns the path if it isnt
-std::vector<UVertex> UnitigGraph::flagDanglingEnd(UVertex& v, bool source)
-{
-	std::vector<UVertex> pathToJunction{v};
-	auto vertex = v;
-
-	int indegree = boost::in_degree(v,g_);
-	int outdegree = boost::out_degree(v,g_);
-	int coverage = 
-		source ? g_[*(boost::out_edges(vertex, g_).first)].capacity // coverage of outgoing edge
-				: g_[*(boost::in_edges(vertex, g_).first)].capacity; //coverage of ingoing edge
-
-	while (outdegree <= 1 and indegree <= 1)
-	{
-		if ((source and outdegree == 0) or (!source and indegree == 0)) // simple path (maybe they will be deleted later on)
-		{
-			std::vector<UVertex> noDelete{};
-			return noDelete;
-		}
-		auto e = source ? *(boost::out_edges(vertex, g_).first) : *(boost::in_edges(vertex, g_).first);
-		vertex = source ? boost::target(e,g_) : boost::source(e,g_);
-		pathToJunction.push_back(vertex);
-		outdegree = boost::out_degree(vertex,g_);
-		indegree = boost::in_degree(vertex,g_);
-	} // follow path until next junction
-	pathToJunction.pop_back(); // remove the junction itself again, so it doesnt get deleted
-	if ((source and indegree > 1 and outdegree == 1) or (!source and indegree == 1 and outdegree > 1)) // next junction
-	{
-		if (pathToJunction.size() < LONG_THRESH) // path is long enough (TODO make this parameter as well?)
-		{
-			return pathToJunction;
-		}
-		float total_coverage = 0.;
-		if (source)
-		{
-			for (const auto& edge : boost::in_edges(vertex, g_))
-			{
-				total_coverage += g_[edge].capacity;
-			}
-		}
-		else
-		{
-			for (const auto& edge : boost::out_edges(vertex, g_))
-			{
-				total_coverage += g_[edge].capacity;
-			}
-		}
-		if (coverage/total_coverage < std::min(4*FRAC_THRESH, 0.5)) //TODO since the path is really short, we can be quite strict!
-		{
-			return pathToJunction;
-		}
-		else // fraction is okay, we are considered a real source/sink
-		{
-			std::vector<UVertex> noDelete{};
-			return noDelete;
-		}
-	}
-	else
-	{
-		std::vector<UVertex> noDelete{};
-		return noDelete;
-	}
-}
-
-void UnitigGraph::filterTerminals()
-{
-	auto vertices = boost::vertices(g_);
-	std::vector<UVertex> toDelete;
-
-	for (auto& v : vertices)
-	{
-		int indegree = boost::in_degree(v,g_);
-		int outdegree = boost::out_degree(v,g_);
-		if (indegree == 0 or outdegree == 0)
-		{
-			if (indegree == 0 and outdegree <= 1) // TODO if we are a real junction ourselves, we are assumed to be valid
-			{
-				std::vector<UVertex> pathToJunction = flagDanglingEnd(v, true);
-				toDelete.insert(toDelete.end(), pathToJunction.begin(), pathToJunction.end());
-			}
-			else if (indegree <= 1 and outdegree == 0)
-			{
-				std::vector<UVertex> pathToJunction = flagDanglingEnd(v, false);
-				toDelete.insert(toDelete.end(), pathToJunction.begin(), pathToJunction.end());
-			}
-		}
-	}
-	for (auto& v : toDelete)
-	{
-		boost::clear_vertex(v, g_);
-		boost::remove_vertex(v, g_);
-	}
-}
-
 void UnitigGraph::removeStableSets()
 {
 	boost::graph_traits<UGraph>::vertex_iterator vi, vi_end, next;
@@ -666,7 +563,7 @@ void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig 
 			unsigned int child = next_element.second;
 			unsigned int children = boost::out_degree(curr,g_); //check reverse complement?
 			
-            if (!child) // this vertex is visited the first time this run (child is nullptr)
+            if (!child) // this vertex is visited the first time this run (child is 0)
 			{
                 g_[curr].tarjan_index = index;
                 g_[curr].scc = index;
@@ -729,56 +626,13 @@ void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig 
     boost::remove_vertex(dummy, g_); // remove the dummy again
 }
 
-// transforms cycles to single vertices and checks cycle separately
-void UnitigGraph::condenseCycles()
-{
-    std::unordered_map<unsigned int,std::vector<UVertex>> sccs;
-	for (auto& v : boost::vertices(g_)) // sort the vertices by their scc
-    {
-        unsigned int scc = g_[v].scc;
-        auto exist = sccs.find(scc);
-        if (exist != sccs.end())
-            exist->second.push_back(v);
-        else
-            sccs[scc] = {v};
-    }
-    for (auto& sorted_scc : sccs)
-    {
-        auto& vertices = sorted_scc.second;
-        if (vertices.size() > 1) // scc with >1 member: cycle
-        {
-            UVertex dummy = boost::add_vertex(g_);
-            for (auto& v : vertices)
-            {
-                auto oe = boost::out_edges(v,g_);
-                auto ie = boost::in_edges(v,g_);
-                for (auto&& out_edge : oe)
-                {
-                    auto w = boost::target(out_edge, g_);
-                    if (g_[w].scc != sorted_scc.first) // different scc
-                    {
-                        
-                    }
-                }
-            }
-        }
-    }
-}
-
 // the graph might contain some unconnected vertices, clean up
 void UnitigGraph::cleanGraph()
 {
 	std::cerr << "Removing stable sets..." << std::endl;
 	removeStableSets();
-	if (true) //TODO make this parametrized if results isnt always strictly improved
-	{
-		std::cerr << "Filtering terminal paths..." << std::endl;
-		filterTerminals(); // this can be done in cycles (filter - contract - remove)
-		std::cerr << "Contracting simple paths.." << std::endl;
-		contractPaths(); 
-		std::cerr << "Removing stable sets (again)..." << std::endl;
-		removeStableSets();
-	}
+    std::cerr << "Contracting simple paths.." << std::endl;
+    contractPaths(); 
 }
 
 // returns the sources of the graph sorted by their connected components TODO change to SCC!
@@ -826,17 +680,24 @@ void UnitigGraph::add_sorted_edges(std::vector<UEdge>& q, const UVertex& source,
 // Tests whether two percentages "belong together" TODO this is quite arbitrary
 bool UnitigGraph::test_hypothesis(float to_test, float h0)
 {
-	return (std::abs(to_test - h0) < FRAC_THRESH); // they differ by less than 6%
-	// this probably is not bad for values significantly larger than 5%
+	return (std::abs(to_test - h0) < 0.06); // they differ by less than 6%
+    // TODO
 }
 
 void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::vector<float>& coverage_fraction, std::vector<UEdge>& visited_edges)
 {
 	int outdegree = boost::out_degree(target, g_);
+    std::vector<UEdge> cycles;
+    UEdge fattest_edge;
+    float fattest_coverage = 0.;
+    bool cycle = false; // are we currently on a cycle
+	float min_fraction = 1.01; //slightly above 1 so it is true for 1.0
+    float max_capacity = 0.;
 	UEdge next_edge;
 
 	while (outdegree) // not a sink
 	{
+        UVertex curr = target;
 		std::vector<UEdge> fattest_edges;
 		std::make_heap(fattest_edges.begin(), fattest_edges.end());
 		
@@ -851,31 +712,58 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 			total_coverage += g_[e].capacity;
 		}
 		next_edge = fattest_edges.back();
-		// if next_edge is visited, we found a cycle, break it by following the second fattest edge
-		if (g_[next_edge].visited)
+		target = boost::target(next_edge, g_);
+		// if next_edge is visited, we found a cycle, "break" it
+		if (g_[target].scc == g_[curr].scc) // a cycle starts here
+            cycle = true;
+        else //fattest edge does not pass through cycle
+        {
+            cycle = false;
+            cycles.clear();
+        }
+        if (g_[next_edge].visited) //fattest path goes along cycle - now perform magic
 		{
-			break;
-			while (!fattest_edges.empty() and g_[next_edge].visited)
-			{
-				next_edge = fattest_edges.back();
-				std::pop_heap(fattest_edges.begin(), fattest_edges.end());
-				fattest_edges.pop_back();
-			}
 		}
 		else
 		{
 			std::pop_heap(fattest_edges.begin(), fattest_edges.end());
 			fattest_edges.pop_back();
 		}
-		target = boost::target(next_edge, g_);
+        if (cycle)
+        {
+			while (!fattest_edges.empty())
+			{
+				auto&& alt_edge = fattest_edges.back();
+				auto&& alt_vertex = boost::target(alt_edge, g_);
+                std::pop_heap(fattest_edges.begin(), fattest_edges.end());
+				fattest_edges.pop_back();
+                if (g_[alt_vertex].scc != g_[target].scc)
+                {
+                    cycles.push_back(alt_edge); // add all non-cycle edges
+                    if (g_[alt_edge].capacity > fattest_coverage)
+                    {
+                        fattest_coverage = g_[alt_edge].capacity;
+                        fattest_edge = alt_edge; // this will be the edge with which we are leaving the cycle
+                    }
+                    break;
+                }
+			}
+        }
 		sequence += g_[next_edge].name; // add to current sequence
-		coverage_fraction.push_back(g_[next_edge].capacity/total_coverage); // fraction of outflow
-        std::cout << g_[next_edge].name << ":" << g_[next_edge].capacity << " (" << g_[next_edge].capacity/total_coverage << ")" << std::endl;
+        float capacity = g_[next_edge].capacity;
+		float fraction = capacity/total_coverage;
+        coverage_fraction.push_back(fraction); // fraction of outflow
+        if (fraction < min_fraction)
+            min_fraction = fraction;
+        if (capacity > max_capacity)
+            max_capacity = capacity;
+        if (!test_hypothesis(fraction,min_fraction))
+        { //? TODO
+        }
 		visited_edges.push_back(next_edge); // has already been updated here
         g_[next_edge].visited = true; // mark edge as visited
 		outdegree = boost::out_degree(target, g_);
 	}
-	float min_fraction = *std::min_element(coverage_fraction.begin(), coverage_fraction.end());
 	for (unsigned int i = 0; i < coverage_fraction.size(); i++)
 	{
 		if (!test_hypothesis(coverage_fraction[i],min_fraction)) // significantly higher, some flow remains
@@ -890,6 +778,11 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
             g_[visited_edges[i]].visited = false; // "unvisit" edges
 		}
 	}
+    if (sequence.length() > 150) // i.e. readsize TODO
+    {
+        std::cout << ">Contig_(" << min_fraction << " of " << max_capacity << ")" << std::endl;
+        std::cout << sequence << std::endl;
+    }
 }
 
 // calculates the flows and corresponding paths through the graph
@@ -901,7 +794,6 @@ void UnitigGraph::calculateFlow()
 
 	std::cerr << sources.size() << " connected components found." << std::endl;
 
-	unsigned int j = 0; // contig number
 	for (const Connected_Component& cc : sources)
 	{
 		std::vector<UEdge> q;
@@ -931,19 +823,10 @@ void UnitigGraph::calculateFlow()
 			{
 				total_coverage += g_[e].capacity;
 			}
-            std::cout << g_[first_edge].name << ":" << g_[first_edge].capacity << " (" << g_[first_edge].capacity/total_coverage << ")" << std::endl;
 			coverage_fraction.push_back(g_[first_edge].capacity/total_coverage);
 			visited_edges.push_back(first_edge);
 		
 			find_fattest_path(target, sequence, coverage_fraction, visited_edges);
-
-            float min_fraction = *std::min_element(coverage_fraction.begin(), coverage_fraction.end());
-
-			if (sequence.length() > CONTIG_THRESH) // i.e. readsize
-			{
-				std::cout << ">Contig_" << j++ << " (" << min_fraction << " of " << first_capacity << ")" << std::endl;
-				std::cout << sequence << std::endl;
-			}
 			
 			if (g_[first_edge].capacity == 0)
 			{
@@ -990,7 +873,7 @@ void UnitigGraph::debug()
 		boost::put(propmapIndex,*vi,i++);
 	}
 
-    //boost::write_graphviz(std::cout, g_, boost::make_label_writer(&VertexProperties::index), boost::make_label_writer(&EdgeProperties::capacity), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
 	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::name, g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
-	boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::scc,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::scc,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
 }

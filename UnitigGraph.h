@@ -58,24 +58,22 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&); // TODO delete dBg after UnitigGraph creation?
+	UnitigGraph(deBruijnGraph&, float); // TODO delete dBg after UnitigGraph creation?
 	UnitigGraph(); // debug
 	void debug(); // debug information
     void calculateFlow();
 private:
-	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&);
-	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
-	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
-	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
+	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float, float);
+	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&, float);
+	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
+	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
 	UVertex addVertex(unsigned int*, std::string name);
-	
+
+	float calculateThresholds(const deBruijnGraph&, float);
     void markCycles();
     void cleanGraph();
-    void condenseCycles();
 	void removeStableSets();
 	void contractPaths();
-	void filterTerminals();
-	std::vector<UVertex> flagDanglingEnd(UVertex&, bool source);
 
 	void find_fattest_path(UVertex target, std::string& sequence, std::vector<float>& coverage_fraction, std::vector<UEdge>& visited_edges);
 	void add_sorted_edges(std::vector<UEdge>& q, const UVertex& source, bool addAll);
