@@ -100,15 +100,34 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1), thresho
 float UnitigGraph::calculateThresholds(const deBruijnGraph& dbg, float error_rate)
 {
     auto&& cov_distr = dbg.coverageDistribution();
+    std::vector<std::pair<float, float> > sorted_coverage;
     float total_edges = 0.;
     float avg_coverage = 0.;
+    float median_coverage = 0.;
+    float middle_coverage = 0.;
     for (const auto& cov : cov_distr)
     {
+        sorted_coverage.push_back(cov);
         total_edges += cov.second; //counts all edges
         avg_coverage += cov.first * cov.second; // adds up the coverage values
     }
+    std::sort(sorted_coverage.begin(), sorted_coverage.end());
+    float used_edges = 0.;
+    unsigned int i = 0;
+    for (const auto& cov : sorted_coverage)
+    {
+        used_edges += cov.second;
+        if (used_edges > total_edges/2 and !median_coverage)
+        {
+            median_coverage = cov.first;
+        }
+        if (i++ > sorted_coverage.size()/2 and !middle_coverage)
+        {
+            middle_coverage = cov.first;
+        }
+    }
     avg_coverage /= total_edges;
-    return avg_coverage;
+    return middle_coverage * error_rate;
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -749,9 +768,13 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
                 }
 			}
         }
-		sequence += g_[next_edge].name; // add to current sequence
         float capacity = g_[next_edge].capacity;
 		float fraction = capacity/total_coverage;
+        if (test_hypothesis(fraction, 0.5)) // fraction is close to 0.5 -> split contigs?
+        {
+            // TODO
+        }
+		sequence += g_[next_edge].name; // add to current sequence
         coverage_fraction.push_back(std::make_pair(capacity, total_coverage)); // fraction of outflow
         if (fraction < min_fraction)
             min_fraction = fraction;
@@ -807,7 +830,12 @@ void UnitigGraph::calculateFlow()
 
 			float first_capacity = g_[first_edge].capacity;
             if (first_capacity < threshold_) // the highest abundant source is not relevant
-                break;
+            {
+                q.pop_back();
+                std::pop_heap(q.begin(), q.end());
+                continue;
+                //break;
+            }
 
 			std::vector<std::pair<float, float> > coverage_fraction; // fraction of the path
 			std::vector<UEdge> visited_edges; // edges on the fattest path, TODO store pointers?
