@@ -731,13 +731,6 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
             cycles.clear();
         }
         if (g_[next_edge].visited) //fattest path goes along cycle - now perform magic
-		{
-		}
-		else
-		{
-			fattest_edges.pop_back();
-		}
-        if (cycle)
         {
 			while (!fattest_edges.empty())
 			{
@@ -750,12 +743,16 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
                     if (g_[alt_edge].capacity > fattest_coverage)
                     {
                         fattest_coverage = g_[alt_edge].capacity;
-                        fattest_edge = alt_edge; // this will be the edge with which we are leaving the cycle
+                        next_edge = alt_edge; // this will be the edge with which we are leaving the cycle
                     }
                     break;
                 }
 			}
+            // if fattest edges is empty: all vertices are on cycle...break
         }
+        if (fattest_edges.empty())
+            break; // TODO
+	    fattest_edges.pop_back();
         float capacity = g_[next_edge].capacity;
 		float fraction = capacity/total_coverage;
         if (test_hypothesis(fraction, 0.5)) // fraction is close to 0.5 -> split contigs?
@@ -895,5 +892,5 @@ void UnitigGraph::debug()
 
     //boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
 	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::name, g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
-	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::cc,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
+	//boost::write_graphviz(std::cout, g_, boost::make_label_writer(boost::get(&VertexProperties::scc,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
 }
