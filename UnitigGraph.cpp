@@ -681,21 +681,6 @@ std::vector<Connected_Component> UnitigGraph::getSources() const
 	return sources;
 }
 
-// add edges of source to heap
-void UnitigGraph::add_sorted_edges(std::vector<UEdge>& q, const UVertex& source, bool addAll)
-{
-	auto edgeCompare = [&](UEdge e1, UEdge e2){
-		return g_[e1].capacity < g_[e2].capacity; // highest capacity last, (pop_back from heap)
-	}; //lambda for comparing to edges based on their capacity
-	
-	auto out_edges = boost::out_edges(source, g_);
-	for (const auto& oe : out_edges) // we dont do coverage checks here
-	{
-		q.push_back(oe);
-		std::push_heap(q.begin(), q.end(), edgeCompare);
-	}
-}
-
 // Tests whether two percentages "belong together" TODO this is quite arbitrary
 bool UnitigGraph::test_hypothesis(float to_test, float h0)
 {
@@ -705,7 +690,11 @@ bool UnitigGraph::test_hypothesis(float to_test, float h0)
 
 void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::vector<std::pair<float, float> >& coverage_fraction, std::vector<UEdge>& visited_edges)
 {
-	int outdegree = boost::out_degree(target, g_);
+    auto edgeCompare = [&](UEdge e1, UEdge e2){
+        return g_[e1].capacity < g_[e2].capacity; // highest capacity last
+    }; //lambda for comparing to edges based on their capacity
+	
+    int outdegree = boost::out_degree(target, g_);
     std::vector<UEdge> cycles;
     UEdge fattest_edge;
     float fattest_coverage = 0.;
@@ -718,11 +707,12 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 	{
         UVertex curr = target;
 		std::vector<UEdge> fattest_edges;
-		std::make_heap(fattest_edges.begin(), fattest_edges.end());
-		
-		add_sorted_edges(fattest_edges, target, true);
-		
-		std::sort_heap(fattest_edges.begin(), fattest_edges.end());
+        auto out_edges = boost::out_edges(target, g_);
+        for (const auto& oe : out_edges)
+        {
+            fattest_edges.push_back(oe);
+        }
+		std::sort(fattest_edges.begin(), fattest_edges.end(), edgeCompare);
 
 		float total_coverage = 0.;
 		
@@ -745,7 +735,6 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 		}
 		else
 		{
-			std::pop_heap(fattest_edges.begin(), fattest_edges.end());
 			fattest_edges.pop_back();
 		}
         if (cycle)
@@ -754,7 +743,6 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
 			{
 				auto&& alt_edge = fattest_edges.back();
 				auto&& alt_vertex = boost::target(alt_edge, g_);
-                std::pop_heap(fattest_edges.begin(), fattest_edges.end());
 				fattest_edges.pop_back();
                 if (g_[alt_vertex].scc != g_[target].scc)
                 {
@@ -804,24 +792,32 @@ void UnitigGraph::find_fattest_path(UVertex target, std::string& sequence, std::
         std::cout << sequence << std::endl;
     }
 }
+	
 
 // calculates the flows and corresponding paths through the graph
 void UnitigGraph::calculateFlow()
 {
-	std::cerr << "Calculating flow..." << std::endl;
+    auto edgeCompare = [&](UEdge e1, UEdge e2){
+        return g_[e1].capacity < g_[e2].capacity; // highest capacity last
+    }; //lambda for comparing to edges based on their capacity
+	
+    std::cerr << "Calculating flow..." << std::endl;
 	// sources is a vector of all sources of a certain connected component
 	auto sources = getSources();
 
 	for (const Connected_Component& cc : sources)
 	{
 		std::vector<UEdge> q;
-		std::make_heap(q.begin(), q.end());
 		// sort all first edges by their capacity
 		for (const auto& source : cc)
 		{
-			add_sorted_edges(q, source, false); //creates a heap
-		}
-		std::sort_heap(q.begin(), q.end());
+            auto out_edges = boost::out_edges(source, g_);
+            for (const auto& oe : out_edges)
+            {
+                q.push_back(oe);
+		    }
+        }
+		std::sort(q.begin(), q.end(), edgeCompare);
 
 		UEdge first_edge;
 		while (!q.empty())
@@ -832,7 +828,6 @@ void UnitigGraph::calculateFlow()
             if (first_capacity < threshold_) // the highest abundant source is not relevant
             {
                 q.pop_back();
-                std::pop_heap(q.begin(), q.end());
                 continue;
                 //break;
             }
@@ -855,10 +850,10 @@ void UnitigGraph::calculateFlow()
 			
 			if (g_[first_edge].capacity == 0)
 			{
-				q.pop_back(); std::pop_heap(q.begin(), q.end()); // source flow has been depleted
+				q.pop_back(); // source flow has been depleted
 			}
             /* for statistical evaluation of the resulting pathes*/
-			std::sort_heap(q.begin(), q.end()); // capacity of first_edge has changed
+			std::sort(q.begin(), q.end(), edgeCompare); // capacity of first_edge has changed
 		}
 	}
 }
