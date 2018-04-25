@@ -22,6 +22,7 @@ struct VertexProperties {
     std::string name;
     unsigned int tarjan_index;
     bool onStack;
+    bool visited;
 };
 
 struct Capacity {
@@ -39,7 +40,6 @@ struct Capacity {
 
 struct EdgeProperties{
     std::string name;
-    bool visited;
     float capacity;
     Capacity cap_info;
     float residual_capacity;
@@ -76,7 +76,7 @@ private:
 	void removeStableSets();
 	void contractPaths();
 
-	void find_fattest_path(UVertex target, std::string& sequence, std::vector<std::pair<float,float> >& coverage_fraction, std::vector<UEdge>& visited_edges);
+	void find_fattest_path(UVertex);
 	bool test_hypothesis(float to_test, float h0);
 	std::vector<std::vector<UVertex> > getSources() const;
 
