@@ -43,6 +43,7 @@ struct EdgeProperties{
     float capacity;
     Capacity cap_info;
     float residual_capacity;
+    bool visited;
 };
 
 typedef boost::adjacency_list<boost::listS, boost::listS, boost::bidirectionalS,
@@ -77,6 +78,8 @@ private:
 	void contractPaths();
 
 	void find_fattest_path(UVertex);
+    std::string calculate_contigs(std::vector<std::pair<float,float> >&, std::vector<UEdge>&);
+    UEdge roll_out_cycle(UVertex, UEdge, std::vector<UEdge>&);
 	bool test_hypothesis(float to_test, float h0);
 	std::vector<std::vector<UVertex> > getSources() const;
 

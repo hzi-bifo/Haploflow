@@ -385,6 +385,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         g_[e.first].cap_info.first = first;
         g_[e.first].cap_info.last= last;
         g_[e.first].cap_info.length = g_[e.first].name.length();
+        g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,prev);
 }
@@ -486,6 +487,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
         g_[e.first].cap_info.first = first;
         g_[e.first].cap_info.last = last;
         g_[e.first].cap_info.length = g_[e.first].name.length();
+        g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,next);
 }
@@ -535,6 +537,7 @@ void UnitigGraph::contractPaths()
             g_[new_e.first].cap_info.first = first;
             g_[new_e.first].cap_info.last = last;
             g_[new_e.first].cap_info.length = g_[new_e.first].name.length();
+            g_[new_e.first].visited = false;
 			boost::clear_vertex(*vi,g_);
 			boost::remove_vertex(*vi,g_);
 		}
@@ -693,7 +696,6 @@ void UnitigGraph::find_fattest_path(UVertex source)
     }; //lambda for comparing to edges based on their capacity
 	
     int outdegree = boost::out_degree(source, g_);
-    std::vector<UEdge> cycles;
     UEdge fattest_edge;
     std::vector<std::pair<float, float>> coverage_fraction;
     std::vector<UEdge> visited_edges;
@@ -718,39 +720,85 @@ void UnitigGraph::find_fattest_path(UVertex source)
 		std::sort(fattest_edges.begin(), fattest_edges.end(), edgeCompare);
 
 		next_edge = fattest_edges.back();
-		source = boost::target(next_edge, g_);
-        if (g_[source].visited) //fattest path goes along cycle
-        {
-            
-        }
 	    fattest_edges.pop_back();
+        g_[next_edge].visited = true;
+		visited_edges.push_back(next_edge); // has already been updated here
         
         float capacity = g_[next_edge].capacity;
 		float fraction = capacity/total_coverage;
-        
         coverage_fraction.push_back(std::make_pair(capacity, total_coverage)); // fraction of outflow
-        if (fraction < min_fraction)
-            min_fraction = fraction;
-        if (capacity > max_capacity)
-            max_capacity = capacity;
-		visited_edges.push_back(next_edge); // has already been updated here
+
+		source = boost::target(next_edge, g_);
+        if (g_[source].visited) //fattest path goes along cycle
+        {
+            UEdge out_edge = roll_out_cycle(source, next_edge, visited_edges);
+            if (out_edge == next_edge)
+                break; // no edges go out of cycle - we end in it
+            else
+            {
+                next_edge = out_edge;
+                source = boost::target(next_edge, g_);
+            }
+        }
 		outdegree = boost::out_degree(source, g_);
 	}
+    std::string sequence = calculate_contigs(coverage_fraction, visited_edges);
+}
 
+std::string UnitigGraph::calculate_contigs(std::vector<std::pair<float,float> >& coverage_fraction, std::vector<UEdge>& visited_edges)
+{
+    std::string sequence;
 	for (unsigned int i = 0; i < coverage_fraction.size(); i++)
 	{
-		if (!test_hypothesis(coverage_fraction[i].first/coverage_fraction[i].second,min_fraction)) // significantly higher, some flow remains
-		{
-			float new_cov = g_[visited_edges[i]].capacity * (1 - min_fraction);
-            g_[visited_edges[i]].capacity = new_cov; // reduce by min_fraction percent
-		}
-		else // they belong to the same genome, use all flow
-		{
-            g_[visited_edges[i]].capacity = 0.;
-		}
 	}
+    return sequence;
 }
-	
+
+UEdge UnitigGraph::roll_out_cycle(UVertex source, UEdge next_edge, std::vector<UEdge>& visited_edges)
+{
+    auto edgeCompare = [&](UEdge e1, UEdge e2){
+        return g_[e1].capacity < g_[e2].capacity; // highest capacity last
+    }; //lambda for comparing to edges based on their capacity
+    
+    UVertex prev = boost::source(next_edge, g_);
+    std::vector<UEdge> cycle_out_edges;
+    std::vector<UEdge> cycles;
+    std::vector<float> cycle_cap;
+    for (unsigned int i = visited_edges.size()-1; i >= 0; i--)
+    {
+        UEdge visited = visited_edges[i];
+        cycles.push_back(visited); // store edges on cycle
+        cycle_cap.push_back(g_[visited].capacity);
+        for (auto oe : boost::out_edges(prev, g_))
+        {
+            UVertex target = boost::target(oe, g_);
+            if (!g_[target].visited) // we only leave the cycle if neighbour isnt visited
+                cycle_out_edges.push_back(oe);
+        }
+        if (prev == source) // found the beginning of the cycle
+            break;
+        prev = boost::source(visited, g_);
+    }
+    if (cycle_out_edges.empty())
+        return cycles.back();
+    std::sort(cycle_out_edges.begin(), cycle_out_edges.end(), edgeCompare);
+    UEdge out_edge = cycle_out_edges.back();
+    float cap = g_[out_edge].capacity;
+    float min_cap = *(std::min_element(cycle_cap.begin(), cycle_cap.end()));
+    float max_cap = *(std::max_element(cycle_cap.begin(), cycle_cap.end()));
+    float avg_cap = 0.;
+    for (float c : cycle_cap)
+        avg_cap += c;
+    avg_cap /= cycle_cap.size();
+    for (auto e : cycles)
+    {
+        if (e == next_edge)
+        {
+        }
+        visited_edges.push_back(e);
+    }
+    return out_edge;
+}
 
 // calculates the flows and corresponding paths through the graph
 void UnitigGraph::calculateFlow()
