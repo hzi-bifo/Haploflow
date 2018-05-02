@@ -745,12 +745,18 @@ void UnitigGraph::find_fattest_path(UVertex source)
     std::string sequence = calculate_contigs(coverage_fraction, visited_edges);
 }
 
+// Given all the chosen edges and their coverage fraction, builds the contigs and reduces flow accordingly
 std::string UnitigGraph::calculate_contigs(std::vector<std::pair<float,float> >& coverage_fraction, std::vector<UEdge>& visited_edges)
 {
-    std::string sequence;
-	for (unsigned int i = 0; i < coverage_fraction.size(); i++)
-	{
-	}
+    UEdge first_edge = visited_edges.front();
+    UVertex first_vertex = boost::source(first_edge, g_);
+    std::string sequence = g_[first_vertex].name; // sequence of first vertex
+
+    // build sequence (TODO: if coverage is 50/50 add N?)
+    for (const auto& e : visited_edges)
+    {
+        sequence += g_[e].name;
+    }
     return sequence;
 }
 
