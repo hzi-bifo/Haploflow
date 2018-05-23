@@ -224,7 +224,6 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 	Vertex* currV = dbg.getVertex(curr);
 	unsigned int total_out = currV->get_total_out_coverage();
 	unsigned int total_in = currV->get_total_in_coverage();
-	float epsilon = float(total_out)/total_in; // the gain/loss of this vertex
 	Sequence src = *dbg.getSequence(curr);
 	// this is for checking whether the reverse complement is in the debruijn graph
 	bool reverse = (src != curr); // true, if reverse complement, i.e. src and curr are not the same
@@ -663,7 +662,7 @@ std::vector<Connected_Component> UnitigGraph::getSources() const
 	std::unordered_map<unsigned int,unsigned int> cc_map;
 	for (auto&& v : boost::vertices(g_))
 	{
-		if (boost::in_degree(v,g_) == 0)
+		if (boost::in_degree(v,g_) == 0) // these are "real" sources
 		{
 			unsigned int curr_cc = g_[v].cc;
 			auto miter = cc_map.find(curr_cc);
@@ -683,10 +682,14 @@ std::vector<Connected_Component> UnitigGraph::getSources() const
 }
 
 // Tests whether two percentages "belong together" TODO this is quite arbitrary
-bool UnitigGraph::test_hypothesis(float to_test, float h0)
+bool UnitigGraph::test_hypothesis(float to_test_num, float to_test_denom, float h0, bool error_type)
 {
-	return (std::abs(to_test - h0) < 0.06); // they differ by less than 6%
-    // TODO
+    float diff = std::abs(to_test_num - h0 * to_test_denom); // the absolute difference between num and expected num
+    float perc = to_test_num/to_test_denom;
+    if (error_type)
+        return (diff > threshold_ or std::abs(perc - h0) > 0.05); //more likely they dont belong together
+    else
+        return (diff < threshold_ or std::abs(perc - h0) < 0.05); // they differ by less than x%
 }
 
 void UnitigGraph::find_fattest_path(UVertex source)
@@ -699,9 +702,6 @@ void UnitigGraph::find_fattest_path(UVertex source)
     UEdge fattest_edge;
     std::vector<std::pair<float, float>> coverage_fraction;
     std::vector<UEdge> visited_edges;
-
-	float min_fraction = 1.01; //slightly above 1 so it is true for 1.0
-    float max_capacity = 0.;
 	UEdge next_edge;
 
 	while (outdegree) // not a sink
@@ -725,7 +725,7 @@ void UnitigGraph::find_fattest_path(UVertex source)
 		visited_edges.push_back(next_edge); // has already been updated here
         
         float capacity = g_[next_edge].capacity;
-		float fraction = capacity/total_coverage;
+
         coverage_fraction.push_back(std::make_pair(capacity, total_coverage)); // fraction of outflow
 
 		source = boost::target(next_edge, g_);
@@ -742,22 +742,56 @@ void UnitigGraph::find_fattest_path(UVertex source)
         }
 		outdegree = boost::out_degree(source, g_);
 	}
-    std::string sequence = calculate_contigs(coverage_fraction, visited_edges);
+    calculate_contigs(coverage_fraction, visited_edges);
 }
 
 // Given all the chosen edges and their coverage fraction, builds the contigs and reduces flow accordingly
-std::string UnitigGraph::calculate_contigs(std::vector<std::pair<float,float> >& coverage_fraction, std::vector<UEdge>& visited_edges)
+void UnitigGraph::calculate_contigs(std::vector<std::pair<float,float> >& coverage_fraction, std::vector<UEdge>& visited_edges)
 {
     UEdge first_edge = visited_edges.front();
     UVertex first_vertex = boost::source(first_edge, g_);
     std::string sequence = g_[first_vertex].name; // sequence of first vertex
+    
+    std::vector<float> to_reduce{1.0}; // calculating the fluctuation in flow
+    float path_fraction = 1.0;
+    float min_flow = -1;
+    float max_flow = 0;
 
-    // build sequence (TODO: if coverage is 50/50 add N?)
-    for (const auto& e : visited_edges)
+    for (unsigned int i = 0; i < coverage_fraction.size(); i++)
     {
-        sequence += g_[e].name;
+        auto& cov_pair = coverage_fraction[i];
+        float capacity = cov_pair.first;
+        float total_capacity = cov_pair.second;
+        float capacity_fraction = capacity/total_capacity;
+        if (capacity > max_flow)
+            max_flow = capacity;
+        if (min_flow == -1 or capacity < min_flow)
+            min_flow = capacity;
+        if (i > 1)
+        {
+            auto& prev_coverage = coverage_fraction[i-1];
+            to_reduce.push_back(total_capacity/(prev_coverage.second)); // calculate gain/loss in this vertex
+            path_fraction *= capacity/prev_coverage.first; // out_flow in percent of in_flow of current path
+        }
+        else
+            path_fraction = capacity_fraction;
+        //if (test_hypothesis(capacity, total_capacity, 0.5, true)) // the following sequence is unsure
+        //    sequence += "X";
+        sequence += g_[visited_edges[i]].name;
+        //if (test_hypothesis(capacity, total_capacity, 0.5, true)) // until the next "X"
+        //    sequence += "X";
     }
-    return sequence;
+    std::cout << "Contig_" << path_fraction * 100 << std::endl; // contig with % flow
+    std::cout << sequence << std::endl;
+    for (unsigned int i = 0; i < to_reduce.size(); i ++ )
+    {
+        auto& current_edge = g_[visited_edges[i]];
+        float reduce_flow = min_flow * to_reduce[i]; // reduce more, if high gain TODO
+        if (test_hypothesis(reduce_flow, current_edge.capacity, 1.0))
+            current_edge.capacity = 0;
+        else
+            current_edge.capacity -= reduce_flow;
+    }
 }
 
 UEdge UnitigGraph::roll_out_cycle(UVertex source, UEdge next_edge, std::vector<UEdge>& visited_edges)
@@ -769,12 +803,10 @@ UEdge UnitigGraph::roll_out_cycle(UVertex source, UEdge next_edge, std::vector<U
     UVertex prev = boost::source(next_edge, g_);
     std::vector<UEdge> cycle_out_edges;
     std::vector<UEdge> cycles;
-    std::vector<float> cycle_cap;
-    for (unsigned int i = visited_edges.size()-1; i >= 0; i--)
+    for (unsigned int i = visited_edges.size()-1; i >= 0; i--) // move through the cycle backwards
     {
-        UEdge visited = visited_edges[i];
+        UEdge visited = visited_edges[i]; //next_edge is always the last in visited_edges
         cycles.push_back(visited); // store edges on cycle
-        cycle_cap.push_back(g_[visited].capacity);
         for (auto oe : boost::out_edges(prev, g_))
         {
             UVertex target = boost::target(oe, g_);
@@ -785,24 +817,44 @@ UEdge UnitigGraph::roll_out_cycle(UVertex source, UEdge next_edge, std::vector<U
             break;
         prev = boost::source(visited, g_);
     }
-    if (cycle_out_edges.empty())
-        return cycles.back();
+    //if (cycle_out_edges.empty()) // TODO readd
+        return cycles.back(); // no out_edges, return next_edge
     std::sort(cycle_out_edges.begin(), cycle_out_edges.end(), edgeCompare);
     UEdge out_edge = cycle_out_edges.back();
+    UVertex out_vertex = boost::source(out_edge, g_); // vertex from which we are leaving the cycle
+
     float cap = g_[out_edge].capacity;
-    float min_cap = *(std::min_element(cycle_cap.begin(), cycle_cap.end()));
-    float max_cap = *(std::max_element(cycle_cap.begin(), cycle_cap.end()));
     float avg_cap = 0.;
-    for (float c : cycle_cap)
-        avg_cap += c;
-    avg_cap /= cycle_cap.size();
-    for (auto e : cycles)
+    bool finished = false;
+    //TODO refactoring, rewrite
+    while (!finished)
     {
-        if (e == next_edge)
+        unsigned int j = 0;
+        for (unsigned int i = 0; i < cycles.size(); i++)
         {
+            avg_cap += g_[cycles[i]].capacity;
+            if (boost::target(cycles[i],g_) == out_vertex) // we can leave the cycle here, do we?
+            {
+                j = cycles.size() - i - 1; //TODO
+                avg_cap /= (i+1); // calculate real average
+                if (test_hypothesis(cap, avg_cap, 1.0))
+                {
+                    finished = true;           
+                    break; // we finished cycling
+                }
+                else // our coverage should be higher (TODO?)
+                {
+                    avg_cap = 0; // reset average
+                }
+            }
         }
-        visited_edges.push_back(e);
+        avg_cap /= j; // average over the half of the cycle going from out_edge to source
+        for (auto& e : cycles)
+        {
+            g_[e].capacity -= avg_cap; //TODO (test for null)
+        }
     }
+    
     return out_edge;
 }
 
@@ -844,9 +896,35 @@ void UnitigGraph::calculateFlow()
             }
 
 			auto source = boost::source(first_edge, g_);
-			find_fattest_path(source);
+            auto target = boost::target(first_edge, g_);
+
+            auto out_edges = boost::out_edges(target, g_);
+            float next_cap = 0.;
+            auto& next_edge = first_edge;
+
+            /*for (auto&& e : out_edges)
+            {
+                float cap = g_[e].capacity;
+                if (cap > next_cap)
+                {
+                    next_cap = cap;
+                    next_edge = e;
+                }
+            }
+            if (next_cap > first_capacity) // TODO set threshold
+            {
+                std::cerr << "Discarded source: " << g_[first_edge].name << std::endl;
+			    find_fattest_path(target);
+                q.pop_back();
+                q.push_back(next_edge);
+            }
+            else
+            {*/
+                find_fattest_path(source);
+            /*}*/
+
 			
-			if (g_[first_edge].capacity == 0)
+			if (g_[next_edge].capacity == 0)
 			{
 				q.pop_back(); // source flow has been depleted
 			}
