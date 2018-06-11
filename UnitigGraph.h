@@ -76,12 +76,16 @@ private:
     void cleanGraph();
 	void removeStableSets();
 	void contractPaths();
+    void removeEmpty();
 
-	void find_fattest_path(UVertex);
-    void calculate_contigs(std::vector<std::pair<float,float> >&, std::vector<UEdge>&);
-    UEdge roll_out_cycle(UVertex, UEdge, std::vector<UEdge>&);
+    float in_capacity(UVertex);
+    float out_capacity(UVertex);
+
+	std::vector<UEdge> find_fattest_path(UEdge);
+    std::pair<std::string, std::pair<float, float> > calculate_contigs(std::vector<UEdge>&);
 	bool test_hypothesis(float to_test_num, float to_test_denom, float h0, bool = false);
-	std::vector<std::vector<UVertex> > getSources() const;
+    float calculate_gain(UVertex& v);
+	UEdge getSeed() const;
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
 	UGraph g_;

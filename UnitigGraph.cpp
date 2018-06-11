@@ -557,7 +557,7 @@ void UnitigGraph::removeStableSets()
 		}
 	}
 }
-void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig graph
+void UnitigGraph::markCycles() //non-recursive tarjan implementation for unitig graph
 {
     // lca, curr, scc
 	std::stack<std::pair<std::pair<UVertex, UVertex>, unsigned int> > recursion_stack;
@@ -645,40 +645,45 @@ void UnitigGraph::markCycles() //non-recusrive tarjan implementation for unitig 
     boost::remove_vertex(dummy, g_); // remove the dummy again
 }
 
+void UnitigGraph::removeEmpty()
+{
+    std::vector<UEdge> toDelete;
+    for (auto&& e : boost::edges(g_))
+    {
+        if (g_[e].capacity == 0)
+            toDelete.push_back(e);
+    }
+    for (auto&& e : toDelete)
+    {
+        boost::remove_edge(e, g_);
+    }
+}
+
 // the graph might contain some unconnected vertices, clean up
 void UnitigGraph::cleanGraph()
 {
-	std::cerr << "Removing stable sets..." << std::endl;
+    std::cerr << "Removing edges with no capacity..." << std::endl;
+	removeEmpty();
+    std::cerr << "Removing stable sets..." << std::endl;
 	removeStableSets();
-    std::cerr << "Contracting simple paths.." << std::endl;
+    std::cerr << "Contracting simple paths..." << std::endl;
     contractPaths(); 
 }
 
-// returns the sources of the graph sorted by their connected components
-std::vector<Connected_Component> UnitigGraph::getSources() const
+// returns the seed vertex = vertex with the highest "coverage"
+UEdge UnitigGraph::getSeed() const
 {
-	unsigned int cc_count = 0; // "real" number of ccs
-	std::vector<std::vector<UVertex> > sources;
-	std::unordered_map<unsigned int,unsigned int> cc_map;
-	for (auto&& v : boost::vertices(g_))
+    UEdge seed;
+    float max = 0;
+	for (auto&& e : boost::edges(g_))
 	{
-		if (boost::in_degree(v,g_) == 0) // these are "real" sources
-		{
-			unsigned int curr_cc = g_[v].cc;
-			auto miter = cc_map.find(curr_cc);
-			if (miter == cc_map.end())
-			{
-				std::vector<UVertex> cc_i({v});
-				sources.push_back(cc_i);
-				cc_map.insert(std::make_pair(curr_cc,cc_count++));
-			}
-			else
-			{
-				sources[miter->second].push_back(v);
-			}
-		}
-	}
-	return sources;
+        if (g_[e].capacity > max)
+        {
+            max = g_[e].capacity;
+            seed = e;
+        }
+    }
+	return seed;
 }
 
 // Tests whether two percentages "belong together" TODO this is quite arbitrary
