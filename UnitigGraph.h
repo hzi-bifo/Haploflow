@@ -64,6 +64,7 @@ public:
 	UnitigGraph(); // debug
 	void debug(); // debug information
     void calculateFlow();
+    void printGraph(std::ostream&) const;
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
