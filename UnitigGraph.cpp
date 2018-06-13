@@ -298,6 +298,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 {
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
+    float gain = 1;
 	// DEBUG
 	float min = coverage; // TODO
 	float max = coverage;
@@ -333,12 +334,15 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		if (cov > max)
 			max = cov;
 		avg += cov;
+        gain = last/cov;
         last = cov;
 		length++; // used for the coverage caluclations of the path later on
 		nextV = dbg.getVertex(prev);
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
 		sequence += lastchar;
+        if (gain < 0.95 or gain > 1.05)
+            break;
 	}
 	avg /= float(length); // average coverage over the path
 	if (!nextV->is_visited() and avg >= threshold_) // if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
@@ -385,6 +389,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	// with a little effort this can be moved inside the while loop for efficiency reasons
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
+    float gain = 1;
 	// DEBUG, coverage information
 	float min = coverage; // TODO
 	float max = coverage;
@@ -415,6 +420,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		if (cov > max)
 			max = cov;
 		avg += cov;
+        gain = last/cov;
         last = cov;
 		length++;
 		next = next.substr(1) + c;
@@ -422,6 +428,8 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
 		sequence += c; 
+        if (gain < 0.95 or gain > 1.05)
+            break;
 	}
 	/* 
 	if nextV is visited then nextV may either be a junction, in which case it should have been
@@ -477,7 +485,7 @@ void UnitigGraph::contractPaths()
 		unsigned int indegree = boost::in_degree(*vi, g_);
 		unsigned int outdegree = boost::out_degree(*vi,g_);
 		
-		// if in and outdegree is 1, we are on a simple path and can contract again TODO coverage calculation
+		// if in and outdegree is 1, we are on a simple path and can contract again
 		if (outdegree == 1 and indegree == 1)
 		{
 			auto&& ie = boost::in_edges(*vi,g_);
@@ -495,6 +503,9 @@ void UnitigGraph::contractPaths()
             float min = std::min(cap_info_e.min, cap_info_f.min);
             float first = cap_info_e.first;
             float last = cap_info_f.last;
+
+            if (cap_info_f.first < 0.95 * cap_info_e.last or cap_info_f.first > 1.05 * cap_info_e.last) // do not contract paths which have high divergence in capacity
+                continue;
             
             float capacity = g_[e.first].capacity * w;
 			e = boost::edge(*vi,new_target,g_);
