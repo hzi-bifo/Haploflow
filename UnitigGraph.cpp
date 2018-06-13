@@ -795,7 +795,9 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
 {
     UEdge source = path.front();
     std::string contig = g_[source].name; // kmer of first vertex
-    float min_flow = g_[source].capacity; 
+    float min_flow = g_[source].capacity;
+    std::vector<float> flows;
+    float median_flow;
     float max_flow = g_[source].capacity;
     std::vector<float> gains;
     for (auto& e : path)
@@ -803,6 +805,7 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
         UVertex source = boost::source(e, g_);
         float gain = calculate_gain(source);
         gains.push_back(gain);
+        flows.push_back(g_[e].capacity);
         contig += g_[e].name;
         if (g_[e].capacity < min_flow)
         {
@@ -813,15 +816,34 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
             max_flow = g_[e].capacity;
         }
     }
+    std::sort(flows.begin(), flows.end()); // for finding the median
+    if (flows.size() % 2 == 0)
+    {
+        median_flow = flows[flows.size()/2];
+    }
+    else
+    {
+        median_flow = (flows[flows.size()/2] + flows[flows.size()/2 + 1])/2.;
+    }
     for (auto& e : path)
     {
         if (test_hypothesis(g_[e].capacity, min_flow, 1.0, false) or g_[e].capacity < threshold_) // the latter case is somewhat strange
         {
             g_[e].capacity = 0;
+            g_[e].cap_info.first = 0;
+            g_[e].cap_info.last= 0;
+            g_[e].cap_info.min = 0;
+            g_[e].cap_info.max = 0;
+            g_[e].cap_info.avg = 0;
         }
         else
         {
             g_[e].capacity -= min_flow;
+            g_[e].cap_info.first = std::min(g_[e].capacity, g_[e].cap_info.first);
+            g_[e].cap_info.last = std::min(g_[e].capacity, g_[e].cap_info.last);
+            g_[e].cap_info.min = std::min(g_[e].capacity, g_[e].cap_info.min);
+            g_[e].cap_info.max = std::min(g_[e].capacity, g_[e].cap_info.max);
+            g_[e].cap_info.avg = g_[e].capacity;
         }
     }
     return std::make_pair(contig,std::make_pair(min_flow,max_flow));
