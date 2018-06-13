@@ -94,6 +94,10 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1), thresho
 		}
 	}
 	std::cerr << "Unitig graph succesfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
+    t = clock();
+    std::cerr << "Finding Strongly Connected Components" << std::endl;
+    markCycles();
+    std::cerr << "Done finding sccs after " << (clock() - t)/100000. << " seconds" << std::endl;
 }
 
 // TODO
@@ -343,23 +347,9 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		addVertex(index, prev); // the vertex is new and found to be relevant
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited())
+	else if (!nextV->is_visited() or avg < threshold_ or nextV->index == 0)
 	{
 		return std::make_pair(nextV,""); // path has too low coverage
-	}
-	else if (succ.size() == 1 and pred.size() == 1)
-	{
-		return std::make_pair(nextV,""); // TODO
-		// this vertex has been found on another path
-	}
-    else if (avg < threshold_)
-    {
-        return std::make_pair(nextV,"");
-    }
-	// if the vertex has not been added, dont try to add an edge to it
-	if (nextV->index == 0)
-	{
-		return std::make_pair(nextV,"");
 	}
 	UVertex src = graph_[nextV->index];
 	auto e = boost::edge(src,trg,g_);
@@ -446,25 +436,10 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		addVertex(index, next);
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited())
+	else if (!nextV->is_visited() or avg < threshold_ or nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
-	else if (succ.size() == 1 and pred.size() == 1) // check else-if case
-	{
-        // TODO this should not happen
-		return std::make_pair(nextV,""); // path has been found, do not add anything
-	}
-    else if (avg < threshold_)
-    {
-        return std::make_pair(nextV,"");
-    }
-	// this vertex has been found and considered irrelevant because of insufficient coverage
-	if (nextV->index == 0)
-	{
-		return std::make_pair(nextV,"");
-	}
-	
 	UVertex trg = graph_[nextV->index];
 	auto e = boost::edge(src,trg,g_);
 	if ((!e.second or (e.second and g_[e.first].name != sequence)))
@@ -812,9 +787,6 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
     float min_flow = g_[source].capacity; 
     float max_flow = g_[source].capacity;
     std::vector<float> gains;
-    float total_gain = 1; // total gain of vertices along path
-    float max_flow_gain = 1;
-    float min_flow_gain = 1; // store at which gain the min/max has been reached
     for (auto& e : path)
     {
         UVertex source = boost::source(e, g_);
@@ -824,18 +796,14 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
         if (g_[e].capacity < min_flow)
         {
             min_flow = g_[e].capacity;
-            min_flow_gain = total_gain;
         }
         if (g_[e].capacity > max_flow)
         {
             max_flow = g_[e].capacity;
-            max_flow_gain = total_gain;
         }
     }
-    unsigned int i = 0;
     for (auto& e : path)
     {
-        total_gain = gains[i++];
         if (test_hypothesis(g_[e].capacity, min_flow, 1.0, false) or g_[e].capacity < threshold_) // the latter case is somewhat strange
         {
             g_[e].capacity = 0;
@@ -857,6 +825,10 @@ void UnitigGraph::calculateFlow()
     unsigned int i = 0;
     while (true)
     {
+        cleanGraph();
+        std::string filename = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/HIV_3_mix/Graphs/Graph" + std::to_string(i) + ".dot";
+        std::ofstream outfile (filename);
+        printGraph(outfile);
         auto seed = getSeed();
         if (g_[seed].capacity <= threshold_)
         {
@@ -864,11 +836,8 @@ void UnitigGraph::calculateFlow()
         }
         std::vector<UEdge> path = find_fattest_path(seed);
         auto contig = calculate_contigs(path);
-        //std::string filename = "Graph" + std::to_string(i) + ".dot";
-        //std::ofstream outfile (filename);
         std::cout << "Contig_" << i++ << "_flow_" << contig.second.first << "_of_" << contig.second.second << std::endl;
         std::cout << contig.first << std::endl;
-        cleanGraph();
     }
 }
 
@@ -886,7 +855,7 @@ void UnitigGraph::printGraph(std::ostream& os) const
 
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::name, g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
 }
 
 void UnitigGraph::debug()
@@ -898,18 +867,4 @@ void UnitigGraph::debug()
 	auto&& numE = boost::num_edges(g_);
 	
 	std::cerr << "Unitig graph has " << numV << " vertices and " << numE << " edges, starting cleaning" << std::endl;
-	clock_t t = clock();
-
-	//TODO move this out
-	cleanGraph();
-	
-	numV = boost::num_vertices(g_);
-	numE = boost::num_edges(g_);
-	std::cerr << "Finished cleaning: Unitig graph has " << numV << " vertices and " << numE << " edges" << std::endl;
-	std::cerr << "Cleaning took " << (clock() - t)/1000000. << " seconds." << std::endl;
-
-    t = clock();
-    std::cerr << "Finding Strongly Connected Components" << std::endl;
-    markCycles();
-    std::cerr << "Done finding sccs after " << (clock() - t)/100000. << " seconds" << std::endl;
 }
