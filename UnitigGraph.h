@@ -78,6 +78,7 @@ private:
 	void removeStableSets();
 	void contractPaths();
     void removeEmpty();
+    void unvisit();
 
     float in_capacity(UVertex);
     float out_capacity(UVertex);

@@ -93,7 +93,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1), thresho
 			cc_++; // new connected component found
 		}
 	}
-	std::cerr << "Unitig graph succesfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
+	std::cerr << "Unitig graph successfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
     t = clock();
     std::cerr << "Finding Strongly Connected Components" << std::endl;
     markCycles();
@@ -131,7 +131,7 @@ float UnitigGraph::calculateThresholds(const deBruijnGraph& dbg, float error_rat
         }
     }
     avg_coverage /= total_edges;
-    return middle_coverage * error_rate;
+    return middle_coverage * error_rate; //TODO
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -719,24 +719,30 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         for (auto&& ie : in_edges)
         {
             UVertex in = boost::source(ie,g_);
-            if (g_[ie].capacity > max)
+            if (g_[ie].capacity > max and !g_[in].visited)
             {
                 currV = in;
                 max = g_[ie].capacity;
                 max_edge = ie;
+                std::cerr << max << " ";
             }
         }
+        std::cerr << std::endl;
+        if (max == 0)
+        {
+            break;
+        }
+        g_[currV].visited = true;
         currE = max_edge;
         path.push_front(currE); // add first, so if cycle, then first vertex = last vertex
-        if (currE == seed) //TODO if we walk in a cycle of which source is not part of
-            break;
     }
-    if (in_capacity(currV) > 0 and currE == seed) // if we are no real source (in capacity) and end up in seed, we are cycle
+    if (in_capacity(currV) > 0) // if we are no real source (in capacity) we are cycle
     {
         for (auto&& e : path)
         {
             return_path.push_back(e);
         }
+        std::cerr << return_path.size() << std::endl;
         return return_path;
     }
     currE = seed; // now forward
@@ -749,23 +755,35 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         for (auto&& oe : out_edges)
         {
             UVertex out = boost::target(oe, g_);
-            if (g_[oe].capacity > max)
+            if (g_[oe].capacity > max and !g_[out].visited)
             {
                 currV = out;
                 max = g_[oe].capacity;
                 max_edge = oe;
             }
         }
+        if (max == 0) // no non-cycle vertex found TODO
+        {
+            break;
+        }
+        g_[currV].visited = true;
         currE = max_edge;
         path.push_back(currE);
-        if (currE == seed)
-            break;
     }
     for (auto&& e : path)
     {
         return_path.push_back(e);
     }
+    unvisit(); // so they are not counted as visited for next contig
     return return_path;
+}
+
+void UnitigGraph::unvisit()
+{
+    for (auto& v : boost::vertices(g_))
+    {
+        g_[v].visited = false;
+    }
 }
 
 // Calculates how much "gain" in flow a single vertex has in percent
@@ -859,7 +877,7 @@ void UnitigGraph::calculateFlow()
     while (true)
     {
         cleanGraph();
-        std::string filename = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/HIV_3_mix/Graphs/Graph" + std::to_string(i) + ".dot";
+        std::string filename = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/HCMV/Graphs/Graph" + std::to_string(i) + ".dot";
         std::ofstream outfile (filename);
         printGraph(outfile);
         auto seed = getSeed();
@@ -867,10 +885,21 @@ void UnitigGraph::calculateFlow()
         {
             break; // all flow has been used, this CC is clear
         }
+        std::cerr << "Finding fattest path..." << std::endl;
         std::vector<UEdge> path = find_fattest_path(seed);
+        std::cerr << "Calculating contig " << i << std::endl;
         auto contig = calculate_contigs(path);
-        std::cout << "Contig_" << i++ << "_flow_" << contig.second.first << "_of_" << contig.second.second << std::endl;
-        std::cout << contig.first << std::endl;
+        if (contig.first.size() > 150)
+        {
+            std::cout << "Contig_" << i++ << "_flow_" << contig.second.first << "_of_" << contig.second.second << std::endl;
+            std::cout << contig.first << std::endl;
+        }
+        else
+        {
+            std::cerr << "Removed short contig" << std::endl;
+            std::cerr << contig.first << std::endl;
+            i++;
+        }
     }
 }
 
