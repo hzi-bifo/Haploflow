@@ -9,6 +9,7 @@ deBruijnGraph::deBruijnGraph(std::string filename)
     std::string sequence;
     int a_in; int c_in; int g_in; int t_in;
     int a_out; int c_out; int g_out; int t_out;
+    unsigned int starts_with;
 
     while (std::getline(graph_file, line))
     {    
@@ -40,14 +41,18 @@ deBruijnGraph::deBruijnGraph(std::string filename)
                 case 6: c_out = stoi(line); break;
                 case 7: g_out = stoi(line); break;
                 case 8: t_out = stoi(line); break;
+                case 9: break;
+                case 10: break;
+                case 11: break; // these don't set anything
+                case 12: starts_with = stoi(line); break;
                 default: counter = 0; break; 
             }
-            counter++; counter %= 9; 
+            counter++; counter %= 13; 
         }
         if (!counter)
         {
             Sequence s(sequence);
-            Vertex v(a_in, c_in, g_in, t_in, a_out, c_out, g_out, t_out);
+            Vertex v(a_in, c_in, g_in, t_in, a_out, c_out, g_out, t_out, starts_with);
             graph_.emplace(s,v);
         }
     }

@@ -11,7 +11,7 @@ class Vertex
 {
 public:
     Vertex();
-	Vertex(int ain, int cin, int gin, int tin, int aout, int cout, int gout, int tout);
+	Vertex(int ain, int cin, int gin, int tin, int aout, int cout, int gout, int tout, unsigned int starts_with);
 	Vertex(const Vertex& v);
     friend std::ostream& operator<<(std::ostream& os, const Vertex& v);
 	
@@ -52,12 +52,12 @@ private:
 	unsigned int g_out;
 	unsigned int t_in;
 	unsigned int t_out;
+	unsigned int starts_with; // number of reads starting with *this
 	unsigned int n_in;
 	unsigned int n_out;
 	unsigned int degree; // in_degree + out_degree
 	bool visited;
 	bool flagged; // flagged for delete
-	unsigned int starts_with; // number of reads starting with *this
 };
 
 #endif
