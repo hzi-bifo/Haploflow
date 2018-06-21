@@ -74,7 +74,16 @@ private:
 	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
 	UVertex addVertex(unsigned int*, std::string name);
 
-	float calculateThresholds(const deBruijnGraph&, float);
+    std::pair<std::string, std::pair<float, float> > calculate_contigs(std::vector<UEdge>&);
+	float calculate_thresholds(const deBruijnGraph&, float);
+    float calculate_gain(UVertex& v, bool);
+    std::pair<std::vector<float>,float> calculate_flow(std::vector<UEdge>&);
+	std::vector<UEdge> find_fattest_path(UEdge);
+    bool check_cycle(std::deque<UEdge>& path, UVertex v, UEdge e);
+    std::deque<UEdge> get_next_cycle_edge(std::deque<UEdge>& path, UVertex v, bool forward);
+    
+	UEdge getSeed() const;
+    
     void markCycles();
     void cleanGraph();
 	void removeStableSets();
@@ -85,11 +94,7 @@ private:
     float in_capacity(UVertex);
     float out_capacity(UVertex);
 
-	std::vector<UEdge> find_fattest_path(UEdge);
-    std::pair<std::string, std::pair<float, float> > calculate_contigs(std::vector<UEdge>&);
 	bool test_hypothesis(float to_test_num, float to_test_denom, float h0, bool = false);
-    float calculate_gain(UVertex& v);
-	UEdge getSeed() const;
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
 	UGraph g_;
