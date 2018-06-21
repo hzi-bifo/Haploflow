@@ -70,7 +70,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1), thresho
 	unsigned int index = 1;
 	auto&& out_unbalanced = junc.first;
 	auto&& in_unbalanced = junc.second;
-    threshold_ = calculateThresholds(dbg, error_rate);
+    threshold_ = calculate_thresholds(dbg, error_rate);
 	// starting from the sources, we build the unitig graph
 	for (auto& v : out_unbalanced)
 	{
@@ -100,8 +100,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1), thresho
     std::cerr << "Done finding sccs after " << (clock() - t)/100000. << " seconds" << std::endl;
 }
 
-// TODO
-float UnitigGraph::calculateThresholds(const deBruijnGraph& dbg, float error_rate)
+float UnitigGraph::calculate_thresholds(const deBruijnGraph& dbg, float error_rate)
 {
     auto&& cov_distr = dbg.coverageDistribution();
     std::vector<std::pair<float, float> > sorted_coverage;
@@ -787,7 +786,7 @@ void UnitigGraph::unvisit()
 }
 
 // Calculates how much "gain" in flow a single vertex has in percent
-float UnitigGraph::calculate_gain(UVertex& v)
+float UnitigGraph::calculate_gain(UVertex& v, bool forward)
 {
     if (in_capacity(v) == 0 or out_capacity(v) == 0)
     {
@@ -864,11 +863,11 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
             g_[e].cap_info.avg = g_[e].capacity;
         }
     }
-    return std::make_pair(contig,std::make_pair(min_flow,max_flow));
+    return std::make_pair(contig,std::make_pair(min_flow,min_flow)); //TODO
 }
 
 // calculates the flows and corresponding paths through the graph
-void UnitigGraph::calculateFlow()
+void UnitigGraph::assemble()
 {
     std::cerr << "Calculating flow..." << std::endl;
 	// sources is a vector of all seeds ("sources") of a certain connected component

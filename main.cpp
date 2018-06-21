@@ -14,10 +14,10 @@ int main (int argc, char* argv[])
 	//dbg.markCycles();
 	//std::cerr << "Cycle detection took " << (clock() - t)/1000000. << " seconds." << std::endl;
 	//dbg.debug();
-	UnitigGraph ug(dbg, atof(argv[3]));
+	UnitigGraph ug(dbg, atof(argv[2]));
     t = clock();
-	ug.debug();
-    ug.calculateFlow();
+	//ug.debug();
+    ug.assemble();
 	//std::cerr << "Calculating flow took " << (clock() - t)/1000000. << " seconds." << std::endl;
 	return 0;
 }
