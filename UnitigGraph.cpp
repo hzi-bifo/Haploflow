@@ -295,9 +295,9 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 // go back through the graph until the next unbalanced node is found and add an ("reversed") edge
 std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg)
 {
+    float starts_with = nextV->get_read_starts(); // number of reads starts within this edge
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
-    float gain = 1;
 	// DEBUG
 	float min = coverage; // TODO
 	float max = coverage;
@@ -333,14 +333,14 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		if (cov > max)
 			max = cov;
 		avg += cov;
-        gain = last/cov;
         last = cov;
 		length++; // used for the coverage caluclations of the path later on
 		nextV = dbg.getVertex(prev);
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
 		sequence += lastchar;
-        if (gain < 0.95 or gain > 1.05)
+        starts_with += nextV->get_read_starts();
+        if (std::abs(last - cov) > threshold_)
             break;
 	}
 	avg /= float(length); // average coverage over the path
@@ -370,6 +370,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		{
             g_[e.first].name = sequence;    
 		}
+        g_[e.first].starting = starts_with;
         g_[e.first].capacity = avg;
         g_[e.first].cap_info.avg = avg;
         g_[e.first].cap_info.max = max;
@@ -377,6 +378,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         g_[e.first].cap_info.first = first;
         g_[e.first].cap_info.last= last;
         g_[e.first].cap_info.length = g_[e.first].name.length();
+        g_[e.first].cap_info.starting = starts_with/(g_[e.first].cap_info.length * avg);
         g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,prev);
@@ -386,9 +388,9 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg)
 {
 	// with a little effort this can be moved inside the while loop for efficiency reasons
+    float starts_with = nextV->get_read_starts(); // number of reads starts within this edge
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
-    float gain = 1;
 	// DEBUG, coverage information
 	float min = coverage; // TODO
 	float max = coverage;
@@ -419,7 +421,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		if (cov > max)
 			max = cov;
 		avg += cov;
-        gain = last/cov;
         last = cov;
 		length++;
 		next = next.substr(1) + c;
@@ -427,7 +428,8 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		pred = nextV->get_predecessors();
 		succ = nextV->get_successors();
 		sequence += c; 
-        if (gain < 0.95 or gain > 1.05)
+        starts_with += nextV->get_read_starts();
+        if (std::abs(last - cov) > threshold_)
             break;
 	}
 	/* 
@@ -461,6 +463,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		{
             g_[e.first].name = sequence;
 		}
+        g_[e.first].starting = starts_with;
         g_[e.first].capacity = avg;
         g_[e.first].cap_info.avg = avg;
         g_[e.first].cap_info.max = max;
@@ -468,6 +471,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
         g_[e.first].cap_info.first = first;
         g_[e.first].cap_info.last = last;
         g_[e.first].cap_info.length = g_[e.first].name.length();
+        g_[e.first].cap_info.starting = starts_with/(g_[e.first].cap_info.length * avg);
         g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,next);
@@ -503,11 +507,13 @@ void UnitigGraph::contractPaths()
             float first = cap_info_e.first;
             float last = cap_info_f.last;
 
-            if (cap_info_f.first < 0.95 * cap_info_e.last or cap_info_f.first > 1.05 * cap_info_e.last) // do not contract paths which have high divergence in capacity
+            if (std::abs(cap_info_f.first - cap_info_e.last) > threshold_ or std::abs(cap_info_f.first - cap_info_e.last) > threshold_) // do not contract paths which have high divergence in capacity
                 continue;
             
+            float starts_with = g_[e.first].starting;
             float capacity = g_[e.first].capacity * w;
 			e = boost::edge(*vi,new_target,g_);
+            starts_with += g_[e.first].starting;
 			seq += g_[e.first].name; // append the sequence
 			capacity += g_[e.first].capacity * (seq.length() - w);
 			capacity /= seq.length(); // currently using the average coverage on the contracted path
@@ -521,6 +527,8 @@ void UnitigGraph::contractPaths()
             g_[new_e.first].cap_info.first = first;
             g_[new_e.first].cap_info.last = last;
             g_[new_e.first].cap_info.length = g_[new_e.first].name.length();
+            g_[new_e.first].cap_info.starting = starts_with/(g_[new_e.first].cap_info.length * capacity);
+            g_[new_e.first].starting = starts_with;
             g_[new_e.first].visited = false;
 			boost::clear_vertex(*vi,g_);
 			boost::remove_vertex(*vi,g_);
