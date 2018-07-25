@@ -145,7 +145,7 @@ UVertex UnitigGraph::addVertex(unsigned int* index, std::string name)
     g_[uv].tarjan_index = 0; // needs to be 0 to find out whether it has been set
     g_[uv].onStack = false;
     g_[uv].cc = cc_; // set cc to current CC
-    g_[uv].visited = false;
+    g_[uv].visiting_time = 0;
 	
     auto&& ins = std::make_pair(*index,uv);
 	graph_.insert(ins);
@@ -679,15 +679,12 @@ UEdge UnitigGraph::getSeed() const
 	return seed;
 }
 
-// Tests whether two percentages "belong together" TODO this is quite arbitrary
-bool UnitigGraph::test_hypothesis(float to_test_num, float to_test_denom, float h0, bool error_type)
+// Tests whether two percentages "belong together"
+bool UnitigGraph::test_hypothesis(float to_test_num, float to_test_denom, float h0)
 {
     float diff = std::abs(to_test_num - h0 * to_test_denom); // the absolute difference between num and expected num
-    float perc = to_test_num/to_test_denom;
-    if (error_type)
-        return (diff > threshold_ or std::abs(perc - h0) > 0.05); // more likely they dont belong together
-    else
-        return (diff < threshold_ or std::abs(perc - h0) < 0.05); // they differ by less than x%
+    //float perc = to_test_num/to_test_denom; //currently unused
+    return (diff < threshold_); // they differ by less than threshold 
 }
 
 
@@ -711,18 +708,6 @@ float UnitigGraph::out_capacity(UVertex target)
     return capacity;
 }
 
-// whether to break after this cycle or continue with some edge
-bool UnitigGraph::check_cycle(std::deque<UEdge>& path, UVertex v, UEdge e)
-{
-    //for (auto& e : path)
-    //{
-    //    std::cerr << g_[e].cap_info << std::endl;
-    //}
-    //std::cerr << std::endl;
-    return false;
-    //return (path.front() != path.back()); //TODO
-}
-
 std::pair<std::vector<float>, float> UnitigGraph::calculate_flow(std::vector<UEdge>& path)
 {
     std::vector<float> gains;
@@ -737,77 +722,132 @@ std::pair<std::vector<float>, float> UnitigGraph::calculate_flow(std::vector<UEd
     return std::make_pair(gains, min_flow);
 }
 
-// return edge with highest flow coming in or out of the found cycle
-std::deque<UEdge> UnitigGraph::get_next_cycle_edge(std::deque<UEdge>& path, UVertex v, bool forward)
+UEdge UnitigGraph::check_cycle_out_edges(std::vector<UEdge>& out)
 {
-    std::deque<UEdge> next_path;
-    unsigned int i = 0; // the position in the cycle
-    std::deque<UEdge>::iterator pos; 
-    UEdge max_edge;
-    bool in_cycle = false;
-    float max_out_flow = 0;
-    std::vector<UVertex> vertices;
-    for (auto&& it = path.begin(); it != path.end(); ++it)
+    unsigned int size = out.size();
+    if (size == 0)
+        throw size;
+    else if (size == 1)
+        return out.front();
+    else if (size == 2) // if size is 2 and only one path returns to cycle, the ordering is clear
     {
-        auto e = *it; // so we can do stuff like we do in a range-based for-loop
-        auto source = boost::source(e, g_);
-        if (source == v)
-        {
-            pos = it; //first vertex belonging to cycle
-            in_cycle = true;
-        }
-        if (!in_cycle) // the cycle is either 1-x or x-end
-            continue;
-        auto target = boost::target(e, g_);
-        bool found = false;
-        if (forward)
-        {
-            for (auto oe : boost::out_edges(source, g_)) // go the cycle forwards
-            {
-                if (oe != e and g_[oe].capacity > max_out_flow) // max edge found
-                {
-                    max_edge = oe;
-                    max_out_flow = g_[oe].capacity;
-                    std::copy(pos, it, next_path.begin()); // this is a little inefficient, but requires less storage
-                    pos = it;
-                }
-            }
-            if (target == v) // we are through, create next_path as calculated
-                break;
-        }
-        else
-        {
-            for (auto ie : boost::in_edges(target, g_))
-            {
-                if (ie != e and g_[ie].capacity > max_out_flow)
-                {
-                    max_edge = ie;
-                    max_out_flow = g_[ie].capacity;
-                    found = true;
-                }
-            }
-            if (found)
-                next_path.clear();
-            else
-                next_path.push_front(e);
-            if (source == v and i > 0)
-                break;
-        }
-        i++;
+        throw size; // TODO
     }
-    next_path.push_back(max_edge); //finally add the new edge
-    return next_path;
+    else if (size > 2)
+        throw size;
+    return out.front();
+}
+
+std::vector<UEdge> UnitigGraph::continue_cycle(std::deque<UEdge>& path, bool forward)
+{
+    std::vector<UEdge> continue_path;
+    if (forward) // we entered cycle forward, target of last edge is first cycle edge
+    {
+        std::vector<UEdge> int_edges;
+        UEdge last = path.back();
+        UVertex v = boost::target(last, g_);
+        std::vector<UEdge> alt_edges;
+        unsigned int max = 0;
+        for (auto&& e : path)
+        {
+            UVertex source = boost::source(e, g_);
+            auto out_edges = boost::out_edges(source, g_);
+            for (auto&& oe : out_edges)
+            {
+                if (oe != e)
+                {
+                    unsigned int cap = g_[oe].capacity;
+                    if (cap > max and !test_hypothesis(cap, max, 1.0)) // edge is unique maximum
+                    {
+                        alt_edges.clear();
+                        alt_edges.push_back(oe);
+                        max = cap;
+                    }
+                    else if (test_hypothesis(cap, max, 1.0)) // edge is close to previous maximum
+                    {
+                        alt_edges.push_back(oe); // there is more than one alternative out_edge
+                    }
+                }
+            }
+        }
+        try
+        {
+            UEdge to_continue = check_cycle_out_edges(alt_edges);
+            if (g_[to_continue].visited) // the next selected edge is on cycle already
+                return continue_path;
+            UVertex source = boost::source(to_continue, g_);
+            int start = g_[v].visiting_time;
+            int position = g_[source].visiting_time; // start of the cycle
+            std::cerr << "f: " << start << " " << position << std::endl;
+            for (int i = start; i < position; i++) // add all edges between start and position
+            {
+                continue_path.push_back(path.at(i));
+            }
+            continue_path.push_back(to_continue); //first in return path
+            return continue_path;
+        } catch (unsigned int i)
+        {
+            return continue_path; // TODO store position so contig can be continued/mapped against
+        }
+    }
+    else // cycle is on way back from seed, front is edge which's source is already visited
+    {
+        std::vector<UEdge> out_edges;
+        UEdge last = path.front();
+        UVertex v = boost::source(last, g_);
+        std::vector<UEdge> alt_edges;
+        unsigned int max = 0;
+        for (auto&& e : path)
+        {
+            UVertex target = boost::target(e, g_);
+            auto in_edges = boost::in_edges(target, g_);
+            for (auto&& ie : in_edges)
+            {
+                if (ie != e)
+                {
+                    unsigned int cap = g_[ie].capacity;
+                    if (cap > max and !test_hypothesis(cap, max, 1.0)) // edge is unique maximum
+                    {
+                        alt_edges.clear();
+                        alt_edges.push_back(ie);
+                        max = cap;
+                    }
+                    else if (test_hypothesis(cap, max, 1.0)) // edge is close to previous maximum
+                    {
+                        alt_edges.push_back(ie); // there is more than one alternative out_edge
+                    }
+                }
+            }
+        }
+        try
+        {
+            UEdge to_continue = check_cycle_out_edges(alt_edges);
+            UVertex target = boost::target(to_continue, g_);
+            int start = g_[v].visiting_time; // start of the cycle
+            int position = g_[target].visiting_time; 
+            std::cerr << "b: " << start << " " << position << std::endl;
+            continue_path.push_back(to_continue); //first in return path
+            for (int i = position + 1; i <= start; i++) // add all edges between start and position
+            {
+                continue_path.push_back(path.at(path.size() + i - 1));
+            }
+            return continue_path;
+        } catch (unsigned int i)
+        {
+            return continue_path; // TODO store position so contig can be continued/mapped against
+        }
+    }
 }
 
 // Calculates the fattest path through the graph
 std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
 {
     std::deque<UEdge> path = {seed}; // seed vertex, we start search here
+    int i = 0; // visiting time of the vertex
     std::vector<UEdge> return_path;
     UEdge currE = seed;
     UVertex currV = boost::source(currE, g_);
-    bool continue_cycle = true; // we found a cycle, but are confident we continue the path
-    while (in_capacity(currV) > 0 and continue_cycle) // if we are not source, go backwards from seed
+    while (in_capacity(currV) > 0) // if we are not source, go backwards from seed
     {
         auto in_edges = boost::in_edges(currV, g_);
         float max = 0;
@@ -815,7 +855,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         for (auto&& ie : in_edges)
         {
             UVertex in = boost::source(ie,g_);
-            if (g_[ie].capacity > max)
+            if (g_[ie].capacity > max) // max ingoing from current vertex
             {
                 currV = in;
                 max = g_[ie].capacity;
@@ -825,31 +865,27 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         currE = max_edge; // edge we continue with (highest flow)
         path.push_front(currE); // add first, so if cycle, then first vertex = last vertex
         // cycle treatment: check whether we want to continue after cycle, than add path until the next edge out of the cycle
-        if (g_[currV].visited)
+        if (g_[currV].visiting_time != 0)
         {
-            continue_cycle = check_cycle(path, currV, currE);
-            if (continue_cycle)
-            {
-                auto to_continue = get_next_cycle_edge(path, currV, false);
-                if (to_continue.empty())
-                    break;
-                for (auto& e : to_continue)
-                    path.push_front(e);
-                currE = path.front();
-                currV = boost::source(currE, g_);
-                g_[currV].visited = true;
-            }
+            std::vector<UEdge> to_continue = continue_cycle(path, false);
+            if (to_continue.empty())
+                break;
+            for (auto& e : to_continue)
+                path.push_front(e);
+            currE = path.front();
+            currV = boost::source(currE, g_);
         }
-        else
-            g_[currV].visited = true;
+        g_[currV].visiting_time = --i; // visited before seed
     }
+    i = 0; // reset counter, everything now is after seed
     currE = seed; // now forward, same algorithm as above
     currV = boost::target(currE, g_);
-    while (out_capacity(currV) > 0 and continue_cycle)
+    while (out_capacity(currV) > 0)
     {
         auto out_edges = boost::out_edges(currV, g_);
         float max = 0;
         UEdge max_edge;
+        std::vector<UEdge> pos_max_edges;
         for (auto&& oe : out_edges)
         {
             UVertex out = boost::target(oe, g_);
@@ -862,23 +898,21 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         }
         currE = max_edge;
         path.push_back(currE);
-        if (g_[currV].visited)
+        if (g_[currV].visiting_time > 0)
         {
-            continue_cycle = check_cycle(path, currV, currE);
-            if (continue_cycle)
-            {
-                auto to_continue = get_next_cycle_edge(path, currV, true);
-                if (to_continue.empty())
-                    break;
-                for (auto& e : to_continue)
-                    path.push_back(e);
-                currE = path.back();
-                currV = boost::target(currE, g_);
-                g_[currV].visited = true;
-            }
+            std::vector<UEdge> to_continue = continue_cycle(path, true);
+            if (to_continue.empty())
+                break;
+            for (auto& e : to_continue)
+                path.push_back(e);
+            currE = path.back();
+            currV = boost::target(currE, g_);
         }
-        else
-            g_[currV].visited = true;
+        else if (g_[currV].visiting_time < 0) // this edge has been detected on the way back -> one big cycle -> cancel
+        {
+            break;
+        }
+        g_[currV].visiting_time = ++i;
     }
     for (auto&& e : path)
     {
@@ -892,7 +926,7 @@ void UnitigGraph::unvisit()
 {
     for (auto& v : boost::vertices(g_))
     {
-        g_[v].visited = false;
+        g_[v].visiting_time = 0;
     }
 }
 
@@ -934,7 +968,7 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
     {   
         float flow_check = min_flow;
         contig += g_[e].name;
-        if (test_hypothesis(g_[e].capacity, flow_check, 1.0, false) or g_[e].capacity < flow_check)
+        if (test_hypothesis(g_[e].capacity, flow_check, 1.0) or g_[e].capacity < flow_check)
         {
             g_[e].capacity = 0;
             g_[e].cap_info.first = 0;
@@ -960,13 +994,12 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
 void UnitigGraph::assemble()
 {
     std::cerr << "Calculating flow..." << std::endl;
-	// sources is a vector of all seeds ("sources") of a certain connected component
 
     unsigned int i = 0;
     while (true)
     {
         cleanGraph();
-        std::string filename = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/HIV_3_mix/Graphs/Graph" + std::to_string(i) + ".dot";
+        std::string filename = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/HCMV/Graphs/Graph" + std::to_string(i) + ".dot";
         std::ofstream outfile (filename);
         printGraph(outfile);
         auto seed = getSeed();
@@ -980,7 +1013,7 @@ void UnitigGraph::assemble()
         auto contig = calculate_contigs(path);
         if (contig.first.size() > 150)
         {
-            std::cout << "Contig_" << i++ << "_flow_" << contig.second.first << "_of_" << contig.second.second << std::endl;
+            std::cout << ">Contig_" << i++ << "_flow_" << contig.second.first << "_of_" << contig.second.second << std::endl;
             std::cout << contig.first << std::endl;
         }
         else
@@ -1004,8 +1037,8 @@ void UnitigGraph::printGraph(std::ostream& os) const
         boost::put(propmapIndex,*vi,i++);
     }
 
-    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::name, g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::name, g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
 }
 

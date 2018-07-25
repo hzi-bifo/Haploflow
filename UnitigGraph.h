@@ -22,7 +22,7 @@ struct VertexProperties {
     std::string name;
     unsigned int tarjan_index;
     bool onStack;
-    bool visited;
+    int visiting_time;
 };
 
 struct Capacity {
@@ -78,9 +78,9 @@ private:
 	float calculate_thresholds(const deBruijnGraph&, float);
     float calculate_gain(UVertex& v, bool);
     std::pair<std::vector<float>,float> calculate_flow(std::vector<UEdge>&);
+    UEdge check_cycle_out_edges(std::vector<UEdge>&);
+    std::vector<UEdge> continue_cycle(std::deque<UEdge>&, bool);
 	std::vector<UEdge> find_fattest_path(UEdge);
-    bool check_cycle(std::deque<UEdge>& path, UVertex v, UEdge e);
-    std::deque<UEdge> get_next_cycle_edge(std::deque<UEdge>& path, UVertex v, bool forward);
     
 	UEdge getSeed() const;
     
@@ -94,7 +94,7 @@ private:
     float in_capacity(UVertex);
     float out_capacity(UVertex);
 
-	bool test_hypothesis(float to_test_num, float to_test_denom, float h0, bool = false);
+	bool test_hypothesis(float to_test_num, float to_test_denom, float h0);
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
 	UGraph g_;
