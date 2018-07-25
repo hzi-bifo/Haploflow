@@ -769,6 +769,8 @@ std::vector<UEdge> UnitigGraph::continue_cycle(std::deque<UEdge>& path, bool for
                     }
                 }
             }
+            if (source == v)
+                break;
         }
         try
         {
@@ -778,7 +780,6 @@ std::vector<UEdge> UnitigGraph::continue_cycle(std::deque<UEdge>& path, bool for
             UVertex source = boost::source(to_continue, g_);
             int start = g_[v].visiting_time;
             int position = g_[source].visiting_time; // start of the cycle
-            std::cerr << "f: " << start << " " << position << std::endl;
             for (int i = start; i < position; i++) // add all edges between start and position
             {
                 continue_path.push_back(path.at(i));
@@ -818,6 +819,8 @@ std::vector<UEdge> UnitigGraph::continue_cycle(std::deque<UEdge>& path, bool for
                     }
                 }
             }
+            if (target == v) // the end of the cycle is reached, do not continue search for alternative edges
+                break;
         }
         try
         {
@@ -825,7 +828,6 @@ std::vector<UEdge> UnitigGraph::continue_cycle(std::deque<UEdge>& path, bool for
             UVertex target = boost::target(to_continue, g_);
             int start = g_[v].visiting_time; // start of the cycle
             int position = g_[target].visiting_time; 
-            std::cerr << "b: " << start << " " << position << std::endl;
             continue_path.push_back(to_continue); //first in return path
             for (int i = position + 1; i <= start; i++) // add all edges between start and position
             {
@@ -914,10 +916,16 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         }
         g_[currV].visiting_time = ++i;
     }
+    unsigned int tot = 0;
     for (auto&& e : path)
     {
+        auto src = boost::source(e,g_);
+        auto size = g_[e].name.size();
+        tot += size;
+        std::cerr << g_[src].index << " (" << size << "/" << tot << ") ";
         return_path.push_back(e);
     }
+    std::cerr << std::endl;
     unvisit(); // so they are not counted as visited for next contig
     return return_path;
 }
@@ -999,7 +1007,7 @@ void UnitigGraph::assemble()
     while (true)
     {
         cleanGraph();
-        std::string filename = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/HCMV/Graphs/Graph" + std::to_string(i) + ".dot";
+        std::string filename = "out/HCMV/Graphs/Graph" + std::to_string(i) + ".dot";
         std::ofstream outfile (filename);
         printGraph(outfile);
         auto seed = getSeed();
