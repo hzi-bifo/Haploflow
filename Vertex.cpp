@@ -13,7 +13,7 @@ Vertex::Vertex() :
 										g_out(0),
 										t_in(0),
 										t_out(0),
-										starts_with(0),
+										terminal(std::make_pair(0,0)),
 										n_in(0),
 										n_out(0),
 										degree(0),
@@ -22,7 +22,7 @@ Vertex::Vertex() :
 {
 }
 
-Vertex::Vertex(int ain, int cin, int gin, int tin, int aout, int cout, int gout, int tout, unsigned int start):
+Vertex::Vertex(int ain, int cin, int gin, int tin, int aout, int cout, int gout, int tout, std::pair<unsigned int, unsigned int> start):
     scc(0),
     index(0),
     onStack(false),
@@ -34,7 +34,7 @@ Vertex::Vertex(int ain, int cin, int gin, int tin, int aout, int cout, int gout,
     g_out(gout),
     t_in(tin),
     t_out(tout),
-    starts_with(start),
+    terminal(start),
     n_in(0),
     n_out(0), // unused right now
     degree(8-!ain-!cin-!gin-!tin-!aout-!cout-!gout-!tout), // degree is 8 if all are set (!x returns 0)
@@ -55,7 +55,7 @@ Vertex::Vertex(const Vertex& v) :
 	g_out(v.g_out),
 	t_in(v.t_in),
 	t_out(v.t_out),
-	starts_with(v.starts_with),
+	terminal(v.terminal),
 	n_in(v.n_in),
 	n_out(v.n_out),
 	degree(v.degree),
@@ -68,7 +68,7 @@ std::ostream& operator<<(std::ostream& os, const Vertex& v)
 {
     os << v.a_in << '\t' << v.c_in << '\t' << v.g_in << '\t' << v.t_in << std::endl;
     os << v.a_out << '\t' << v.c_out << '\t' << v.g_out << '\t' << v.t_out << std::endl;
-    os << v.degree << '\t' << v.visited << '\t' << v.flagged << '\t' << v.starts_with;
+    os << v.degree << '\t' << v.visited << '\t' << v.terminal.first<< '\t' << v.terminal.second;
     return os;
 }
 
@@ -106,7 +106,12 @@ void Vertex::add_predecessor(const char& letter)
 
 void Vertex::read_start()
 {
-	starts_with++;
+	terminal.first++;
+}
+
+void Vertex::read_end()
+{
+    terminal.second++;
 }
 
 void Vertex::visit()
@@ -178,7 +183,12 @@ std::vector<char> Vertex::get_predecessors() const
 
 unsigned int Vertex::get_read_starts() const
 {
-	return starts_with;
+	return terminal.first;
+}
+
+unsigned int Vertex::get_read_ends() const
+{
+	return terminal.second;
 }
 
 unsigned int Vertex::get_out_coverage(const char c) const

@@ -9,7 +9,7 @@ deBruijnGraph::deBruijnGraph(std::string filename)
     std::string sequence;
     int a_in; int c_in; int g_in; int t_in;
     int a_out; int c_out; int g_out; int t_out;
-    unsigned int starts_with;
+    unsigned int starts_with; unsigned int ends_with;
 
     while (std::getline(graph_file, line))
     {    
@@ -43,8 +43,8 @@ deBruijnGraph::deBruijnGraph(std::string filename)
                 case 8: t_out = stoi(line); break;
                 case 9: break;
                 case 10: break;
-                case 11: break; // these don't set anything
-                case 12: starts_with = stoi(line); break;
+                case 11: starts_with = stoi(line); break; // these don't set anything
+                case 12: ends_with = stoi(line); break;
                 default: counter = 0; break; 
             }
             counter++; counter %= 13; 
@@ -52,7 +52,7 @@ deBruijnGraph::deBruijnGraph(std::string filename)
         if (!counter)
         {
             Sequence s(sequence);
-            Vertex v(a_in, c_in, g_in, t_in, a_out, c_out, g_out, t_out, starts_with);
+            Vertex v(a_in, c_in, g_in, t_in, a_out, c_out, g_out, t_out, std::make_pair(starts_with, ends_with));
             graph_.emplace(s,v);
         }
     }
@@ -161,6 +161,7 @@ unsigned int deBruijnGraph::split_read(const std::string& line)
 	{
 		v.first->second.add_predecessor(line[line.length() - k_ - 1]);
 	}
+    v.first->second.read_end(); // the read ended with this vertex
 	return 0;
 }
 

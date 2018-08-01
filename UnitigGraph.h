@@ -27,6 +27,7 @@ struct VertexProperties {
 
 struct Capacity {
     float starting;
+    float ending;
     float first;
     float last;
     float min;
@@ -35,12 +36,13 @@ struct Capacity {
     float length;
     friend std::ostream& operator<<(std::ostream& os, const Capacity& cap)
     {
-        return os << "(" << cap.avg << ", " << cap.first << "/" << cap.last << ", (length: " << cap.length << "), (min: " << cap.min << ", max: " << cap.max << "), starting vertices per length and coverage: " << cap.starting;
+        return os << "(" << cap.avg << ", " << cap.first << "/" << cap.last << ", (length: " << cap.length << "), (min: " << cap.min << ", max: " << cap.max << "), starting/ending vertices per length and coverage: " << cap.starting << "/" << cap.ending;
     }
 };
 
 struct EdgeProperties{
     unsigned int starting; // how many reads start in this edge
+    unsigned int ending; // how many reads end in this edge
     std::string name;
     float capacity;
     Capacity cap_info;

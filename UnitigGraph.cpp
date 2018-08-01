@@ -296,6 +296,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg)
 {
     float starts_with = nextV->get_read_starts(); // number of reads starts within this edge
+    float ends_with = nextV->get_read_ends(); // number of reads ends within this edge
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
 	// DEBUG
@@ -340,6 +341,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		succ = nextV->get_successors();
 		sequence += lastchar;
         starts_with += nextV->get_read_starts();
+        ends_with += nextV->get_read_ends();
         if (std::abs(last - cov) > threshold_)
             break;
 	}
@@ -371,6 +373,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
             g_[e.first].name = sequence;    
 		}
         g_[e.first].starting = starts_with;
+        g_[e.first].ending = ends_with;
         g_[e.first].capacity = avg;
         g_[e.first].cap_info.avg = avg;
         g_[e.first].cap_info.max = max;
@@ -379,6 +382,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         g_[e.first].cap_info.last= last;
         g_[e.first].cap_info.length = g_[e.first].name.length();
         g_[e.first].cap_info.starting = starts_with/(g_[e.first].cap_info.length * avg);
+        g_[e.first].cap_info.ending = ends_with/(g_[e.first].cap_info.length * avg);
         g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,prev);
@@ -389,6 +393,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 {
 	// with a little effort this can be moved inside the while loop for efficiency reasons
     float starts_with = nextV->get_read_starts(); // number of reads starts within this edge
+    float ends_with = nextV->get_read_ends(); // number of reads ends within this edge
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
 	// DEBUG, coverage information
@@ -429,6 +434,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		succ = nextV->get_successors();
 		sequence += c; 
         starts_with += nextV->get_read_starts();
+        ends_with += nextV->get_read_ends();
         if (std::abs(last - cov) > threshold_)
             break;
 	}
@@ -464,6 +470,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
             g_[e.first].name = sequence;
 		}
         g_[e.first].starting = starts_with;
+        g_[e.first].ending = ends_with;
         g_[e.first].capacity = avg;
         g_[e.first].cap_info.avg = avg;
         g_[e.first].cap_info.max = max;
@@ -472,6 +479,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
         g_[e.first].cap_info.last = last;
         g_[e.first].cap_info.length = g_[e.first].name.length();
         g_[e.first].cap_info.starting = starts_with/(g_[e.first].cap_info.length * avg);
+        g_[e.first].cap_info.ending = ends_with/(g_[e.first].cap_info.length * avg);
         g_[e.first].visited = false;
 	}
 	return std::make_pair(nextV,next);
@@ -511,9 +519,11 @@ void UnitigGraph::contractPaths()
                 continue;
             
             float starts_with = g_[e.first].starting;
+            float ends_with = g_[e.first].ending;
             float capacity = g_[e.first].capacity * w;
 			e = boost::edge(*vi,new_target,g_);
             starts_with += g_[e.first].starting;
+            ends_with += g_[e.first].ending;
 			seq += g_[e.first].name; // append the sequence
 			capacity += g_[e.first].capacity * (seq.length() - w);
 			capacity /= seq.length(); // currently using the average coverage on the contracted path
@@ -528,7 +538,9 @@ void UnitigGraph::contractPaths()
             g_[new_e.first].cap_info.last = last;
             g_[new_e.first].cap_info.length = g_[new_e.first].name.length();
             g_[new_e.first].cap_info.starting = starts_with/(g_[new_e.first].cap_info.length * capacity);
+            g_[new_e.first].cap_info.ending = ends_with/(g_[new_e.first].cap_info.length * capacity);
             g_[new_e.first].starting = starts_with;
+            g_[new_e.first].ending = ends_with;
             g_[new_e.first].visited = false;
 			boost::clear_vertex(*vi,g_);
 			boost::remove_vertex(*vi,g_);
