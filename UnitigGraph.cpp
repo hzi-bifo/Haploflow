@@ -899,7 +899,6 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         auto out_edges = boost::out_edges(currV, g_);
         float max = 0;
         UEdge max_edge;
-        std::vector<UEdge> pos_max_edges;
         for (auto&& oe : out_edges)
         {
             UVertex out = boost::target(oe, g_);
@@ -926,18 +925,17 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         {
             break;
         }
+        if (g_[currE].cap_info.starting > 0.02 or g_[currE].cap_info.ending > 0.02) //TODO (values are random)
+            break; // break if too many starting or ending vertices
         g_[currV].visiting_time = ++i;
     }
     unsigned int tot = 0;
     for (auto&& e : path)
     {
-        auto src = boost::source(e,g_);
         auto size = g_[e].name.size();
         tot += size;
-        std::cerr << g_[src].index << " (" << size << "/" << tot << ") ";
         return_path.push_back(e);
     }
-    std::cerr << std::endl;
     unvisit(); // so they are not counted as visited for next contig
     return return_path;
 }
@@ -978,9 +976,7 @@ float UnitigGraph::calculate_gain(UVertex& v, bool forward)
 // Given all the chosen edges and their coverage fraction, builds the contigs and reduces flow accordingly
 std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(std::vector<UEdge>& path)
 {
-    std::pair<std::vector<float>, float> flow = calculate_flow(path);
-    float min_flow = flow.second;
-    std::vector<float> gains = flow.first;
+    float min_flow = calculate_flow(path);
     UEdge start = path.front();
     UVertex source = boost::source(start, g_);
     std::string contig = g_[source].name; // kmer of first vertex
