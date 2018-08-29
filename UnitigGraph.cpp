@@ -725,6 +725,9 @@ float UnitigGraph::calculate_flow(std::vector<UEdge>& path)
     float min_flow = -1;
     float small_flow = -1;
     unsigned int length = 0;
+    unsigned int tot_length = 0;
+    for (auto& e : path)
+        tot_length += g_[e].name.size(); // to see if calculated value is more than 150 bases away from begin
     for (auto& e : path)
     {
         length += g_[e].name.size();
@@ -732,7 +735,7 @@ float UnitigGraph::calculate_flow(std::vector<UEdge>& path)
         {
             min_flow = g_[e].capacity;
         }
-        else if (length >= 150 and (small_flow == -1 or g_[e].capacity < small_flow))
+        else if ((length >= 150 and length <= tot_length - 150) and (small_flow == -1 or g_[e].capacity < small_flow)) //TODO arbitrary
         {
             small_flow = g_[e].capacity;
         }
@@ -898,7 +901,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
             currE = path.front();
             currV = boost::source(currE, g_);
         }
-        if (g_[currE].cap_info.starting > 0.02 or g_[currE].cap_info.ending > 0.02) //TODO (values are random)
+        if (g_[currE].cap_info.starting > 0.025 or g_[currE].cap_info.ending > 0.025) //TODO (values are random)
             break; // break if too many starting or ending vertices
         g_[currV].visiting_time = --i; // visited before seed
     }
@@ -936,7 +939,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         {
             break;
         }
-        if (g_[currE].cap_info.starting > 0.02 or g_[currE].cap_info.ending > 0.02) //TODO (values are random)
+        if (g_[currE].cap_info.starting > 0.025 or g_[currE].cap_info.ending > 0.025) //TODO (values are random)
             break; // break if too many starting or ending vertices
         g_[currV].visiting_time = ++i;
     }
