@@ -5,8 +5,8 @@ int main (int argc, char* argv[])
 {
 	clock_t t = clock();
 	std::cerr << "Building deBruijnGraph..." << std::endl;
-	deBruijnGraph dbg = deBruijnGraph(std::string(argv[1]), atoi(argv[2])); // read file + k
-	//deBruijnGraph dbg = deBruijnGraph(std::string(argv[1])); // dump file
+	//deBruijnGraph dbg = deBruijnGraph(std::string(argv[1]), atoi(argv[2])); // read file + k
+	deBruijnGraph dbg = deBruijnGraph(std::string(argv[1])); // dump file
     std::cerr << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
 	//std::cout << dbg;
     //return 0;
@@ -17,7 +17,7 @@ int main (int argc, char* argv[])
 	UnitigGraph ug(dbg, atof(argv[2]));
     t = clock();
 	//ug.debug();
-    ug.assemble();
+    ug.assemble(argv[3]);
 	//std::cerr << "Calculating flow took " << (clock() - t)/1000000. << " seconds." << std::endl;
 	return 0;
 }

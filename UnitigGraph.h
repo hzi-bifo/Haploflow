@@ -67,7 +67,7 @@ public:
 	UnitigGraph(deBruijnGraph&, float); // TODO delete dBg after UnitigGraph creation?
 	UnitigGraph(); // debug
 	void debug(); // debug information
-    void assemble();
+    void assemble(std::string);
     void printGraph(std::ostream&) const;
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float);

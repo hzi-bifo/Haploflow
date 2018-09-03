@@ -1021,15 +1021,17 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
 }
 
 // calculates the flows and corresponding paths through the graph
-void UnitigGraph::assemble()
+void UnitigGraph::assemble(std::string fname)
 {
     std::cerr << "Calculating flow..." << std::endl;
 
     unsigned int i = 0;
+    std::cerr << "Contracting simple paths" << std::endl;
+    contractPaths();
     while (true)
     {
         cleanGraph();
-        std::string filename = "out/HCMV/Graphs/Graph" + std::to_string(i) + ".dot";
+        std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
         std::ofstream outfile (filename);
         printGraph(outfile);
         auto seed = getSeed();
