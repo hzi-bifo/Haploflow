@@ -671,8 +671,8 @@ void UnitigGraph::cleanGraph()
 	removeEmpty();
     std::cerr << "Removing stable sets..." << std::endl;
 	removeStableSets();
-    std::cerr << "Contracting simple paths..." << std::endl;
-    contractPaths(); 
+    //std::cerr << "Contracting simple paths..." << std::endl;
+    //contractPaths(); 
 }
 
 // returns the seed vertex = vertex with the highest "coverage"
