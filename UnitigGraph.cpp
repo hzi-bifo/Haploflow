@@ -515,8 +515,9 @@ void UnitigGraph::contractPaths()
             float first = cap_info_e.first;
             float last = cap_info_f.last;
 
-            if (std::abs(cap_info_f.first - cap_info_e.last) > threshold_ or std::abs(cap_info_f.first - cap_info_e.last) > threshold_) // do not contract paths which have high divergence in capacity
-                continue;
+            // TODO temporarily disabled to study effect of not contracting
+            //if (std::abs(cap_info_f.first - cap_info_e.last) > threshold_ or std::abs(cap_info_f.first - cap_info_e.last) > threshold_) // do not contract paths which have high divergence in capacity
+            //    continue;
             
             float starts_with = g_[e.first].starting;
             float ends_with = g_[e.first].ending;
@@ -901,7 +902,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
             currE = path.front();
             currV = boost::source(currE, g_);
         }
-        if (g_[currE].cap_info.starting > 0.025 or g_[currE].cap_info.ending > 0.025) //TODO (values are random)
+        if (g_[currE].cap_info.starting > 0.02 or g_[currE].cap_info.ending > 0.02) //TODO (values are random)
             break; // break if too many starting or ending vertices
         g_[currV].visiting_time = --i; // visited before seed
     }
@@ -939,7 +940,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         {
             break;
         }
-        if (g_[currE].cap_info.starting > 0.025 or g_[currE].cap_info.ending > 0.025) //TODO (values are random)
+        if (g_[currE].cap_info.starting > 0.02 or g_[currE].cap_info.ending > 0.02) //TODO (values are random)
             break; // break if too many starting or ending vertices
         g_[currV].visiting_time = ++i;
     }
