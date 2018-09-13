@@ -752,13 +752,13 @@ std::pair<float, float> UnitigGraph::calculate_flow(std::vector<UEdge>& path)
         if (g_[e].capacity < min_flow or min_flow == -1)
         {
             min_flow = g_[e].capacity;
-            flow_frac = g_[e].capacity/out_capacity(source);
         }
         else if ((length >= 150 and length <= tot_length - 150) and (small_flow == -1 or g_[e].capacity < small_flow)) //TODO arbitrary
         {
             small_flow = g_[e].capacity;
-            flow_frac = g_[e].capacity/out_capacity(source);
         }
+        if (g_[e].capacity/out_capacity(source) < flow_frac)
+            flow_frac = g_[e].capacity/out_capacity(source);
     } //TODO
     if (small_flow == -1) //if contig is too short, return min flow, else choose flow from the middle of contig
         return std::make_pair(min_flow, flow_frac);
