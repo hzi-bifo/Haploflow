@@ -890,9 +890,25 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
 {
     std::deque<UEdge> path = {seed}; // seed vertex, we start search here
     int i = 0; // visiting time of the vertex
+    int total_length = 0;
+
+    bool increasing = false;  // fattest path is increasing starting from seed
+    bool decreasing = false; // whether the path is currently decreasing/increasing in flow
+    float diff = g_[seed].cap_info.last - g_[seed].cap_info.first; // to check whether this is positive or negative 
+    if (diff + threshold_ < 0)
+    {
+        decreasing = true;
+    }
+    else if (diff - threshold_ > 0)
+    {
+        increasing = true;
+    }
+    float curr_diff = 0;
+
     std::vector<UEdge> return_path;
     UEdge currE = seed;
     UVertex currV = boost::source(currE, g_);
+    
     while (in_capacity(currV) > 0) // if we are not source, go backwards from seed
     {
         auto in_edges = boost::in_edges(currV, g_);
@@ -913,6 +929,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         // cycle treatment: check whether we want to continue after cycle, than add path until the next edge out of the cycle
         if (g_[currV].visiting_time != 0)
         {
+            break; // TODO
             std::vector<UEdge> to_continue = continue_cycle(path, false);
             if (to_continue.empty())
                 break;
@@ -945,6 +962,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         path.push_back(currE);
         if (g_[currV].visiting_time > 0)
         {
+            break;
             std::vector<UEdge> to_continue = continue_cycle(path, true);
             if (to_continue.empty())
                 break;
