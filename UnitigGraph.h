@@ -26,17 +26,17 @@ struct VertexProperties {
 };
 
 struct Capacity {
-    float starting;
-    float ending;
     float first;
     float last;
     float min;
     float max;
     float avg;
     float length;
+    float starting;
+    float ending;
     friend std::ostream& operator<<(std::ostream& os, const Capacity& cap)
     {
-        return os << "(" << cap.avg << ", " << cap.first << "/" << cap.last << ", (length: " << cap.length << "), (min: " << cap.min << ", max: " << cap.max << "), starting/ending vertices per length and coverage: " << cap.starting << "/" << cap.ending;
+        return os << "(" << cap.avg << ", " << cap.first << "/" << cap.last << ", (length: " << cap.length << "), (min: " << cap.min << ", max: " << cap.max << "), start%: " << cap.starting << ", end%: " << cap.ending;
     }
 };
 
@@ -72,8 +72,8 @@ public:
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
-	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
-	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&);
+	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
+	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
 	UVertex addVertex(unsigned int*, std::string name);
 
     std::pair<std::string, std::pair<float, float> > calculate_contigs(std::vector<UEdge>&);

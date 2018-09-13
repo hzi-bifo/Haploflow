@@ -240,22 +240,24 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
             float pcov = coverage/float(total_out); // percentage of coverage
             if (!reverse)
             {
+                float curr_start = currV->get_read_starts() * currV->get_out_coverage(n)/currV->get_total_out_coverage();
                 next = curr.substr(1) + n;
                 Vertex* nextV = dbg.getVertex(next);
                 Sequence s = *dbg.getSequence(next);
                 sequence += n;
                 if (!nextV->is_flagged())
-                    following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, pcov, dbg));
+                    following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, pcov, dbg, curr_start));
             }
             // if we are a reverse complement, we actually want to add the path in reverse order
             else
             {
+                float curr_end = currV->get_read_ends() * currV->get_in_coverage(deBruijnGraph::complement(n))/currV->get_total_in_coverage();
                 next = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
                 Vertex* nextV = dbg.getVertex(next);
                 Sequence s = *dbg.getSequence(next);
                 sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr (by definition)
                 if (!nextV->is_flagged())
-                    following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, pcov, dbg));
+                    following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, pcov, dbg, curr_end));
             }
         }
     }
@@ -270,21 +272,23 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
             float pcov = coverage/float(total_in); 
             if (!reverse)
             {
+                float curr_end = currV->get_read_ends() * currV->get_in_coverage(n)/currV->get_total_in_coverage();
                 prev = n + curr.substr(0,curr.length() - 1);
                 Vertex* nextV = dbg.getVertex(prev);
                 Sequence s = *dbg.getSequence(prev);
                 sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr
                 if (!nextV->is_flagged())
-                    following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, pcov, dbg));
+                    following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, pcov, dbg, curr_end));
             }
             else
             {
+                float curr_start = currV->get_read_starts() * currV->get_out_coverage(deBruijnGraph::complement(n))/currV->get_total_out_coverage();
                 prev = curr.substr(1) + deBruijnGraph::complement(n);
                 Vertex* nextV = dbg.getVertex(prev);
                 Sequence s = *dbg.getSequence(prev);
                 sequence += deBruijnGraph::complement(n);
                 if (!nextV->is_flagged())
-                    following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, pcov, dbg));
+                    following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, pcov, dbg, curr_start));
             }
         }
     }
@@ -293,10 +297,17 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
 }
 
 // go back through the graph until the next unbalanced node is found and add an ("reversed") edge
-std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg)
+std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex* nextV, std::string prev, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg, float curr_end)
 {
-    float starts_with = nextV->get_read_starts(); // number of reads starts within this edge
-    float ends_with = nextV->get_read_ends(); // number of reads ends within this edge
+	char lastchar = g_[trg].name.back(); //char with which we are pointing to trg
+    float total_out = nextV->get_total_out_coverage();
+    if (total_out == 0)
+    {
+        unsigned int comp = 1;
+        total_out = std::max(nextV->get_out_coverage(lastchar),comp);
+    }
+    float starts_with = nextV->get_read_starts() * nextV->get_out_coverage(lastchar)/total_out; // number of reads starts within this edge, normalized by total flow through this edge
+    float ends_with = curr_end; // number of reads ends within this edge
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
 	// DEBUG
@@ -306,7 +317,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
     float first = coverage; // first out-coverage
     float last = coverage;
 	unsigned int length = 1;
-	char lastchar = g_[trg].name.back(); //char with which we are pointing to trg
 	// loop until the next unbalanced node is found, which is either visited (has been added) or will be added
 	while (!nextV->is_visited() and succ.size() == 1 and pred.size() == 1)
 	{
@@ -379,7 +389,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         g_[e.first].cap_info.max = max;
         g_[e.first].cap_info.min = min;
         g_[e.first].cap_info.first = first;
-        g_[e.first].cap_info.last= last;
+        g_[e.first].cap_info.last = last;
         g_[e.first].cap_info.length = g_[e.first].name.length();
         g_[e.first].cap_info.starting = starts_with/(g_[e.first].cap_info.length * avg);
         g_[e.first].cap_info.ending = ends_with/(g_[e.first].cap_info.length * avg);
@@ -389,11 +399,18 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 }
 
 // same function like the reverse one, but going forward and finding successors
-std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg)
+std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV, std::string next, std::string& sequence, unsigned int* index, float coverage, float pcov, deBruijnGraph& dbg, float curr_start)
 {
 	// with a little effort this can be moved inside the while loop for efficiency reasons
-    float starts_with = nextV->get_read_starts(); // number of reads starts within this edge
-    float ends_with = nextV->get_read_ends(); // number of reads ends within this edge
+    float first_char = g_[src].name.front();
+    float starts_with = curr_start; // number of reads starts within this edge, normalized by total flow through this edge
+    float total_in = nextV->get_total_in_coverage();
+    if (total_in == 0)
+    {
+        unsigned int comp = 1;
+        total_in = std::max(nextV->get_in_coverage(first_char), comp);
+    }
+    float ends_with = nextV->get_read_ends() * nextV->get_in_coverage(first_char)/total_in; // number of reads ends within this edge
 	auto&& succ = nextV->get_successors();
 	auto&& pred = nextV->get_predecessors();
 	// DEBUG, coverage information
@@ -435,8 +452,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		sequence += c; 
         starts_with += nextV->get_read_starts();
         ends_with += nextV->get_read_ends();
-        if (std::abs(last - cov) > threshold_)
-            break;
 	}
 	/* 
 	if nextV is visited then nextV may either be a junction, in which case it should have been
@@ -538,8 +553,6 @@ void UnitigGraph::contractPaths()
             g_[new_e.first].cap_info.first = first;
             g_[new_e.first].cap_info.last = last;
             g_[new_e.first].cap_info.length = g_[new_e.first].name.length();
-            g_[new_e.first].cap_info.starting = starts_with/(g_[new_e.first].cap_info.length * capacity);
-            g_[new_e.first].cap_info.ending = ends_with/(g_[new_e.first].cap_info.length * capacity);
             g_[new_e.first].starting = starts_with;
             g_[new_e.first].ending = ends_with;
             g_[new_e.first].visited = false;
@@ -729,7 +742,9 @@ std::pair<float, float> UnitigGraph::calculate_flow(std::vector<UEdge>& path)
     unsigned int length = 0;
     unsigned int tot_length = 0;
     for (auto& e : path)
+    {
         tot_length += g_[e].name.size(); // to see if calculated value is more than 150 bases away from begin
+    }
     for (auto& e : path)
     {
         auto source = boost::source(e, g_);
@@ -906,8 +921,6 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
             currE = path.front();
             currV = boost::source(currE, g_);
         }
-        if (g_[currE].cap_info.starting > 0.02 or g_[currE].cap_info.ending > 0.02) //TODO (values are random)
-            break; // break if too many starting or ending vertices
         g_[currV].visiting_time = --i; // visited before seed
     }
     i = 0; // reset counter, everything now is after seed
@@ -944,8 +957,6 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         {
             break;
         }
-        if (g_[currE].cap_info.starting > 0.02 or g_[currE].cap_info.ending > 0.02) //TODO (values are random)
-            break; // break if too many starting or ending vertices
         g_[currV].visiting_time = ++i;
     }
     unsigned int tot = 0;
