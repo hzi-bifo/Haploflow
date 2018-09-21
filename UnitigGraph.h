@@ -78,8 +78,8 @@ private:
 
     std::pair<std::string, std::pair<float, float> > calculate_contigs(std::vector<UEdge>&);
 	float calculate_thresholds(const deBruijnGraph&, float);
-    float calculate_gain(UVertex& v, bool);
-    std::pair<float, float> calculate_flow(std::vector<UEdge>&);
+    float calculate_gain(UVertex& v);
+    std::pair<float, std::vector<float> > calculate_flow(std::vector<UEdge>&);
     UEdge check_cycle_out_edges(std::vector<UEdge>&);
     std::vector<UEdge> continue_cycle(std::deque<UEdge>&, bool);
 	std::vector<UEdge> find_fattest_path(UEdge);

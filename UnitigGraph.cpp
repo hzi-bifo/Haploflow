@@ -767,36 +767,60 @@ float UnitigGraph::out_capacity(UVertex target)
     return capacity;
 }
 
-std::pair<float, float> UnitigGraph::calculate_flow(std::vector<UEdge>& path)
+std::pair<float, std::vector<float> > UnitigGraph::calculate_flow(std::vector<UEdge>& path)
 {
     float min_flow = -1;
-    float small_flow = -1;
     float flow_frac = 1;
-    unsigned int length = 0;
+    float min_gain = 0;
+    std::vector<float> flows;
+    std::vector<float> gains;
+
     unsigned int tot_length = 0;
     for (auto& e : path)
     {
         tot_length += g_[e].name.size(); // to see if calculated value is more than 150 bases away from begin
     }
+    unsigned int length = 0;
     for (auto& e : path)
     {
         auto source = boost::source(e, g_);
+        float gain = calculate_gain(source);
+        if ((length >= 150 and length <= tot_length - 150))
+        {
+            if (min_flow == -1 or g_[e].capacity < min_flow)
+            {
+                min_flow = g_[e].capacity;
+                min_gain = gains.back() * gain;
+            }
+            gains.push_back(gains.back() * gain);
+        }
+        else
+        {
+            gains.push_back(1);
+        }
         length += g_[e].name.size();
-        if (g_[e].capacity < min_flow or min_flow == -1)
+    }
+    unsigned int i = 0;
+    for (auto& e : path)
+    {
+        if (min_flow == -1) // TODO removes all flow (?)
         {
-            min_flow = g_[e].capacity;
+            flows.push_back(g_[e].capacity);
+            flow_frac = 1;
+            continue;
         }
-        else if ((length >= 150 and length <= tot_length - 150) and (small_flow == -1 or g_[e].capacity < small_flow)) //TODO arbitrary
+        float current_flow = min_flow * (gains[i++]/min_gain);
+        float current_frac = current_flow/g_[e].capacity;
+        auto source = boost::source(e, g_);
+        auto target = boost::target(e, g_);
+        std::cerr << g_[source].index << " -> " << g_[target].index << " (" << g_[e].capacity << ") : " << min_flow << " * " << gains[i-1] << " / " << min_gain << " = " << current_flow << std::endl;
+        flows.push_back(current_flow);
+        if (current_frac < flow_frac)
         {
-            small_flow = g_[e].capacity;
+            flow_frac = current_frac;
         }
-        if (g_[e].capacity/out_capacity(source) < flow_frac)
-            flow_frac = g_[e].capacity/out_capacity(source);
-    } //TODO
-    if (small_flow == -1) //if contig is too short, return min flow, else choose flow from the middle of contig
-        return std::make_pair(min_flow, flow_frac);
-    else
-        return std::make_pair(small_flow, flow_frac);
+    } 
+    return std::make_pair(flow_frac, flows);
 }
 
 UEdge UnitigGraph::check_cycle_out_edges(std::vector<UEdge>& out)
@@ -1016,7 +1040,7 @@ void UnitigGraph::unvisit()
 }
 
 // Calculates how much "gain" in flow a single vertex has in percent
-float UnitigGraph::calculate_gain(UVertex& v, bool forward)
+float UnitigGraph::calculate_gain(UVertex& v)
 {
     if (in_capacity(v) == 0 or out_capacity(v) == 0)
     {
@@ -1028,32 +1052,32 @@ float UnitigGraph::calculate_gain(UVertex& v, bool forward)
     float outflow = 0;
     for (auto&& ie : inedges)
     {
-        inflow += g_[ie].capacity;
+        inflow += g_[ie].cap_info.last;
     }
     for (auto&& oe : outedges)
     {
-        outflow += g_[oe].capacity;
+        outflow += g_[oe].cap_info.first;
     }
-    if (forward)
-        return outflow/inflow;
-    else
-        return inflow/outflow;
+    return outflow/inflow;
 }
 
 // Given all the chosen edges and their coverage fraction, builds the contigs and reduces flow accordingly
 std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(std::vector<UEdge>& path)
 {
     auto flow = calculate_flow(path);
-    float min_flow = flow.first;
-    float flow_check = flow.second;
+    float flow_frac = flow.first;
+    std::vector<float> flows = flow.second;
+    float min_flow = flows.front();
+
+    unsigned int i = 0;
     UEdge start = path.front();
     UVertex source = boost::source(start, g_);
     std::string contig = g_[source].name; // kmer of first vertex
     for (auto& e : path)
     {   
         contig += g_[e].name;
-        auto source = boost::source(e, g_);
-        if (test_hypothesis(g_[e].capacity, min_flow, 1.0) or g_[e].capacity < min_flow)
+        float current_flow = flows[i];
+        if (test_hypothesis(g_[e].capacity, current_flow, 1.0) or g_[e].capacity < current_flow)
         {
             g_[e].capacity = 0;
             g_[e].cap_info.first = 0;
@@ -1064,16 +1088,17 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
         }
         else
         {
-            float reduce_flow = std::max(min_flow, flow_check * g_[e].capacity);
-            g_[e].capacity -= reduce_flow;
-            g_[e].cap_info.first -= reduce_flow;
-            g_[e].cap_info.last -= reduce_flow;
-            g_[e].cap_info.min -= reduce_flow;
-            g_[e].cap_info.max -= reduce_flow; // TODO these 4
-            g_[e].cap_info.avg -= reduce_flow;
+            g_[e].capacity -= current_flow;
+            g_[e].cap_info.first -= current_flow;
+            g_[e].cap_info.last -= current_flow;
+            g_[e].cap_info.min -= current_flow;
+            g_[e].cap_info.max -= current_flow; // TODO these 4
+            g_[e].cap_info.avg -= current_flow;
         }
+        if (current_flow < min_flow)
+            min_flow = current_flow;
     }
-    return std::make_pair(contig,std::make_pair(flow_check,min_flow)); //TODO
+    return std::make_pair(contig,std::make_pair(flow_frac, min_flow)); //TODO
 }
 
 // calculates the flows and corresponding paths through the graph
