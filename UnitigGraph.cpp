@@ -553,6 +553,8 @@ void UnitigGraph::contractPaths()
             g_[new_e.first].cap_info.first = first;
             g_[new_e.first].cap_info.last = last;
             g_[new_e.first].cap_info.length = g_[new_e.first].name.length();
+            g_[new_e.first].cap_info.starting = starts_with/(g_[new_e.first].cap_info.length * capacity);
+            g_[new_e.first].cap_info.ending = ends_with/(g_[new_e.first].cap_info.length * capacity);
             g_[new_e.first].starting = starts_with;
             g_[new_e.first].ending = ends_with;
             g_[new_e.first].visited = false;
@@ -889,21 +891,7 @@ std::vector<UEdge> UnitigGraph::continue_cycle(std::deque<UEdge>& path, bool for
 std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
 {
     std::deque<UEdge> path = {seed}; // seed vertex, we start search here
-    int i = 0; // visiting time of the vertex
-    int total_length = 0;
-
-    bool increasing = false;  // fattest path is increasing starting from seed
-    bool decreasing = false; // whether the path is currently decreasing/increasing in flow
-    float diff = g_[seed].cap_info.last - g_[seed].cap_info.first; // to check whether this is positive or negative 
-    if (diff + threshold_ < 0)
-    {
-        decreasing = true;
-    }
-    else if (diff - threshold_ > 0)
-    {
-        increasing = true;
-    }
-    float curr_diff = 0;
+    int i = -1; // visiting time of the vertex
 
     std::vector<UEdge> return_path;
     UEdge currE = seed;
@@ -1068,6 +1056,8 @@ void UnitigGraph::assemble(std::string fname)
     while (true)
     {
         cleanGraph();
+        if (boost::num_vertices(g_) == 0)
+            break;
         std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
         std::ofstream outfile (filename);
         printGraph(outfile);
