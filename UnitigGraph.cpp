@@ -344,7 +344,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		if (cov > max)
 			max = cov;
 		avg += cov;
-        last = cov;
+        first = cov;
 		length++; // used for the coverage caluclations of the path later on
 		nextV = dbg.getVertex(prev);
 		pred = nextV->get_predecessors();
