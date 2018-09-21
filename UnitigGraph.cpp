@@ -695,15 +695,46 @@ void UnitigGraph::cleanGraph()
 UEdge UnitigGraph::getSeed() const
 {
     UEdge seed;
+    UEdge source1;
+    UEdge source2;
+    UEdge source3;
     float max = 0;
+    float max_diff = 0;
+    float max_rel = 0;
+    float max_start = 0;
 	for (auto&& e : boost::edges(g_))
 	{
+        auto cap = g_[e].cap_info;
+        float strt = cap.starting;
+        float abs = std::abs(cap.first - cap.last);
+        float rel = std::max(cap.first, cap.last) / std::min(cap.first, cap.last);
+        if (abs > max_diff)
+        {
+            max_diff = abs;
+            source1 = e;
+        }
+        if (rel > max_rel)
+        {
+            max_rel = rel;
+            source2 = e;
+        }
+        if (strt > max_start)
+        {
+            max_start = strt;
+            source3 = e;
+        }
         if (g_[e].capacity > max)
         {
             max = g_[e].capacity;
             seed = e;
         }
     }
+    auto src1 = boost::source(source1, g_);
+    auto src2 = boost::source(source2, g_);
+    auto src3 = boost::source(source3, g_);
+    std::cerr << g_[src1].index << " " << max_diff << std::endl;
+    std::cerr << g_[src2].index << " " << max_rel << std::endl;
+    std::cerr << g_[src3].index << " " << max_start << std::endl;
 	return seed;
 }
 
