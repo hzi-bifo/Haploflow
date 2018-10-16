@@ -823,212 +823,93 @@ std::pair<float, std::vector<float> > UnitigGraph::calculate_flow(std::vector<UE
     return std::make_pair(flow_frac, flows);
 }
 
-UEdge UnitigGraph::check_cycle_out_edges(std::vector<UEdge>& out)
+// run dijsktra with fatness as optimality criterion
+void UnitigGraph::dijsktra(UEdge seed)
 {
-    unsigned int size = out.size();
-    if (size == 0)
-        throw size;
-    else if (size == 1)
-        return out.front();
-    else if (size == 2) // if size is 2 and only one path returns to cycle, the ordering is clear
+    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest fatness
+        return g_[e1].fatness < g_[e2].fatness;
+    };
+    std::vector<UEdge> q;
+    for (auto e : boost::edges(g_)) //initialise distances and fatness
     {
-        throw size; // TODO
+        g_[e].fatness = 0;
+        if (e == seed)
+        {
+            g_[e].fatness = g_[e].capacity;
+        }
+        q.push_back(e);
     }
-    else if (size > 2)
-        throw size;
-    return out.front();
-}
-
-std::vector<UEdge> UnitigGraph::continue_cycle(std::deque<UEdge>& path, bool forward)
-{
-    std::vector<UEdge> continue_path;
-    if (forward) // we entered cycle forward, target of last edge is first cycle edge
+    std::sort(q.begin(), q.end(), edge_compare);
+    while (!q.empty()) // classic dijsktra routine
     {
-        std::vector<UEdge> int_edges;
-        UEdge last = path.back();
-        UVertex v = boost::target(last, g_);
-        std::vector<UEdge> alt_edges;
-        unsigned int max = 0;
-        for (auto&& e : path)
+        auto curr = q.back();
+        q.pop_back();
+        auto source = boost::source(curr, g_);
+        auto target = boost::target(curr, g_);
+        for (auto oe : boost::out_edges(target, g_))
         {
-            UVertex source = boost::source(e, g_);
-            auto out_edges = boost::out_edges(source, g_);
-            for (auto&& oe : out_edges)
+            float fat = g_[oe].fatness;
+            float max = 0;
+            if (fat < std::min(g_[curr].fatness, g_[oe].capacity))
             {
-                if (oe != e)
-                {
-                    unsigned int cap = g_[oe].capacity;
-                    if (cap > max and !test_hypothesis(cap, max, 1.0)) // edge is unique maximum
-                    {
-                        alt_edges.clear();
-                        alt_edges.push_back(oe);
-                        max = cap;
-                    }
-                    else if (test_hypothesis(cap, max, 1.0)) // edge is close to previous maximum
-                    {
-                        alt_edges.push_back(oe); // there is more than one alternative out_edge
-                    }
-                }
+                g_[oe].fatness = std::min(g_[curr].fatness, g_[oe].capacity);
+                g_[oe].prev = curr;
             }
-            if (source == v)
-                break;
-        }
-        try
-        {
-            UEdge to_continue = check_cycle_out_edges(alt_edges);
-            if (g_[to_continue].visited) // the next selected edge is on cycle already
-                return continue_path;
-            UVertex source = boost::source(to_continue, g_);
-            int start = g_[v].visiting_time;
-            int position = g_[source].visiting_time; // start of the cycle
-            for (int i = start; i < position; i++) // add all edges between start and position
+            if (g_[oe].fatness > max)
             {
-                continue_path.push_back(path.at(i));
+                max = g_[oe].fatness;
+                g_[curr].next = oe;
             }
-            continue_path.push_back(to_continue); //first in return path
-            return continue_path;
-        } catch (unsigned int i)
-        {
-            return continue_path; // TODO store position so contig can be continued/mapped against
         }
-    }
-    else // cycle is on way back from seed, front is edge which's source is already visited
-    {
-        std::vector<UEdge> out_edges;
-        UEdge last = path.front();
-        UVertex v = boost::source(last, g_);
-        std::vector<UEdge> alt_edges;
-        unsigned int max = 0;
-        for (auto&& e : path)
+        for (auto ie : boost::in_edges(source, g_))
         {
-            UVertex target = boost::target(e, g_);
-            auto in_edges = boost::in_edges(target, g_);
-            for (auto&& ie : in_edges)
+            float fat = g_[ie].fatness;
+            float max = 0;
+            if (fat < std::min(g_[curr].fatness, g_[ie].capacity))
             {
-                if (ie != e)
-                {
-                    unsigned int cap = g_[ie].capacity;
-                    if (cap > max and !test_hypothesis(cap, max, 1.0)) // edge is unique maximum
-                    {
-                        alt_edges.clear();
-                        alt_edges.push_back(ie);
-                        max = cap;
-                    }
-                    else if (test_hypothesis(cap, max, 1.0)) // edge is close to previous maximum
-                    {
-                        alt_edges.push_back(ie); // there is more than one alternative out_edge
-                    }
-                }
+                g_[ie].fatness = std::min(g_[curr].fatness, g_[ie].capacity);
+                g_[ie].next = curr;
             }
-            if (target == v) // the end of the cycle is reached, do not continue search for alternative edges
-                break;
-        }
-        try
-        {
-            UEdge to_continue = check_cycle_out_edges(alt_edges);
-            UVertex target = boost::target(to_continue, g_);
-            int start = g_[v].visiting_time; // start of the cycle
-            int position = g_[target].visiting_time; 
-            continue_path.push_back(to_continue); //first in return path
-            for (int i = position + 1; i <= start; i++) // add all edges between start and position
+            if (g_[ie].fatness > max)
             {
-                continue_path.push_back(path.at(path.size() + i - 1));
+                max = g_[ie].fatness;
+                g_[curr].prev = ie;
             }
-            return continue_path;
-        } catch (unsigned int i)
-        {
-            return continue_path; // TODO store position so contig can be continued/mapped against
         }
+        std::sort(q.begin(), q.end(), edge_compare);
     }
 }
 
 // Calculates the fattest path through the graph
 std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
 {
-    std::deque<UEdge> path = {seed}; // seed vertex, we start search here
-    int i = -1; // visiting time of the vertex
-
-    std::vector<UEdge> return_path;
-    UEdge currE = seed;
-    UVertex currV = boost::source(currE, g_);
-    
-    while (in_capacity(currV) > 0) // if we are not source, go backwards from seed
+    dijsktra(seed); //run dijsktra
+    auto curr = seed;
+    auto source = boost::source(curr, g_);
+    auto target = boost::target(curr, g_);
+    std::deque<UEdge> path = {seed};
+    while (in_capacity(source) > 0 and !g_[curr].visited)
     {
-        auto in_edges = boost::in_edges(currV, g_);
-        float max = 0;
-        UEdge max_edge;
-        for (auto&& ie : in_edges)
-        {
-            UVertex in = boost::source(ie,g_);
-            if (g_[ie].capacity > max) // max ingoing from current vertex
-            {
-                currV = in;
-                max = g_[ie].capacity;
-                max_edge = ie; // highest flow goes through here
-            }
-        }
-        currE = max_edge; // edge we continue with (highest flow)
-        path.push_front(currE); // add first, so if cycle, then first vertex = last vertex
-        // cycle treatment: check whether we want to continue after cycle, than add path until the next edge out of the cycle
-        if (g_[currV].visiting_time != 0)
-        {
-            break; // TODO
-            std::vector<UEdge> to_continue = continue_cycle(path, false);
-            if (to_continue.empty())
-                break;
-            for (auto& e : to_continue)
-                path.push_front(e);
-            currE = path.front();
-            currV = boost::source(currE, g_);
-        }
-        g_[currV].visiting_time = --i; // visited before seed
+        g_[curr].visited = true;
+        curr = g_[curr].prev;
+        path.push_front(curr);
+        source = boost::source(curr, g_);
     }
-    i = 0; // reset counter, everything now is after seed
-    currE = seed; // now forward, same algorithm as above
-    currV = boost::target(currE, g_);
-    while (out_capacity(currV) > 0)
+    while (out_capacity(target) > 0 and !g_[curr].visited)
     {
-        auto out_edges = boost::out_edges(currV, g_);
-        float max = 0;
-        UEdge max_edge;
-        for (auto&& oe : out_edges)
-        {
-            UVertex out = boost::target(oe, g_);
-            if (g_[oe].capacity > max)
-            {
-                currV = out;
-                max = g_[oe].capacity;
-                max_edge = oe;
-            }
-        }
-        currE = max_edge;
-        path.push_back(currE);
-        if (g_[currV].visiting_time > 0)
-        {
-            break;
-            std::vector<UEdge> to_continue = continue_cycle(path, true);
-            if (to_continue.empty())
-                break;
-            for (auto& e : to_continue)
-                path.push_back(e);
-            currE = path.back();
-            currV = boost::target(currE, g_);
-        }
-        else if (g_[currV].visiting_time < 0) // this edge has been detected on the way back -> one big cycle -> cancel
-        {
-            break;
-        }
-        g_[currV].visiting_time = ++i;
+        g_[curr].visited = true;
+        curr = g_[curr].next;
+        path.push_back(curr);
+        target = boost::target(curr, g_);
     }
-    unsigned int tot = 0;
-    for (auto&& e : path)
+    unvisit();
+    for (auto& e : path)
     {
-        auto size = g_[e].name.size();
-        tot += size;
-        return_path.push_back(e);
+        auto source = boost::source(e, g_);
+        auto target = boost::target(e, g_);
+        std::cerr << g_[source].index << " --> " << g_[target].index << ": " << g_[e].fatness << std::endl;
     }
-    unvisit(); // so they are not counted as visited for next contig
-    return return_path;
+    return std::vector<UEdge>(path.begin(), path.end());
 }
 
 void UnitigGraph::unvisit()
@@ -1036,6 +917,10 @@ void UnitigGraph::unvisit()
     for (auto& v : boost::vertices(g_))
     {
         g_[v].visiting_time = 0;
+    }
+    for (auto e : boost::edges(g_))
+    {
+        g_[e].visited = false;
     }
 }
 

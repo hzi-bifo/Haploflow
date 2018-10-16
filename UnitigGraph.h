@@ -15,15 +15,8 @@
 #include <algorithm> // heap
 #include <queue>
 
-struct VertexProperties {
-    unsigned int index;
-    unsigned int scc;
-    unsigned int cc;
-    std::string name;
-    unsigned int tarjan_index;
-    bool onStack;
-    int visiting_time;
-};
+struct EdgeProperties;
+struct VertexProperties;
 
 struct Capacity {
     float first;
@@ -40,15 +33,6 @@ struct Capacity {
     }
 };
 
-struct EdgeProperties{
-    unsigned int starting; // how many reads start in this edge
-    unsigned int ending; // how many reads end in this edge
-    std::string name;
-    float capacity;
-    Capacity cap_info;
-    float residual_capacity;
-    bool visited;
-};
 
 typedef boost::adjacency_list<boost::listS, boost::listS, boost::bidirectionalS,
 							VertexProperties,
@@ -57,6 +41,30 @@ typedef boost::adjacency_list<boost::listS, boost::listS, boost::bidirectionalS,
 typedef typename boost::graph_traits<UGraph>::vertex_descriptor UVertex;
 typedef typename boost::graph_traits<UGraph>::edge_descriptor UEdge;
 typedef boost::graph_traits<UGraph>::vertex_iterator uvertex_iter;
+
+struct EdgeProperties {
+    unsigned int starting; // how many reads start in this edge
+    unsigned int ending; // how many reads end in this edge
+    std::string name;
+    float capacity;
+    Capacity cap_info;
+    float residual_capacity;
+    bool visited;
+    UEdge prev; // edge on path
+    UEdge next; // edge on path
+    float fatness; //fatness of the path going through edges
+    unsigned int distance; //distance from seed
+};
+
+struct VertexProperties {
+    unsigned int index;
+    unsigned int scc;
+    unsigned int cc;
+    std::string name;
+    unsigned int tarjan_index;
+    bool onStack;
+    int visiting_time;
+};
 
 typedef std::vector<UVertex> Connected_Component; // to distinguish from regular std::vector<UVertex>
 
@@ -69,6 +77,7 @@ public:
 	void debug(); // debug information
     void assemble(std::string);
     void printGraph(std::ostream&) const;
+    void dijsktra(UEdge seed);
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
@@ -80,8 +89,6 @@ private:
 	float calculate_thresholds(const deBruijnGraph&, float);
     float calculate_gain(UVertex& v);
     std::pair<float, std::vector<float> > calculate_flow(std::vector<UEdge>&);
-    UEdge check_cycle_out_edges(std::vector<UEdge>&);
-    std::vector<UEdge> continue_cycle(std::deque<UEdge>&, bool);
 	std::vector<UEdge> find_fattest_path(UEdge);
     
 	UEdge getSeed() const;
