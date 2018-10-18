@@ -823,7 +823,7 @@ std::pair<float, std::vector<float> > UnitigGraph::calculate_flow(std::vector<UE
 }
 
 // run dijsktra with fatness as optimality criterion
-void UnitigGraph::dijsktra(UEdge seed)
+void UnitigGraph::dijkstra(UEdge seed)
 {
     auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest fatness
         return g_[e1].fatness < g_[e2].fatness;
@@ -832,8 +832,10 @@ void UnitigGraph::dijsktra(UEdge seed)
     for (auto e : boost::edges(g_)) //initialise distances and fatness
     {
         g_[e].fatness = 0;
+        g_[e].distance = std::numeric_limits<unsigned int>::max();
         if (e == seed)
         {
+            g_[e].distance = 0;
             g_[e].fatness = g_[e].capacity;
         }
         q.push_back(e);
@@ -848,31 +850,11 @@ void UnitigGraph::dijsktra(UEdge seed)
         for (auto oe : boost::out_edges(target, g_))
         {
             float fat = g_[oe].fatness;
-            float max = 0;
             if (fat < std::min(g_[curr].fatness, g_[oe].capacity))
             {
                 g_[oe].fatness = std::min(g_[curr].fatness, g_[oe].capacity);
                 g_[oe].prev = curr;
-            }
-            if (g_[oe].fatness > max)
-            {
-                max = g_[oe].fatness;
-                g_[curr].next = oe;
-            }
-        }
-        for (auto ie : boost::in_edges(source, g_))
-        {
-            float fat = g_[ie].fatness;
-            float max = 0;
-            if (fat < std::min(g_[curr].fatness, g_[ie].capacity))
-            {
-                g_[ie].fatness = std::min(g_[curr].fatness, g_[ie].capacity);
-                g_[ie].next = curr;
-            }
-            if (g_[ie].fatness > max)
-            {
-                max = g_[ie].fatness;
-                g_[curr].prev = ie;
+                g_[oe].distance = g_[curr].distance + g_[oe].name.size();
             }
         }
         std::sort(q.begin(), q.end(), edge_compare);
@@ -882,32 +864,26 @@ void UnitigGraph::dijsktra(UEdge seed)
 // Calculates the fattest path through the graph
 std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
 {
-    dijsktra(seed); //run dijsktra
-    auto curr = seed;
-    auto source = boost::source(curr, g_);
-    auto target = boost::target(curr, g_);
-    std::deque<UEdge> path = {seed};
-    while (in_capacity(source) > 0 and !g_[curr].visited)
+    dijkstra(seed);
+    unsigned int max_dist = 0;
+    UEdge last;
+    for (auto e : boost::edges(g_))
+    {
+        if (g_[e].distance > max_dist and g_[e].distance < std::numeric_limits<unsigned int>::max())
+        {
+            max_dist = g_[e].distance;
+            last = e;
+        }
+    }
+    auto curr = last;
+    std::deque<UEdge> path = {curr};
+    while(g_[curr].distance > 0 and g_[curr].distance < std::numeric_limits<unsigned int>::max() and !g_[curr].visited) // this means the distance has been set, i.e. the vertex has been reached
     {
         g_[curr].visited = true;
         curr = g_[curr].prev;
         path.push_front(curr);
-        source = boost::source(curr, g_);
-    }
-    while (out_capacity(target) > 0 and !g_[curr].visited)
-    {
-        g_[curr].visited = true;
-        curr = g_[curr].next;
-        path.push_back(curr);
-        target = boost::target(curr, g_);
     }
     unvisit();
-    for (auto& e : path)
-    {
-        auto source = boost::source(e, g_);
-        auto target = boost::target(e, g_);
-        std::cerr << g_[source].index << " --> " << g_[target].index << ": " << g_[e].fatness << std::endl;
-    }
     return std::vector<UEdge>(path.begin(), path.end());
 }
 
