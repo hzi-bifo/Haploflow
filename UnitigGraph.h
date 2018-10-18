@@ -50,9 +50,12 @@ struct EdgeProperties {
     Capacity cap_info;
     float residual_capacity;
     bool visited;
-    UEdge prev; // edge on path
-    float fatness; //fatness of the path going through edges
-    unsigned int distance; //distance from seed
+    UEdge prev; // edge on path forwards
+    UEdge next; // edge on path backwards
+    float fatness; //fatness of the path going through edges forwards
+    float fatness2; //fatness of the path going through edges backwards
+    unsigned int distance; //distance from seed forwards
+    unsigned int distance2; //distance from seed backwards
 };
 
 struct VertexProperties {
@@ -76,7 +79,7 @@ public:
 	void debug(); // debug information
     void assemble(std::string);
     void printGraph(std::ostream&) const;
-    void dijkstra(UEdge seed);
+    void dijkstra(UEdge seed, bool);
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
