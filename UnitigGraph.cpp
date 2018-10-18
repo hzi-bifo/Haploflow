@@ -813,7 +813,6 @@ std::pair<float, std::vector<float> > UnitigGraph::calculate_flow(std::vector<UE
         float current_frac = current_flow/g_[e].capacity;
         auto source = boost::source(e, g_);
         auto target = boost::target(e, g_);
-        std::cerr << g_[source].index << " -> " << g_[target].index << " (" << g_[e].capacity << ") : " << min_flow << " * " << gains[i-1] << " / " << min_gain << " = " << current_flow << std::endl;
         flows.push_back(current_flow);
         if (current_frac < flow_frac)
         {
@@ -999,9 +998,6 @@ void UnitigGraph::assemble(std::string fname)
         cleanGraph();
         if (boost::num_vertices(g_) == 0)
             break;
-        std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
-        std::ofstream outfile (filename);
-        printGraph(outfile);
         auto seed = getSeed();
         if (g_[seed].capacity <= threshold_)
         {
@@ -1009,6 +1005,9 @@ void UnitigGraph::assemble(std::string fname)
         }
         std::cerr << "Finding fattest path..." << std::endl;
         std::vector<UEdge> path = find_fattest_path(seed);
+        std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
+        std::ofstream outfile (filename);
+        printGraph(outfile);
         std::cerr << "Calculating contig " << i << std::endl;
         auto contig = calculate_contigs(path);
         if (contig.first.size() > 150)
@@ -1040,6 +1039,7 @@ void UnitigGraph::printGraph(std::ostream& os) const
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::name, g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
     boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::prev,g_)), boost::default_writer(), propmapIndex);
 }
 
 void UnitigGraph::debug()
