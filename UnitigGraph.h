@@ -94,7 +94,8 @@ private:
 	std::vector<UEdge> find_fattest_path(UEdge);
     
 	UEdge getSeed() const;
-    
+
+    void fixFlow(UEdge seed);
     void markCycles();
     void cleanGraph();
 	void removeStableSets();

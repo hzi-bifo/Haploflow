@@ -1025,6 +1025,71 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
     return std::make_pair(contig,std::make_pair(flow_frac, min_flow)); //TODO
 }
 
+void UnitigGraph::fixFlow(UEdge seed)
+{
+    float v_avg = 0;
+    float e_avg = 0;
+    std::vector<float> vertex_flow;
+    for (auto v : boost::vertices(g_))
+    {
+        float in = 0;
+        for (auto ie : boost::in_edges(v, g_))
+        {
+            in += g_[ie].capacity;
+        }
+        float out = 0;
+        for (auto oe: boost::out_edges(v, g_))
+        {
+            out += g_[oe].capacity;
+        }
+        float balanced = (in + out)/2;
+        v_avg += balanced;
+        vertex_flow.push_back(balanced);
+    }
+    std::vector<float> edge_flow;
+    for (auto e : boost::edges(g_))
+    {
+        e_avg += g_[e].capacity;
+        edge_flow.push_back(g_[e].capacity);
+    }
+    std::sort(vertex_flow.begin(), vertex_flow.end());
+    std::sort(edge_flow.begin(), edge_flow.end());
+    float diff = (vertex_flow.back() - vertex_flow.front())/vertex_flow.size();
+    float first = vertex_flow.front();
+    unsigned int i = 0;
+    unsigned int j = 0;
+    std::cerr << "Vertex flows: " << std::endl;
+    for (auto v : vertex_flow)
+    {
+        if (v - first > diff and i - j > vertex_flow.size()/20) //TODO
+        {
+            std::cerr << v << " (" << i - j << ")" <<  std::endl;
+            j = i;
+        }
+        first = v;
+        i++;
+    }
+    diff = (edge_flow.back() - edge_flow.front())/edge_flow.size();
+    first = edge_flow.front();
+    std::cerr << "Edge flows: " << std::endl;
+    std::vector<float> edge_window;
+    for (auto e : edge_flow)
+    {
+        if (e - first > diff and i - j > edge_flow.size()/20)
+        {
+            std::cerr << e << " (" << i - j << ")" <<  std::endl;
+            edge_window.push_back(e);
+            j = i;
+        }
+        first = e;
+        i++;
+    }
+    while (true)
+    {
+        
+    }
+}
+
 // calculates the flows and corresponding paths through the graph
 void UnitigGraph::assemble(std::string fname)
 {
@@ -1033,12 +1098,15 @@ void UnitigGraph::assemble(std::string fname)
     unsigned int i = 0;
     std::cerr << "Contracting simple paths" << std::endl;
     contractPaths();
+    std::cerr << "Fixing flow" << std::endl;
+    auto seed = getSeed();
+    fixFlow(seed);
     while (true)
     {
         cleanGraph();
         if (boost::num_vertices(g_) == 0)
             break;
-        auto seed = getSeed();
+        seed = getSeed();
         if (g_[seed].capacity <= threshold_)
         {
             break; // all flow has been used, this CC is clear
