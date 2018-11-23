@@ -95,7 +95,7 @@ private:
     
 	UEdge getSeed() const;
 
-    void fixFlow(UEdge seed);
+    UEdge fixFlow(UEdge seed);
     void markCycles();
     void cleanGraph();
 	void removeStableSets();

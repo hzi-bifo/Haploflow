@@ -888,6 +888,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
 {
     auto src = boost::source(seed, g_);
     auto trg = boost::target(seed, g_);
+    std::cerr << g_[src].index << " --> " << g_[trg].index << " is seed" << std::endl;
     dijkstra(seed, true);
     dijkstra(seed, false);
     float max_dist = 0;
@@ -897,16 +898,16 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
     {
         auto source = boost::source(e, g_);
         auto target = boost::target(e, g_);
-        if (g_[e].distance * g_[e].fatness > max_dist and g_[e].distance < std::numeric_limits<unsigned int>::max())
+        if (g_[e].distance > max_dist and g_[e].distance < std::numeric_limits<unsigned int>::max())
         {
-            max_dist = g_[e].distance * g_[e].fatness; // so we have both maximised distance and fatness
+            max_dist = g_[e].distance; // so we have both maximised distance and fatness
             // TODO: magnitude of flow vs distance?
             last = e;
             forward = true;
         }
-        if (g_[e].distance2 * g_[e].fatness2 > max_dist and g_[e].distance2 < std::numeric_limits<unsigned int>::max())
+        if (g_[e].distance2 > max_dist and g_[e].distance2 < std::numeric_limits<unsigned int>::max())
         {
-            max_dist = g_[e].distance2 * g_[e].fatness2;
+            max_dist = g_[e].distance2;
             last = e;
             forward = false;
         }
@@ -940,14 +941,14 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         }
     }
     unvisit();
-    /*src = boost::source(path.front(), g_);
+    src = boost::source(path.front(), g_);
     std::cerr << g_[src].index;
     for (auto& e : path)
     {
         auto target = boost::target(e, g_);
-        std::cerr << " --> " << g_[target].index << " (" << g_[e].fatness << ") ";
+        std::cerr << " --> " << g_[target].index << " (" << std::max(g_[e].fatness, g_[e].fatness2) << ") ";
     }
-    std::cerr << std::endl;*/
+    std::cerr << std::endl;
     return std::vector<UEdge>(path.begin(), path.end());
 }
 
@@ -1018,6 +1019,10 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
             g_[e].cap_info.min -= current_flow;
             g_[e].cap_info.max -= current_flow; // TODO these 4
             g_[e].cap_info.avg -= current_flow;
+            auto src = boost::source(e, g_);
+            auto trg = boost::target(e, g_);
+            std::cerr << "Flow remaining on edge " << g_[src].index << "-->" << g_[trg].index << " (" << g_[e].capacity << " of " << g_[e].capacity + current_flow << ")" << std::endl;
+            std::cerr << "Corresponding to " << g_[e].capacity/(g_[e].capacity + current_flow) * 100 << "%" << std::endl;
         }
         if (current_flow < min_flow)
             min_flow = current_flow;
@@ -1025,69 +1030,76 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
     return std::make_pair(contig,std::make_pair(flow_frac, min_flow)); //TODO
 }
 
-void UnitigGraph::fixFlow(UEdge seed)
+UEdge UnitigGraph::fixFlow(UEdge seed)
 {
-    float v_avg = 0;
-    float e_avg = 0;
-    std::vector<float> vertex_flow;
-    for (auto v : boost::vertices(g_))
+    std::vector<UVertex> to_visit;
+    std::vector<UVertex> lossy;
+    auto source = boost::source(seed, g_);
+    to_visit.push_back(source);
+    while (!to_visit.empty())
     {
-        float in = 0;
-        for (auto ie : boost::in_edges(v, g_))
+        auto curr = to_visit.back();
+        to_visit.pop_back();
+        if (!g_[curr].visiting_time)
+            g_[curr].visiting_time = 1;
+        else
+            continue;
+        auto out_edges = boost::out_edges(curr, g_);
+        auto in_edges = boost::in_edges(curr, g_);
+        float total_in = 0;
+        float vertex_in = 0;
+        float total_out = 0;
+        float vertex_out = 0;
+        for (auto ie : in_edges)
         {
-            in += g_[ie].capacity;
+            total_in += g_[ie].capacity;
+            vertex_in += g_[ie].cap_info.last;
         }
-        float out = 0;
-        for (auto oe: boost::out_edges(v, g_))
+        for (auto oe : out_edges)
         {
-            out += g_[oe].capacity;
+            total_out += g_[oe].capacity;
+            vertex_out += g_[oe].cap_info.first;
         }
-        float balanced = (in + out)/2;
-        v_avg += balanced;
-        vertex_flow.push_back(balanced);
+        for (auto ie : in_edges)
+        {
+            auto src = boost::source(ie, g_);
+            if (!g_[src].visiting_time)
+                to_visit.push_back(src);
+        }
+        for (auto oe : out_edges)
+        {
+            auto trg = boost::target(oe, g_);
+            if (!g_[trg].visiting_time)
+                to_visit.push_back(trg);
+        }
+        if (std::abs(total_out - total_in) > threshold_)
+        {
+            lossy.push_back(curr);
+        }
     }
-    std::vector<float> edge_flow;
+    float max_diff = 0;
+    UEdge new_seed;
     for (auto e : boost::edges(g_))
     {
-        e_avg += g_[e].capacity;
-        edge_flow.push_back(g_[e].capacity);
-    }
-    std::sort(vertex_flow.begin(), vertex_flow.end());
-    std::sort(edge_flow.begin(), edge_flow.end());
-    float diff = (vertex_flow.back() - vertex_flow.front())/vertex_flow.size();
-    float first = vertex_flow.front();
-    unsigned int i = 0;
-    unsigned int j = 0;
-    std::cerr << "Vertex flows: " << std::endl;
-    for (auto v : vertex_flow)
-    {
-        if (v - first > diff and i - j > vertex_flow.size()/20) //TODO
+        auto diff = std::abs(g_[e].cap_info.first - g_[e].cap_info.last);
+        auto source = boost::source(e, g_);
+        auto target = boost::target(e, g_);
+        auto lossy_source = std::find(lossy.begin(), lossy.end(), source);
+        auto lossy_target = std::find(lossy.begin(), lossy.end(), target);
+        if ((lossy_source != lossy.end() and lossy_target == lossy.end()) or (lossy_source == lossy.end() and lossy_target != lossy.end()))
         {
-            std::cerr << v << " (" << i - j << ")" <<  std::endl;
-            j = i;
+            if (diff > threshold_)
+            {
+                if (diff > max_diff)
+                {
+                    diff = max_diff;
+                    new_seed = e;
+                }
+            }
         }
-        first = v;
-        i++;
     }
-    diff = (edge_flow.back() - edge_flow.front())/edge_flow.size();
-    first = edge_flow.front();
-    std::cerr << "Edge flows: " << std::endl;
-    std::vector<float> edge_window;
-    for (auto e : edge_flow)
-    {
-        if (e - first > diff and i - j > edge_flow.size()/20)
-        {
-            std::cerr << e << " (" << i - j << ")" <<  std::endl;
-            edge_window.push_back(e);
-            j = i;
-        }
-        first = e;
-        i++;
-    }
-    while (true)
-    {
-        
-    }
+    unvisit();
+    return new_seed;
 }
 
 // calculates the flows and corresponding paths through the graph
@@ -1098,19 +1110,18 @@ void UnitigGraph::assemble(std::string fname)
     unsigned int i = 0;
     std::cerr << "Contracting simple paths" << std::endl;
     contractPaths();
-    std::cerr << "Fixing flow" << std::endl;
-    auto seed = getSeed();
-    fixFlow(seed);
     while (true)
     {
         cleanGraph();
         if (boost::num_vertices(g_) == 0)
             break;
-        seed = getSeed();
+        auto seed = getSeed();
         if (g_[seed].capacity <= threshold_)
         {
             break; // all flow has been used, this CC is clear
         }
+        std::cerr << "Fixing flow" << std::endl;
+        /*seed =*/ fixFlow(seed);
         std::cerr << "Finding fattest path..." << std::endl;
         std::vector<UEdge> path = find_fattest_path(seed);
         std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
@@ -1144,8 +1155,8 @@ void UnitigGraph::printGraph(std::ostream& os) const
     }
 
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::name, g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index, g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance2,g_)), boost::default_writer(), propmapIndex);
 }
 
