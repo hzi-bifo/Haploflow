@@ -273,7 +273,8 @@ std::unordered_map<unsigned int, unsigned int> deBruijnGraph::coverageDistributi
 	for (const auto& p : graph_)
 	{
 		auto& v = p.second;
-		unsigned int coverage = std::max(v.get_total_in_coverage(), v.get_total_out_coverage());
+		//unsigned int coverage = std::max(v.get_total_in_coverage(), v.get_total_out_coverage());
+        unsigned int coverage = v.get_total_in_coverage() + v.get_total_out_coverage();
 		if (cov_dist.find(coverage) != cov_dist.end())
 		{
 			cov_dist[coverage]++;
@@ -361,7 +362,7 @@ Vertex* deBruijnGraph::getVertex(const std::string& kmer)
 
 void deBruijnGraph::debug()
 {
-	std::cerr << "Vertices: " << getSize() << std::endl;
+	//std::cerr << "Vertices: " << getSize() << std::endl;
 	/*std::unordered_map<unsigned int, unsigned int> sccs;
 	for (auto& p : graph_)
 	{
@@ -392,12 +393,12 @@ void deBruijnGraph::debug()
 	unsigned int num = 0;
 	for (auto& elem : cov_dist)
 	{
-		std::cout << elem.second << "\t" << elem.first << std::endl;
+		std::cout << elem.first << "\t" << elem.second << std::endl;
 		num += elem.second;
 		mean += elem.first;
 	}
 	mean /= num;
-	std::cout << mean << std::endl;
+	//std::cout << mean << std::endl;
 	/*std::cerr << "Vertices: " << getSize() << std::endl;
 	clock_t t = clock();
 	std::vector<std::string> sources = getSources();

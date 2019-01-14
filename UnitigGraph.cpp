@@ -946,7 +946,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
     for (auto& e : path)
     {
         auto target = boost::target(e, g_);
-        std::cerr << " --> " << g_[target].index << " (" << std::max(g_[e].fatness, g_[e].fatness2) << ") ";
+        std::cerr << " --> " << g_[target].index << " (" << std::max(g_[e].fatness, g_[e].fatness2) << ")";
     }
     std::cerr << std::endl;
     return std::vector<UEdge>(path.begin(), path.end());
@@ -1081,13 +1081,26 @@ UEdge UnitigGraph::fixFlow(UEdge seed)
     UEdge new_seed;
     for (auto e : boost::edges(g_))
     {
-        auto diff = std::abs(g_[e].cap_info.first - g_[e].cap_info.last);
+        auto diff = g_[e].cap_info.last - g_[e].cap_info.first;
+        auto quotient = std::max(g_[e].cap_info.first/g_[e].cap_info.last,g_[e].cap_info.last/g_[e].cap_info.first);
         auto source = boost::source(e, g_);
         auto target = boost::target(e, g_);
+        auto length = g_[e].cap_info.length;
+        if (diff > threshold_ and ((quotient - 1)/length > 0.02 or quotient > 1.2)) //TODO
+        //if ((quotient - 1)/length > 0.02)
+        {
+            std::cerr << g_[source].index << "->" << g_[target].index << " [label=\"" << g_[e].cap_info << "\", color=red, fontcolor=red]" << std::endl;
+            //std::cerr << g_[source].index << " --> " << g_[target].index << ": " << g_[e].capacity << ", Diff: " << diff << ", Length: " << g_[e].cap_info.length << std::endl;
+        }
+        else
+        {
+            std::cerr << g_[source].index << "->" << g_[target].index << " [label=\"" << g_[e].cap_info << "\"]" << std::endl;
+        }
         auto lossy_source = std::find(lossy.begin(), lossy.end(), source);
         auto lossy_target = std::find(lossy.begin(), lossy.end(), target);
         if ((lossy_source != lossy.end() and lossy_target == lossy.end()) or (lossy_source == lossy.end() and lossy_target != lossy.end()))
         {
+            diff = std::abs(diff);
             if (diff > threshold_)
             {
                 if (diff > max_diff)
@@ -1154,8 +1167,8 @@ void UnitigGraph::printGraph(std::ostream& os) const
         boost::put(propmapIndex,*vi,i++);
     }
 
-    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index, g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index, g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance2,g_)), boost::default_writer(), propmapIndex);
 }
