@@ -29,7 +29,7 @@ struct Capacity {
     float ending;
     friend std::ostream& operator<<(std::ostream& os, const Capacity& cap)
     {
-        return os << "(" << cap.avg << ", " << cap.first << "/" << cap.last << ", (length: " << cap.length << "), (min: " << cap.min << ", max: " << cap.max << "), start%: " << cap.starting << ", end%: " << cap.ending;
+        return os << "(" << cap.avg << ", " << cap.first << "/" << cap.last << ", (length: " << cap.length << "), (min: " << cap.min << ", max: " << cap.max << ")";
     }
 };
 
@@ -42,14 +42,28 @@ typedef typename boost::graph_traits<UGraph>::vertex_descriptor UVertex;
 typedef typename boost::graph_traits<UGraph>::edge_descriptor UEdge;
 typedef boost::graph_traits<UGraph>::vertex_iterator uvertex_iter;
 
+struct Visits {
+    std::vector<unsigned int> visits;
+    friend std::ostream& operator<<(std::ostream& os, const Visits& visits)
+    {
+        os << "[ ";
+        for (auto&& v : visits.visits)
+        {
+            os << v << " ";
+        }
+        os << "]";
+        return os;
+    }
+};
+
 struct EdgeProperties {
-    unsigned int starting; // how many reads start in this edge
-    unsigned int ending; // how many reads end in this edge
     std::string name;
     float capacity;
     Capacity cap_info;
-    float residual_capacity;
     bool visited;
+    //std::vector<unsigned int> visits;
+    Visits visits;
+    unsigned int last_visit;
     UEdge prev; // edge on path forwards
     UEdge next; // edge on path backwards
     float fatness; //fatness of the path going through edges forwards
@@ -95,7 +109,9 @@ private:
     
 	UEdge getSeed() const;
 
-    UEdge fixFlow(UEdge seed);
+    void blockPath(UEdge, unsigned int);
+    void fixFlow();
+    std::pair<UEdge, bool> getUnvisitedEdge(std::vector<UEdge>&);
     void markCycles();
     void cleanGraph();
 	void removeStableSets();
