@@ -1025,7 +1025,6 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
 
 void UnitigGraph::blockPath(UEdge curr, unsigned int visits)
 {
-    float current_flow = 0;
     while (true)
     {
         g_[curr].visits.visits.push_back(visits);
@@ -1073,54 +1072,76 @@ void UnitigGraph::blockPath(UEdge curr, unsigned int visits)
     }
 }
 
-std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(std::vector<UEdge>& sources)
+std::pair<UEdge, std::pair<bool, unsigned int>> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& sources, unsigned int visits, unsigned int source)
 {
     unvisit(); // make sure we havent screwed up
     UEdge curr;
     bool unblocked = false;
-    if (sources.size() > 0) // first check all sources
+    if (visits <= sources.size()) // first check all sources
     {
         unblocked = true;
-        curr = sources.back();
-        sources.pop_back();
+        curr = sources[visits - 1]; // visits start at 1
     }    
     else // if they have been checked, check whether there are unvisited edges and continue
-    { // find the "first one" - an edge which only has visited in_edges
-        for (auto e : boost::edges(g_))
+    { // find the "first one", starting from a source, find the first unvisited edge
+        if (sources.size() == 0) // there is no source -> we are complete cycle -> pick random unvisited edge
         {
-            if (g_[e].last_visit == 0)
+            for (auto e : boost::edges(g_))
             {
-                g_[e].visited = true;
-                unblocked = true;
-                curr = e;
-                auto src = boost::source(curr, g_);
-                auto indegree = boost::in_degree(src, g_);
-                auto in_edges = boost::in_edges(src, g_);
-                bool has_predecessor = indegree;
-                while (has_predecessor)
+                if (g_[e].last_visit == 0)
                 {
-                    has_predecessor = false;
-                    for (auto f : in_edges)
-                    {
-                        if (g_[f].visited)
-                        {
-                            break; // we may end up in a cycle here, do not loop further
-                        }
-                        if (g_[f].last_visit == 0)
-                        {
-                            curr = f;
-                            has_predecessor = true;
-                        }
-                    }
-                    src = boost::source(curr, g_);
-                    indegree = boost::in_degree(src, g_);
-                    in_edges = boost::in_edges(src, g_);
+                    unblocked = true;
+                    curr = e;
                 }
-                break;
+            }
+        }
+        else // at least one source which has been visited before
+        {
+            auto current_source = sources[source];
+            auto target = boost::target(current_source, g_);
+            auto out_edges = boost::out_edges(target, g_);
+            //breadth first search for the first unvisited edge
+            std::queue<UEdge> to_check;
+            for (auto e : out_edges)
+            {
+                to_check.push(e);
+            }
+            while (!to_check.empty())
+            {
+                auto next = to_check.front();
+                to_check.pop();
+                if (g_[next].visited) // to prevent cycling/multiple searches
+                    continue;
+                else
+                    g_[next].visited = true;
+                if (g_[next].last_visit == 0)
+                {
+                    unblocked = true;
+                    curr = next;
+                    break; //we found an unblocked edge, return this one
+                }
+                else // edge is visisted, continue search
+                {
+                    target = boost::target(next, g_);
+                    out_edges = boost::out_edges(target, g_);
+                    for (auto e : out_edges)
+                    {
+                        to_check.push(e);
+                    }
+                }
+            }
+            if (!unblocked)
+            {
+                source++;
+                if (source < sources.size())
+                    return getUnvisitedEdge(sources, visits, source);
+                else
+                    return std::make_pair(curr, std::make_pair(false, source));
+                // we didnt find an unblocked vertex starting from this source, search the next source
             }
         }
     }
-    return std::make_pair(curr, unblocked);
+    return std::make_pair(curr, std::make_pair(unblocked, source));
 }
 
 void UnitigGraph::fixFlow()
@@ -1138,15 +1159,16 @@ void UnitigGraph::fixFlow()
         }
     }
     unsigned int visits = 1;
+    unsigned int source = 0;
     while (true)
     {
-        std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources);
+        std::pair<UEdge, std::pair<bool, unsigned int>> unvisited = getUnvisitedEdge(sources, visits, source);
         UEdge curr = unvisited.first;
-        bool unblocked = unvisited.second;
+        bool unblocked = unvisited.second.first;
+        source = unvisited.second.second;
         if (unblocked)
         {
-            blockPath(curr, visits); //marks the first path
-            visits++;
+            blockPath(curr, visits++); //marks the first path
         }
         else
             break;
@@ -1169,7 +1191,7 @@ void UnitigGraph::fixFlow()
     for (unsigned int i = 0; i < visits; i++)
     {
         std::cerr << i << ": " << unique[i].size() << std::endl;
-        if (unique[i].size() < 0.02 * boost::num_edges(g_))
+        /*if (unique[i].size() < 0.02 * boost::num_edges(g_))
         {
             std::cerr << "Path " << i+1 << " is erroneous" << std::endl;
             std::cerr << "Edges: " << std::endl;
@@ -1177,7 +1199,7 @@ void UnitigGraph::fixFlow()
             {
                 std::cerr << g_[e].name << " (Cap: " << g_[e].capacity << ")" << std::endl;
             }
-        }
+        }*/
     }
 }
 
