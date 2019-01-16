@@ -1152,12 +1152,18 @@ void UnitigGraph::fixFlow()
     {
         auto src = boost::source(e, g_);
         auto in_degree = boost::in_degree(src, g_);
-        if (in_degree == 0)
+        if (in_degree == 0 and std::find(sources.begin(), sources.end(), e) == sources.end()) // only add all source edges if they havent beed added before
         {
             for (auto f : boost::out_edges(src, g_))
+            {
                 sources.push_back(f); // for every outedge of source start search
+            }
         }
     }
+    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
+        return g_[e1].capacity > g_[e2].capacity;
+    };
+    std::sort(sources.begin(), sources.end(), edge_compare); // so that we search the highest source first
     unsigned int visits = 1;
     unsigned int source = 0;
     while (true)
@@ -1175,9 +1181,11 @@ void UnitigGraph::fixFlow()
     }
     // we now have the tentative paths, now check how many edges are unique per path
     std::vector<std::vector<UEdge>> unique;
+    std::vector<std::vector<UEdge>> total;
     for (unsigned int i = 0; i < visits; i++)
     {
         unique.push_back(std::vector<UEdge>{});
+        total.push_back(std::vector<UEdge>{});
     }
     for (auto e : boost::edges(g_))
     {
@@ -1185,12 +1193,14 @@ void UnitigGraph::fixFlow()
         {
             if (g_[e].visits.visits.front() == i + 1)
                 unique[i].push_back(e);
+            if (std::find(g_[e].visits.visits.begin(), g_[e].visits.visits.end(), i + 1) != g_[e].visits.visits.end())
+                total[i].push_back(e);
         }
     }
     std::cerr << "Total edges: " << boost::num_edges(g_) << std::endl;
     for (unsigned int i = 0; i < visits; i++)
     {
-        std::cerr << i << ": " << unique[i].size() << std::endl;
+        std::cerr << i+1 << " unique/total: " << unique[i].size() << "/" << total[i].size() << std::endl;
         /*if (unique[i].size() < 0.02 * boost::num_edges(g_))
         {
             std::cerr << "Path " << i+1 << " is erroneous" << std::endl;
