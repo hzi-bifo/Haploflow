@@ -384,6 +384,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		}
         g_[e.first].last_visit = 0;
         g_[e.first].capacity = avg;
+        g_[e.first].residual_capacity = avg;
         g_[e.first].cap_info.avg = avg;
         g_[e.first].cap_info.max = max;
         g_[e.first].cap_info.min = min;
@@ -485,6 +486,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		}
         g_[e.first].last_visit = 0;
         g_[e.first].capacity = avg;
+        g_[e.first].residual_capacity = avg;
         g_[e.first].cap_info.avg = avg;
         g_[e.first].cap_info.max = max;
         g_[e.first].cap_info.min = min;
@@ -542,6 +544,7 @@ void UnitigGraph::contractPaths()
             g_[new_e.first].last_visit = 0;
             g_[new_e.first].name = seq;
             g_[new_e.first].capacity = capacity;
+            g_[new_e.first].residual_capacity = capacity;
             g_[new_e.first].cap_info.avg = capacity;
             g_[new_e.first].cap_info.max = max;
             g_[new_e.first].cap_info.min = min;
@@ -998,6 +1001,7 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
         if (test_hypothesis(g_[e].capacity, current_flow, 1.0) or g_[e].capacity < current_flow)
         {
             g_[e].capacity = 0;
+            g_[e].residual_capacity = 0;
             g_[e].cap_info.first = 0;
             g_[e].cap_info.last= 0;
             g_[e].cap_info.min = 0;
@@ -1007,6 +1011,7 @@ std::pair<std::string, std::pair<float, float> > UnitigGraph::calculate_contigs(
         else
         {
             g_[e].capacity -= current_flow;
+            g_[e].residual_capacity -= current_flow;
             g_[e].cap_info.first -= current_flow;
             g_[e].cap_info.last -= current_flow;
             g_[e].cap_info.min -= current_flow;
@@ -1039,15 +1044,15 @@ void UnitigGraph::blockPath(UEdge curr, unsigned int visits)
         {
             if (g_[e].visits.visits.size() == 0) // an unvisited edge remains
             {
-                if (g_[e].cap_info.first > max_unvisited) // is maximal unvisited edge
+                if (g_[e].residual_capacity/*cap_info.first*/ > max_unvisited) // is maximal unvisited edge (continue with 0 as well in case residual_capacity was underestimated)
                 {
-                    max_unvisited = g_[e].cap_info.first;
+                    max_unvisited = g_[e].residual_capacity/*cap_info.first*/;
                     max_unvisited_e = e;
                 }
             }
-            else if (g_[e].visits.visits.size() != 0 and g_[e].cap_info.first > max) // maximal visited edge
+            else if (g_[e].visits.visits.size() != 0 and g_[e].residual_capacity/*cap_info.first*/ > max) // maximal visited edge
             {
-                max = g_[e].cap_info.first;
+                max = g_[e].residual_capacity/*cap_info.first*/;
                 max_e = e;
             }
         }
@@ -1166,41 +1171,53 @@ void UnitigGraph::fixFlow()
     std::sort(sources.begin(), sources.end(), edge_compare); // so that we search the highest source first
     unsigned int visits = 1;
     unsigned int source = 0;
+    std::vector<std::vector<UEdge>> unique;
     while (true)
     {
         std::pair<UEdge, std::pair<bool, unsigned int>> unvisited = getUnvisitedEdge(sources, visits, source);
         UEdge curr = unvisited.first;
         bool unblocked = unvisited.second.first;
         source = unvisited.second.second;
+        unique.push_back(std::vector<UEdge>{});
         if (unblocked)
         {
-            blockPath(curr, visits++); //marks the first path
+            blockPath(curr, visits); //marks the first path
         }
         else
             break;
+        float avg = 0;
+        for (auto e : boost::edges(g_))
+        {
+            if (!g_[e].visits.visits.empty() and g_[e].visits.visits.front() == visits)
+            {
+                unique[visits - 1].push_back(e);
+                avg += g_[e].residual_capacity; // TODO residual?
+            }
+        }
+        auto size = unique[visits - 1].size();
+        avg /= size;
+        std::sort(unique[visits - 1].begin(), unique[visits - 1].end(), edge_compare);
+        float median = g_[unique[visits - 1][size/2]].residual_capacity; // roughly median (TODO residual?)
+        /*for (auto e : unique[visits -1 ])
+        {
+            g_[e].residual_capacity = std::max(0.f,g_[e].residual_capacity - median); // reduce residual flow by median on first path
+        }*/
+        visits++;
     }
     // we now have the tentative paths, now check how many edges are unique per path
-    std::vector<std::vector<UEdge>> unique;
-    std::vector<std::vector<UEdge>> total;
-    for (unsigned int i = 0; i < visits; i++)
-    {
-        unique.push_back(std::vector<UEdge>{});
-        total.push_back(std::vector<UEdge>{});
-    }
-    for (auto e : boost::edges(g_))
-    {
-        for (unsigned int i = 0; i < visits; i++)
-        {
-            if (g_[e].visits.visits.front() == i + 1)
-                unique[i].push_back(e);
-            if (std::find(g_[e].visits.visits.begin(), g_[e].visits.visits.end(), i + 1) != g_[e].visits.visits.end())
-                total[i].push_back(e);
-        }
-    }
     std::cerr << "Total edges: " << boost::num_edges(g_) << std::endl;
-    for (unsigned int i = 0; i < visits; i++)
+    for (unsigned int i = 0; i < visits - 1; i++)
     {
-        std::cerr << i+1 << " unique/total: " << unique[i].size() << "/" << total[i].size() << std::endl;
+        std::sort(unique[i].begin(), unique[i].end(), edge_compare);
+        float med = g_[unique[i][unique[i].size()/2]].capacity;
+        float avg = 0;
+        for (auto e : unique[i])
+        {
+            avg += g_[e].capacity;
+        }
+        avg /= unique[i].size();
+        std::cerr << i+1 << " unique: " << unique[i].size() << std::endl;
+        std::cerr << "Capacity (avg/median): " << avg << "/" << med << std::endl;
         /*if (unique[i].size() < 0.02 * boost::num_edges(g_))
         {
             std::cerr << "Path " << i+1 << " is erroneous" << std::endl;

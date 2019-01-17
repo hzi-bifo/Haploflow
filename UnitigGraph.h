@@ -59,6 +59,7 @@ struct Visits {
 struct EdgeProperties {
     std::string name;
     float capacity;
+    float residual_capacity;
     Capacity cap_info;
     bool visited;
     //std::vector<unsigned int> visits;
