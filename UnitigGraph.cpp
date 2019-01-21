@@ -1036,8 +1036,8 @@ void UnitigGraph::blockPath(UEdge curr, unsigned int visits)
         g_[curr].last_visit = visits;
         auto target = boost::target(curr, g_);
         auto out_edges = boost::out_edges(target, g_);
-        float max = 0;
-        float max_unvisited = 0;
+        float max = -1;
+        float max_unvisited = -1;
         UEdge max_e;
         UEdge max_unvisited_e = curr;
         for (auto&& e : out_edges)
@@ -1056,16 +1056,16 @@ void UnitigGraph::blockPath(UEdge curr, unsigned int visits)
                 max_e = e;
             }
         }
-        if (max != 0 and g_[max_e].last_visit == visits) // the max edge has been visited in the same run
+        if (max != -1 and g_[max_e].last_visit == visits) // the max edge has been visited in the same run
         { // TODO we still might want to continue, if the next edge has a similar coverage as the first had
             return;
         }
-        if (max_unvisited != 0) // there still is an unvisited edge
+        if (max_unvisited != -1) // there still is an unvisited edge
         {
             // check whether we want to continue
             curr = max_unvisited_e;
         }
-        else if (max != 0) // all out_edges are visited
+        else if (max != -1) // all out_edges are visited
         {
             //check whether we want to continue
             curr = max_e;
@@ -1198,10 +1198,10 @@ void UnitigGraph::fixFlow()
         avg /= size;
         std::sort(unique[visits - 1].begin(), unique[visits - 1].end(), edge_compare);
         float median = g_[unique[visits - 1][size/2]].residual_capacity; // roughly median (TODO residual?)
-        /*for (auto e : unique[visits -1 ])
+        for (auto e : unique[visits - 1])
         {
-            g_[e].residual_capacity = std::max(0.f,g_[e].residual_capacity - median); // reduce residual flow by median on first path
-        }*/
+            g_[e].residual_capacity = std::max(0.f, g_[e].residual_capacity - median);
+        }
         visits++;
     }
     // we now have the tentative paths, now check how many edges are unique per path
