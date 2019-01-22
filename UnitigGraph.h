@@ -112,7 +112,8 @@ private:
 
     void blockPath(UEdge, unsigned int);
     void fixFlow();
-    std::pair<UEdge, std::pair<bool, unsigned int>> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int, unsigned int);
+    std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
+    std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
     void markCycles();
     void cleanGraph();
 	void removeStableSets();
