@@ -1210,13 +1210,13 @@ void UnitigGraph::fixFlow()
             if (!g_[e].visits.visits.empty() and g_[e].visits.visits.front() == visits)
             {
                 unique[visits - 1].push_back(e);
-                avg += g_[e].residual_capacity; // TODO residual?
+                avg += g_[e].residual_capacity; 
             }
         }
         auto size = unique[visits - 1].size();
         avg /= size;
         std::sort(unique[visits - 1].begin(), unique[visits - 1].end(), edge_compare);
-        float median = g_[unique[visits - 1][size/2]].residual_capacity; // roughly median (TODO residual?)
+        float median = g_[unique[visits - 1][size/2]].residual_capacity; // roughly median
         for (auto e : unique[visits - 1])
         {
             g_[e].residual_capacity = std::max(0.f, g_[e].residual_capacity - median);
@@ -1231,7 +1231,7 @@ void UnitigGraph::fixFlow()
         std::sort(unique[i].begin(), unique[i].end(), edge_compare);
         float med = g_[unique[i][unique[i].size()/2]].capacity;
         bool remove = true;
-        if (unique[i].size() >= 0.02 * boost::num_edges(g_))
+        if (unique[i].size() >= 0.02 * boost::num_edges(g_) or unique[i].size() > 10) //TODO: values
         {
             remove = false;
             paths++;
