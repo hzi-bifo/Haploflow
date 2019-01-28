@@ -112,6 +112,7 @@ private:
 
     void blockPath(UEdge, unsigned int);
     void fixFlow();
+    std::string contig_from_blocked_path(UEdge, unsigned int);
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
     void markCycles();
