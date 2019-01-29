@@ -1037,22 +1037,12 @@ void UnitigGraph::blockPath(UEdge curr, unsigned int visits)
         auto target = boost::target(curr, g_);
         auto out_edges = boost::out_edges(target, g_);
         float max = -1;
-        float max_unvisited = -1;
         UEdge max_e;
-        UEdge max_unvisited_e = curr;
         for (auto&& e : out_edges)
         {
-            if (g_[e].visits.visits.size() == 0) // an unvisited edge remains
+         if (g_[e].residual_capacity > max) // maximal visited edge
             {
-                if (g_[e].residual_capacity/*cap_info.first*/ > max_unvisited) // is maximal unvisited edge (continue with 0 as well in case residual_capacity was underestimated)
-                {
-                    max_unvisited = g_[e].residual_capacity/*cap_info.first*/;
-                    max_unvisited_e = e;
-                }
-            }
-            else if (g_[e].visits.visits.size() != 0 and g_[e].residual_capacity/*cap_info.first*/ > max) // maximal visited edge
-            {
-                max = g_[e].residual_capacity/*cap_info.first*/;
+                max = g_[e].residual_capacity;
                 max_e = e;
             }
         }
@@ -1060,12 +1050,7 @@ void UnitigGraph::blockPath(UEdge curr, unsigned int visits)
         { // TODO we still might want to continue, if the next edge has a similar coverage as the first had
             return;
         }
-        if (max_unvisited != -1) // there still is an unvisited edge
-        {
-            // check whether we want to continue
-            curr = max_unvisited_e;
-        }
-        else if (max != -1) // all out_edges are visited
+        if (max != -1) // all out_edges are visited
         {
             //check whether we want to continue
             curr = max_e;
@@ -1240,12 +1225,19 @@ void UnitigGraph::fixFlow()
         else
             break;
         float avg = 0;
+        std::cerr << "PATH " << visits << std::endl;
         for (auto e : boost::edges(g_))
         {
             if (!g_[e].visits.visits.empty() and g_[e].visits.visits.front() == visits)
             {
                 unique[visits - 1].push_back(e);
                 avg += g_[e].residual_capacity; 
+            }
+            if (std::find(g_[e].visits.visits.begin(), g_[e].visits.visits.end(), visits) != g_[e].visits.visits.end())
+            {
+                auto src = boost::source(e, g_);
+                auto trg = boost::target(e, g_);
+                std::cerr << g_[src].index << "->" << g_[trg].index << ": " << g_[e].residual_capacity << "/" << g_[e].capacity <<std::endl;
             }
         }
         if (unique[visits - 1].size() >= 0.02 * boost::num_edges(g_) or unique[visits - 1].size() > 15)
