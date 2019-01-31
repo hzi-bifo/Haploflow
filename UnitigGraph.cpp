@@ -1171,7 +1171,9 @@ std::string UnitigGraph::contig_from_blocked_path(UEdge source, unsigned int vis
         {
             g_[curr].visited = true;
         }
+        auto src = boost::source(curr, g_);
         auto trg = boost::target(curr, g_);
+        std::cerr << g_[src].index << " -> " << g_[trg].index << ": " << g_[curr].residual_capacity << "/" << g_[curr].capacity << std::endl;
         auto out_edges = boost::out_edges(trg, g_);
         not_sink = false;
         for (auto e : out_edges)
@@ -1225,6 +1227,7 @@ void UnitigGraph::fixFlow()
         else
             break;
         float avg = 0;
+        unsigned int length = 0;
         std::cerr << "PATH " << visits << std::endl;
         for (auto e : boost::edges(g_))
         {
@@ -1232,24 +1235,26 @@ void UnitigGraph::fixFlow()
             {
                 unique[visits - 1].push_back(e);
                 avg += g_[e].residual_capacity; 
+                length += g_[e].name.size();
             }
-            if (std::find(g_[e].visits.visits.begin(), g_[e].visits.visits.end(), visits) != g_[e].visits.visits.end())
-            {
-                auto src = boost::source(e, g_);
-                auto trg = boost::target(e, g_);
-                std::cerr << g_[src].index << "->" << g_[trg].index << ": " << g_[e].residual_capacity << "/" << g_[e].capacity <<std::endl;
-            }
+            //if (std::find(g_[e].visits.visits.begin(), g_[e].visits.visits.end(), visits) != g_[e].visits.visits.end())
+            //{
+            //    auto src = boost::source(e, g_);
+            //    auto trg = boost::target(e, g_);
+            //    std::cerr << g_[src].index << "->" << g_[trg].index << ": " << g_[e].residual_capacity << "/" << g_[e].capacity <<std::endl;
+            //}
         }
-        if (unique[visits - 1].size() >= 0.02 * boost::num_edges(g_) or unique[visits - 1].size() > 15)
+        if (unique[visits - 1].size() >= 0.02 * boost::num_edges(g_) or unique[visits - 1].size() > 15 or length > 500) //TODO entirely arbitrary
         {
             std::string contig = contig_from_blocked_path(curr, visits);
-            std::cout << ">Contig_" << visits << std::endl;
-            std::cout << contig << std::endl;
+            //std::cout << ">Contig_" << visits << std::endl;
+            //std::cout << contig << std::endl;
         }
         auto size = unique[visits - 1].size();
         avg /= size;
         std::sort(unique[visits - 1].begin(), unique[visits - 1].end(), edge_compare);
         float median = g_[unique[visits - 1][size/2]].residual_capacity; // roughly median
+        std::cerr << "Reduce by " << median << std::endl;
         for (auto e : unique[visits - 1])
         {
             g_[e].residual_capacity = std::max(0.f, g_[e].residual_capacity - median);
@@ -1259,7 +1264,8 @@ void UnitigGraph::fixFlow()
     // we now have the tentative paths, now check how many edges are unique per path
     // TODO might not be needed anymore
     //std::cerr << "Total edges: " << boost::num_edges(g_) << std::endl;
-    unsigned int paths = 0;
+    
+    /*unsigned int paths = 0;
     for (unsigned int i = 0; i < visits - 1; i++)
     {
         std::sort(unique[i].begin(), unique[i].end(), edge_compare);
@@ -1280,6 +1286,7 @@ void UnitigGraph::fixFlow()
             }
         }
     }
+    */
 }
 
 // calculates the flows and corresponding paths through the graph
@@ -1291,7 +1298,12 @@ void UnitigGraph::assemble(std::string fname)
     std::cerr << "Contracting simple paths" << std::endl;
     contractPaths();
     fixFlow();
+    /**/
+    std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
+    std::ofstream outfile (filename);
+    printGraph(outfile);
     return; // TODO
+    /**/
     while (true)
     {
         cleanGraph();
