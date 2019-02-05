@@ -42,18 +42,31 @@ typedef typename boost::graph_traits<UGraph>::vertex_descriptor UVertex;
 typedef typename boost::graph_traits<UGraph>::edge_descriptor UEdge;
 typedef boost::graph_traits<UGraph>::vertex_iterator uvertex_iter;
 
-struct Visits {
-    std::vector<unsigned int> visits;
-    friend std::ostream& operator<<(std::ostream& os, const Visits& visits)
+// output operator for std::vector
+template<class T>
+inline std::ostream& operator<<(std::ostream& os, const std::vector<T>& v)
     {
         os << "[ ";
-        for (auto&& v : visits.visits)
+        for (auto&& elem : v)
         {
-            os << v << " ";
+            os << elem << " ";
         }
         os << "]";
         return os;
     }
+
+struct Visits {
+    std::vector<unsigned int> visits;
+    friend std::ostream& operator<<(std::ostream& os, const Visits& v)
+    {
+        os << "[ ";
+        for (auto&& elem : v.visits)
+        {
+            os << elem << " ";
+        }
+        os << "]";
+        return os;
+    };
 };
 
 struct EdgeProperties {
@@ -62,15 +75,13 @@ struct EdgeProperties {
     float residual_capacity;
     Capacity cap_info;
     bool visited;
-    //std::vector<unsigned int> visits;
-    Visits visits;
+    std::vector<unsigned int> visits;
+    Visits v;
     unsigned int last_visit;
     UEdge prev; // edge on path forwards
     UEdge next; // edge on path backwards
     float fatness; //fatness of the path going through edges forwards
-    float fatness2; //fatness of the path going through edges backwards
     unsigned int distance; //distance from seed forwards
-    unsigned int distance2; //distance from seed backwards
 };
 
 struct VertexProperties {
@@ -93,26 +104,27 @@ public:
 	UnitigGraph(); // debug
 	void debug(); // debug information
     void assemble(std::string);
-    void printGraph(std::ostream&) const;
-    void dijkstra(UEdge seed, bool);
+    void printGraph(std::ostream&);
+    void dijkstra(UEdge seed);
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
 	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
 	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
 	UVertex addVertex(unsigned int*, std::string name);
+    std::vector<UEdge> get_sources();
 
-    std::pair<std::string, std::pair<float, float> > calculate_contigs(std::vector<UEdge>&);
+    std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&);
 	float calculate_thresholds(const deBruijnGraph&, float);
-    float calculate_gain(UVertex& v);
-    std::pair<float, std::vector<float> > calculate_flow(std::vector<UEdge>&);
-	std::vector<UEdge> find_fattest_path(UEdge);
+    //float calculate_gain(UVertex& v);
+    //std::pair<float, std::vector<float> > calculate_flow(std::vector<UEdge>&);
+	std::vector<UEdge> find_fattest_path(std::vector<UEdge>&, unsigned int);
     
-	UEdge getSeed() const;
+	//UEdge getSeed() const;
 
     void blockPath(UEdge, unsigned int);
-    void fixFlow();
-    std::string contig_from_blocked_path(UEdge, unsigned int);
+    std::pair<std::vector<UEdge>, std::vector<unsigned int>> fixFlow();
+    std::vector<unsigned int> remove_non_unique_paths(std::vector<std::vector<UEdge>>&, unsigned int);
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
     void markCycles();
