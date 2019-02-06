@@ -76,7 +76,7 @@ struct EdgeProperties {
     Capacity cap_info;
     bool visited;
     std::vector<unsigned int> visits;
-    Visits v;
+    Visits v; //DEBUG ONLY
     unsigned int last_visit;
     UEdge prev; // edge on path forwards
     UEdge next; // edge on path backwards
@@ -118,7 +118,7 @@ private:
 	float calculate_thresholds(const deBruijnGraph&, float);
     //float calculate_gain(UVertex& v);
     //std::pair<float, std::vector<float> > calculate_flow(std::vector<UEdge>&);
-	std::vector<UEdge> find_fattest_path(std::vector<UEdge>&, unsigned int);
+	std::vector<UEdge> find_fattest_path(UEdge seed);
     
 	//UEdge getSeed() const;
 
