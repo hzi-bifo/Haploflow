@@ -123,10 +123,11 @@ private:
 	//UEdge getSeed() const;
 
     void blockPath(UEdge, unsigned int);
-    std::pair<std::vector<UEdge>, std::vector<unsigned int>> fixFlow();
-    std::vector<unsigned int> remove_non_unique_paths(std::vector<std::vector<UEdge>>&, unsigned int);
+    std::pair<std::vector<UEdge>, std::vector<unsigned int>> find_paths();
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
+    void fixFlow(UEdge seed, UEdge target);
+    UEdge get_next_source();
     void markCycles();
     void cleanGraph();
 	void removeStableSets();
