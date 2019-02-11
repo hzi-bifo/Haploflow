@@ -126,7 +126,8 @@ private:
     std::pair<std::vector<UEdge>, std::vector<unsigned int>> find_paths();
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
-    void fixFlow(UEdge seed, UEdge target);
+    void fixFlow(UEdge seed);
+    std::pair<UEdge, float> get_target(UEdge);
     UEdge get_next_source();
     void markCycles();
     void cleanGraph();
