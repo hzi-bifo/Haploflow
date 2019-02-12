@@ -76,6 +76,7 @@ struct EdgeProperties {
     Capacity cap_info;
     bool visited;
     std::vector<unsigned int> visits;
+    unsigned int paths; // number of paths going over edge
     Visits v; //DEBUG ONLY
     unsigned int last_visit;
     UEdge prev; // edge on path forwards
@@ -126,7 +127,8 @@ private:
     std::pair<std::vector<UEdge>, std::vector<unsigned int>> find_paths();
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
-    void fixFlow(UEdge seed);
+    unsigned int fixFlow(UEdge seed);
+    std::vector<unsigned int> remove_non_unique_paths(std::vector<std::vector<UEdge>>, unsigned int);
     std::pair<UEdge, float> get_target(UEdge);
     UEdge get_next_source();
     void markCycles();
