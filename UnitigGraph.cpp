@@ -950,8 +950,8 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
     std::string contig = g_[source].name;
     for (auto e : path)
     {
-        auto source = boost::source(e, g_);
-        auto target = boost::target(e, g_);
+        //auto source = boost::source(e, g_);
+        //auto target = boost::target(e, g_);
         //std::cerr << " -> " << g_[target].index;
         contig += g_[e].name;
         if (g_[e].visits.size() == 1)
@@ -965,14 +965,14 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
         }
     }
     flow /= i; // average flow over unqiue edges of path
-    unsigned int len = g_[path.front()].name.size();
+    unsigned int len = g_[source].name.size();
     //unsigned int j = 0;
     for (auto e : path)
     {
         //g_[e].paths++;
         auto src = boost::source(e, g_);
         auto trg = boost::target(e, g_);
-        auto val = g_[e].capacity;
+        //auto val = g_[e].capacity;
         g_[e].visits.erase(g_[e].visits.begin());
         if (g_[e].visits.empty() or g_[e].visits.size() <= g_[e].paths)
         {
@@ -980,10 +980,12 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
         }
         else
         {
+            //make these two different modus, accurate vs contiguity? TODO
             g_[e].capacity = std::max(threshold_, g_[e].capacity - flow); // there might be paths, so leave a small amount
+            //g_[e].capacity = std::max(0.f, g_[e].capacity - flow); // there might be paths, so leave a small amount
         }
         len += g_[e].name.size();
-        //std::cerr << g_[src].index << " -> " << g_[trg].index << " length: " << len << std::endl;
+        std::cerr << g_[src].index << " -> " << g_[trg].index << " length: " << len << std::endl;
         //std::cerr << g_[src].index << " -> " << g_[trg].index << " set to " << g_[e].capacity << " (was " << val << "), paths to " << g_[e].paths << " of " << g_[e].visits.size() << std::endl;
         /*if (g_[e].visits.size() == 1)
         {
@@ -1044,6 +1046,35 @@ void UnitigGraph::blockPath(UEdge curr, unsigned int visits)
             return;
         }
     }
+}
+
+UEdge UnitigGraph::get_next_source()
+{
+    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
+        return g_[e1].capacity > g_[e2].capacity;
+    };
+    unvisit(); // does this destroy anything? TODO
+    auto sources = get_sources();
+    UEdge source;
+    std::queue<UEdge> to_check;
+    if (sources.size() > 0) // if there are sources, take highest possible source
+    {
+        std::sort(sources.begin(), sources.end(), edge_compare);
+        source = sources.front(); 
+    }
+    else // else take highest unvisited edge
+    {
+        float max = 0.;
+        for (auto e : boost::edges(g_))
+        {
+            if (g_[e].last_visit == 0 and g_[e].capacity > max)
+            {
+                max = g_[e].capacity;
+                source = e;
+            }
+        }
+    }
+    return source;
 }
 
 std::pair<UEdge, bool> UnitigGraph::checkUnvisitedEdges(UEdge current_source)
@@ -1158,7 +1189,7 @@ std::vector<UEdge> UnitigGraph::get_sources()
     return sources;
 }
 
-unsigned int UnitigGraph::fixFlow(UEdge seed)
+std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std::vector<float> previous_flows)
 {
     dijkstra(seed);
     auto target = get_target(seed); // get_target only makes sense after having run dijkstra!
@@ -1169,7 +1200,7 @@ unsigned int UnitigGraph::fixFlow(UEdge seed)
     }
     else
     {
-        return 0; // cannot fix non-existing paths
+        return std::make_pair(0, previous_flows); // cannot fix non-existing paths
     }
     std::deque<UEdge> path;
     std::vector<unsigned int> unique_paths;
@@ -1187,15 +1218,27 @@ unsigned int UnitigGraph::fixFlow(UEdge seed)
             unique_paths[g_[curr].visits.back() - 1]++;
             float current_avg = unique_flows[g_[curr].visits.back() - 1];
             unsigned int current_nr = unique_paths[g_[curr].visits.back() - 1];
+            auto src = boost::source(curr, g_);
+            auto trg = boost::target(curr, g_);
+            std::cerr << g_[src].index << " -> " << g_[trg].index << " " << g_[curr].visits << ": " << g_[curr].capacity << std::endl;
             unique_flows[g_[curr].visits.back() - 1] += (g_[curr].capacity - current_avg)/current_nr;
         }
         tot_length += g_[curr].name.size();
         path.push_front(curr);
         curr = g_[curr].prev;
     }
+    std::cerr << unique_flows << std::endl;
+    std::cerr << unique_paths << std::endl;
+    for (unsigned int i = 0; i < std::min(unique_flows.size(), previous_flows.size()); i++) // don't change the average flow too mcuh by having changed some edges before
+    {
+        if (test_hypothesis(unique_flows[i], previous_flows[i], 1))
+        {
+            unique_flows[i] = previous_flows[i];
+        }
+    }
     if (unique_flows.empty()) //TODO
     {
-        return 0;
+        return std::make_pair(0, previous_flows);
     }
     path.push_front(curr); // add source to path
     //float flow = *std::max(unique_flows.begin(), unique_flows.end());
@@ -1227,7 +1270,8 @@ unsigned int UnitigGraph::fixFlow(UEdge seed)
         }
         length += g_[e].name.size();
     }
-    return changes;
+    std::cerr << changes << " changes in flow" << std::endl;
+    return std::make_pair(changes, unique_flows);
 }
 
 std::pair<std::vector<UEdge>, std::vector<unsigned int>> UnitigGraph::find_paths()
@@ -1306,33 +1350,6 @@ std::vector<unsigned int> UnitigGraph::remove_non_unique_paths(std::vector<std::
     return paths;
 }
 
-UEdge UnitigGraph::get_next_source()
-{
-    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
-        return g_[e1].capacity > g_[e2].capacity;
-    };
-    auto sources = get_sources();
-    UEdge source;
-    if (sources.size() > 0) // if there are sources, take highest possible source
-    {
-        std::sort(sources.begin(), sources.end(), edge_compare);
-        source = sources.front(); //TODO
-    }
-    else // else take highest unvisited edge
-    {
-        float max = 0.;
-        for (auto e : boost::edges(g_))
-        {
-            if (g_[e].last_visit == 0 and g_[e].capacity > max)
-            {
-                max = g_[e].capacity;
-                source = e;
-            }
-        }
-    }
-    return source;
-}
-
 // calculates the flows and corresponding paths through the graph
 void UnitigGraph::assemble(std::string fname)
 {
@@ -1371,10 +1388,13 @@ void UnitigGraph::assemble(std::string fname)
             break;
         }
         std::cerr << "Fixing flow..." << std::endl;
+        std::vector<float> flows;
         for (unsigned int i = 0; i < 50; i++) // do that a few times? TODO 50 is arbitrary
         {
-            auto changes = fixFlow(seed); //TODO what if target is None
-            std::cerr << changes << " changes in flow!" << std::endl;
+            auto changed_flows = fixFlow(seed, flows);
+            //if (i == 0) TODO: this means, average does not change by changing edge capacities
+                flows = changed_flows.second;
+            auto changes = changed_flows.first;
             if (changes == 0)
                 break; //no changes in flow were made
         }
@@ -1402,15 +1422,6 @@ void UnitigGraph::assemble(std::string fname)
         removeEmpty();
         removeStableSets();
     }
-    for (auto e : boost::edges(g_))
-    {
-        if (g_[e].last_visit == 0)
-        {
-            auto src = boost::source(e, g_);
-            auto trg = boost::target(e, g_);
-            std::cerr << g_[src].index << " -> " << g_[trg].index << ": " << g_[e].capacity << std::endl;
-        }
-    }
     std::cerr << "Assembly complete" << std::endl;
 }
 
@@ -1431,8 +1442,8 @@ void UnitigGraph::printGraph(std::ostream& os)
     }
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,g_)), boost::default_writer(), propmapIndex);
 }
