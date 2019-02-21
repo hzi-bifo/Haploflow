@@ -943,7 +943,7 @@ std::pair<float, float> UnitigGraph::calculate_gain(UVertex& v)
 } 
 
 // Given all the chosen edges and their coverage fraction, builds the contigs and reduces flow accordingly
-std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>& path)
+std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>& path, std::vector<float>& flows)
 {
     float flow = 0.;
     float max_flow = 0.;
@@ -976,30 +976,30 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
         //g_[e].paths++;
         auto src = boost::source(e, g_);
         auto trg = boost::target(e, g_);
-        //auto val = g_[e].capacity;
+        auto val = g_[e].capacity;
         g_[e].visits.erase(g_[e].visits.begin());
         if (g_[e].visits.empty() or g_[e].visits.size() <= g_[e].paths)
         {
             g_[e].capacity = 0;
         }
         else
-        {
-            //make these two different modus, accurate vs contiguity? TODO
-            g_[e].capacity = std::max(threshold_, g_[e].capacity - flow); // there might be paths, so leave a small amount
-            //g_[e].capacity = std::max(0.f, g_[e].capacity - flow); // there might be paths, so leave a small amount
+        { // TODO finer granularity for removal if still paths remaining
+            g_[e].capacity = std::max(0.f, g_[e].capacity - flow); // there might be paths, so leave a small amount
+            if (g_[e].capacity <= threshold_)
+            {
+                for (auto v : g_[e].visits)
+                {
+                    if (v < flows.size())
+                        g_[e].capacity += flows[v]; // this is the average flow of the remaining unique flows
+                }
+            }
+            if (g_[e].capacity <= threshold_) // no unique flows were on this edge, but some paths might still be remaining
+                g_[e].capacity = threshold_;
+            //g_[e].capacity = std::max(threshold_, g_[e].capacity - flow); // there might be paths, so leave a small amount
         }
         len += g_[e].name.size();
-        //std::cerr << g_[src].index << " -> " << g_[trg].index << " length: " << len << std::endl;
-        //std::cerr << g_[src].index << " -> " << g_[trg].index << " set to " << g_[e].capacity << " (was " << val << "), paths to " << g_[e].paths << " of " << g_[e].visits.size() << std::endl;
-        /*if (g_[e].visits.size() == 1)
-        {
-            std::cerr << "Unique (" << g_[e].visits.front() << ")" << std::endl;
-        }
-        else
-        {
-            std::cerr << "Multiple (" << g_[e].visits << ")" << std::endl;
-        }
-        std::cerr << j++ << "/" << path.size() << std::endl;*/
+        std::cerr << g_[src].index << " -> " << g_[trg].index << " length: " << len << std::endl;
+        std::cerr << g_[src].index << " -> " << g_[trg].index << " set to " << g_[e].capacity << " (was " << val << ", " << g_[e].visits.size() << " paths" << std::endl;
     }
     return std::make_pair(contig, flow);
 }
@@ -1058,37 +1058,26 @@ UEdge UnitigGraph::get_next_source()
         return g_[e1].capacity > g_[e2].capacity;
     };
     unvisit(); // does this destroy anything? TODO
-    /*auto sources = get_sources();
+    auto sources = get_sources();
     UEdge source;
     std::queue<UEdge> to_check;
     if (sources.size() > 0) // if there are sources, take highest possible source
     {
         std::sort(sources.begin(), sources.end(), edge_compare);
-        source = sources.front(); 
+        source = sources.front();
     }
     else // else take highest unvisited edge
     {
-        float max = 0.;
+        float max = 0;
         for (auto e : boost::edges(g_))
         {
-            if (g_[e].last_visit == 0 and g_[e].capacity > max)
+            auto src = boost::source(e, g_);
+            auto trg = boost::target(e, g_);
+            if (/*g_[e].last_visit == 0 and calculate_gain(src).first > max*/g_[e].capacity > max)
             {
-                max = g_[e].capacity;
+                max = g_[e].capacity;//calculate_gain(src).first;
                 source = e;
             }
-        }
-    }*/
-    float max = 0;
-    UEdge source;
-    for (auto e : boost::edges(g_))
-    {
-        auto src = boost::source(e, g_);
-        auto trg = boost::target(e, g_);
-        if (/*g_[e].last_visit == 0 and*/ calculate_gain(src).first > max)
-        {
-            max = calculate_gain(src).first;
-            source = e;
-            std::cerr << g_[src].index << " -> " << g_[trg].index << ": " << max << std::endl;
         }
     }
     return source;
@@ -1244,8 +1233,8 @@ std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std
         path.push_front(curr);
         curr = g_[curr].prev;
     }
-    //std::cerr << unique_flows << std::endl;
-    //std::cerr << unique_paths << std::endl;
+    std::cerr << unique_flows << std::endl;
+    std::cerr << unique_paths << std::endl;
     for (unsigned int i = 0; i < std::min(unique_flows.size(), previous_flows.size()); i++) // don't change the average flow too mcuh by having changed some edges before
     {
         if (test_hypothesis(unique_flows[i], previous_flows[i], 1))
@@ -1266,8 +1255,10 @@ std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std
     {
         auto src = boost::source(e, g_);
         auto trg = boost::target(e, g_);
-        if (g_[e].capacity == g_[e].fatness) // fatness was reduced here (fatness <= capacity per definition)
-        { // check if fatness reduce was justified
+        if (g_[e].capacity == g_[e].fatness and (changes == 0 or (changes > 0 and g_[e].capacity != threshold_))) // fatness was reduced here (fatness <= capacity per definition)
+        { //only change capacity once, if capacity was set to threshold_ previously (because the path afterwards is basically random)
+        // TODO: it might happen that the capacity is low (but > threshold_)
+            // check if fatness reduce was justified
             auto old = g_[e].capacity;
             g_[e].capacity = 0.f;
             for (unsigned int p : g_[e].visits)
@@ -1282,7 +1273,7 @@ std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std
             else if (!test_hypothesis(g_[e].capacity,old, 1.f))
             {
                 changes++;
-                //std::cerr << g_[src].index << " -> " << g_[trg].index << ": " << old << " -> " << g_[e].capacity << std::endl;
+                std::cerr << g_[src].index << " -> " << g_[trg].index << ": " << old << " -> " << g_[e].capacity << std::endl;
             }
         }
         length += g_[e].name.size();
@@ -1409,21 +1400,20 @@ void UnitigGraph::assemble(std::string fname)
         for (unsigned int i = 0; i < 50; i++) // do that a few times? TODO 50 is arbitrary
         {
             auto changed_flows = fixFlow(seed, flows);
-            //if (i == 0) TODO: this means, average does not change by changing edge capacities
-                flows = changed_flows.second;
+            flows = changed_flows.second;
             auto changes = changed_flows.first;
             if (changes == 0)
                 break; //no changes in flow were made
         }
-        std::cerr << "Finding fattest path..." << std::endl;
-        std::vector<UEdge> path = find_fattest_path(seed);
         /*DEBUG*/
         std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
         std::ofstream outfile (filename);
         printGraph(outfile);
         /*DEBUG*/
+        std::cerr << "Finding fattest path..." << std::endl;
+        std::vector<UEdge> path = find_fattest_path(seed);
         std::cerr << "Calculating contig " << i << "..." << std::endl;
-        auto contig = calculate_contigs(path);
+        auto contig = calculate_contigs(path, flows);
         if (contig.first.size() > 150)
         {
             std::cout << ">Contig_" << i << "_flow_" << contig.second << std::endl;

@@ -115,7 +115,7 @@ private:
 	UVertex addVertex(unsigned int*, std::string name);
     std::vector<UEdge> get_sources();
 
-    std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&);
+    std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&);
 	float calculate_thresholds(const deBruijnGraph&, float);
     std::pair<float, float> calculate_gain(UVertex& v);
     //std::pair<float, std::vector<float> > calculate_flow(std::vector<UEdge>&);
