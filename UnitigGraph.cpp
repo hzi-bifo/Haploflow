@@ -999,7 +999,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
         }
         len += g_[e].name.size();
         std::cerr << g_[src].index << " -> " << g_[trg].index << " length: " << len << std::endl;
-        std::cerr << g_[src].index << " -> " << g_[trg].index << " set to " << g_[e].capacity << " (was " << val << ", " << g_[e].visits.size() << " paths" << std::endl;
+        std::cerr << g_[src].index << " -> " << g_[trg].index << " set to " << g_[e].capacity << " (was " << val << ", " << g_[e].visits.size() << " paths)" << std::endl;
     }
     return std::make_pair(contig, flow);
 }
@@ -1189,6 +1189,19 @@ std::vector<UEdge> UnitigGraph::get_sources()
             for (auto f : boost::out_edges(src, g_))
             {
                 sources.push_back(f); // for every outedge of source start search
+            }
+        }
+        else if (in_degree == 1) // also add sources which have a self-loop (?)
+        {
+            auto inedges = boost::in_edges(src, g_);
+            for (auto ie : inedges)
+            {
+                auto source = boost::source(e, g_);
+                auto target = boost::target(e, g_);
+                if (source == target and std::find(sources.begin(), sources.end(), e) == sources.end())
+                {
+                    sources.push_back(ie);
+                }
             }
         }
     }
