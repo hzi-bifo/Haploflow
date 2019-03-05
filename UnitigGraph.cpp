@@ -383,7 +383,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
             g_[e.first].name = sequence;    
 		}
         g_[e.first].last_visit = 0;
-        g_[e.first].paths = 0;
         g_[e.first].capacity = avg;
         g_[e.first].residual_capacity = avg;
         g_[e.first].cap_info.avg = avg;
@@ -486,7 +485,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
             g_[e.first].name = sequence;
 		}
         g_[e.first].last_visit = 0;
-        g_[e.first].paths = 0;
         g_[e.first].capacity = avg;
         g_[e.first].residual_capacity = avg;
         g_[e.first].cap_info.avg = avg;
@@ -544,7 +542,6 @@ void UnitigGraph::contractPaths()
 
 			auto&& new_e = boost::add_edge(new_source,new_target,g_);
             g_[new_e.first].last_visit = 0;
-            g_[new_e.first].paths = 0;
             g_[new_e.first].name = seq;
             g_[new_e.first].capacity = capacity;
             g_[new_e.first].residual_capacity = capacity;
@@ -970,17 +967,24 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
     }
     flow /= i; // average flow over unqiue edges of path
     unsigned int len = g_[source].name.size();
-    //unsigned int j = 0;
     for (auto e : path)
     {
-        //g_[e].paths++;
         auto src = boost::source(e, g_);
         auto trg = boost::target(e, g_);
         auto val = g_[e].capacity;
+        auto removed_visit = g_[e].visits.front();
         g_[e].visits.erase(g_[e].visits.begin());
-        if (g_[e].visits.empty() or g_[e].visits.size() <= g_[e].paths)
+        if (g_[e].visits.empty())
         {
-            g_[e].capacity = 0;
+            if (g_[e].capacity > 2 * flow) // if we remove current flow (and buffer), there is still the same amount of flow remaining
+            {
+                g_[e].capacity = threshold_; //might want to set this to flow instead
+                g_[e].visits.push_back(removed_visit);
+            }
+            else
+            {
+                g_[e].capacity = 0;
+            }
         }
         else
         { // TODO finer granularity for removal if still paths remaining
@@ -1246,8 +1250,6 @@ std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std
         path.push_front(curr);
         curr = g_[curr].prev;
     }
-    std::cerr << unique_flows << std::endl;
-    std::cerr << unique_paths << std::endl;
     for (unsigned int i = 0; i < std::min(unique_flows.size(), previous_flows.size()); i++) // don't change the average flow too mcuh by having changed some edges before
     {
         if (test_hypothesis(unique_flows[i], previous_flows[i], 1))
@@ -1295,7 +1297,7 @@ std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std
     return std::make_pair(changes, unique_flows);
 }
 
-std::pair<std::vector<UEdge>, std::vector<unsigned int>> UnitigGraph::find_paths()
+std::vector<float> UnitigGraph::find_paths()
 {
     std::vector<UEdge> sources = get_sources(); //get sources of the graph (indegree = 0)
     auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
@@ -1305,6 +1307,7 @@ std::pair<std::vector<UEdge>, std::vector<unsigned int>> UnitigGraph::find_paths
     unsigned int visits = 1;
     std::vector<std::vector<UEdge>> unique;
     std::vector<UEdge> started_from;
+    std::vector<float> unique_paths;
     while (true)
     {
         unvisit();
@@ -1332,43 +1335,40 @@ std::pair<std::vector<UEdge>, std::vector<unsigned int>> UnitigGraph::find_paths
         }
         auto size = unique[visits - 1].size();
         avg /= size;
+        unique_paths.push_back(remove_non_unique_paths(unique, visits - 1));
         visits++;
     }
     // we now have the tentative paths, now check how many edges are unique per path
-    auto unique_numbers = remove_non_unique_paths(unique, visits); // removes sources with non-unique paths
-    /*std::vector<unsigned int> unique_numbers;
-    for (unsigned int i = 0; i < started_from.size(); i++)
-    {
-        unique_numbers.push_back(i);
-    }*/
-    return std::make_pair(started_from, unique_numbers);
+    return unique_paths;
 }
 
-std::vector<unsigned int> UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>> unique, unsigned int visits)
+float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>> unique, unsigned int visits)
 {
-    std::vector<unsigned int> paths;
-    for (unsigned int i = 0; i < visits - 1; i++) // visits start at 1
+    float median = 0.f;
+    auto size = unique[visits].size();
+    if (size < 0.02 * boost::num_edges(g_) and size < 15)
     {
-        if (unique[i].size() < 0.02 * boost::num_edges(g_) and unique[i].size() < 15)
+        for (auto e : boost::edges(g_))
         {
-            for (auto e : boost::edges(g_))
+            if (g_[e].visits.size() > 1) // so we dont not visit some edges
             {
-                if (g_[e].visits.size() > 1) // so we dont not visit some edges
+                auto pos = std::find(g_[e].visits.begin(), g_[e].visits.end(), visits + 1);
+                if (pos != g_[e].visits.end())
                 {
-                    auto pos = std::find(g_[e].visits.begin(), g_[e].visits.end(), i + 1);
-                    if (pos != g_[e].visits.end())
-                    {
-                        g_[e].visits.erase(pos);
-                    }
+                    g_[e].visits.erase(pos);
                 }
             }
         }
-        else
+    }
+    else
+    {
+        median = g_[unique[visits][size/2]].capacity; //roughly median
+        for (auto e : unique[visits])
         {
-            paths.push_back(i+1);
+            g_[e].residual_capacity = std::max(threshold_, g_[e].residual_capacity - median);
         }
     }
-    return paths;
+    return median;
 }
 
 // calculates the flows and corresponding paths through the graph
@@ -1379,7 +1379,7 @@ void UnitigGraph::assemble(std::string fname)
     cleanGraph();
     contractPaths();
     std::cerr << "Calculating paths" << std::endl;
-    /*auto all_paths = */find_paths();
+    auto all_paths = find_paths();
     /*for (auto e : boost::edges(g_))
     {
         if (g_[e].visits.empty())
@@ -1412,7 +1412,7 @@ void UnitigGraph::assemble(std::string fname)
         std::vector<float> flows;
         for (unsigned int i = 0; i < 50; i++) // do that a few times? TODO 50 is arbitrary
         {
-            auto changed_flows = fixFlow(seed, flows);
+            auto changed_flows = fixFlow(seed, all_paths/*flows*/);
             flows = changed_flows.second;
             auto changes = changed_flows.first;
             if (changes == 0)
@@ -1462,8 +1462,8 @@ void UnitigGraph::printGraph(std::ostream& os)
     }
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,g_)), boost::default_writer(), propmapIndex);
 }
