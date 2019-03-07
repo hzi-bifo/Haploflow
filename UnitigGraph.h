@@ -75,6 +75,7 @@ struct EdgeProperties {
     float residual_capacity;
     Capacity cap_info;
     bool visited;
+    bool first_vertex;
     std::vector<unsigned int> visits;
     Visits v; //DEBUG ONLY
     unsigned int last_visit;
@@ -122,13 +123,13 @@ private:
     
 	//UEdge getSeed() const;
 
-    void blockPath(UEdge, unsigned int);
+    std::vector<UEdge> blockPath(UEdge, unsigned int);
     std::vector<float> find_paths();
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
-    std::pair<unsigned int, std::vector<float>> fixFlow(UEdge seed, std::vector<float>);
-    float remove_non_unique_paths(std::vector<std::vector<UEdge>>, unsigned int);
-    std::pair<UEdge, float> get_target(UEdge);
+    std::pair<unsigned int, std::vector<float>> fixFlow(UEdge seed, std::vector<float>&);
+    float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int);
+    std::pair<UEdge, float> get_target(UEdge, bool);
     UEdge get_next_source();
     void markCycles();
     void cleanGraph();
