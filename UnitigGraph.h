@@ -128,7 +128,7 @@ private:
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
     std::pair<unsigned int, std::vector<float>> fixFlow(UEdge seed, std::vector<float>&);
-    float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int);
+    float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int, unsigned int);
     std::pair<UEdge, float> get_target(UEdge, bool);
     UEdge get_next_source();
     void markCycles();

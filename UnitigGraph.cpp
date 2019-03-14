@@ -850,7 +850,7 @@ void UnitigGraph::dijkstra(UEdge seed)
 
 std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient)
 {
-    lenient = true; //TODO
+    lenient = true; //TODO (change for e.g. bacterial genomes)
     float max_dist = 0;
     float running_fatness = 0;
     float running_distance = 0;
@@ -1127,6 +1127,7 @@ std::pair<UEdge, bool> UnitigGraph::checkUnvisitedEdges(UEdge current_source)
     //breadth first search for the first unvisited edge
     std::queue<UEdge> to_check;
     to_check.push(curr);
+    float capacity = 0.f;
     for (auto e : out_edges)
     {
         to_check.push(e);
@@ -1139,11 +1140,14 @@ std::pair<UEdge, bool> UnitigGraph::checkUnvisitedEdges(UEdge current_source)
             continue;
         else
             g_[next].visited = true;
-        if (g_[next].last_visit == 0)
+        if (g_[next].last_visit == 0) // next edge has not been visited
         {
-            unblocked = true;
-            curr = next;
-            break; //we found an unblocked edge, return this one
+            if (g_[next].residual_capacity > capacity) // and has higher capacity than other close-by edges
+            {
+                unblocked = true;
+                curr = next;
+                capacity = g_[next].residual_capacity; // choose as next
+            }
         }
         else // edge is visisted, continue search
         {
@@ -1151,7 +1155,8 @@ std::pair<UEdge, bool> UnitigGraph::checkUnvisitedEdges(UEdge current_source)
             out_edges = boost::out_edges(source, g_);
             for (auto e : out_edges)
             {
-                to_check.push(e);
+                if (!unblocked or g_[e].last_visit == 0) // if we havent found an edge or next edge is unvisited: continue search
+                    to_check.push(e);
             }
         }
     }
@@ -1201,7 +1206,9 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
             {
                 auto nextUnvisited = checkUnvisitedEdges(e);
                 auto potential_source = nextUnvisited.first;
-                if (nextUnvisited.second and (curr != potential_source or g_[potential_source].residual_capacity > g_[curr].residual_capacity))
+                auto source = boost::source(potential_source, g_);
+                auto target = boost::target(potential_source, g_);
+                if (nextUnvisited.second and g_[potential_source].residual_capacity > g_[curr].residual_capacity)
                 { // and check the highest capacity one
                     unblocked = true;
                     curr = potential_source;
@@ -1212,12 +1219,13 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
     return std::make_pair(curr, unblocked);
 }
 
-std::vector<UEdge> UnitigGraph::get_sources()
+std::vector<UEdge> UnitigGraph::get_sources() // also add edges with 0 residual_capacity inflow if true
 {
     std::vector<UEdge> sources;
     for (auto e : boost::edges(g_))
     {
         auto src = boost::source(e, g_);
+        auto target = boost::target(e, g_);
         auto in_degree = boost::in_degree(src, g_);
         if (in_degree == 0 and std::find(sources.begin(), sources.end(), e) == sources.end()) // only add all source edges if they havent beed added before
         {
@@ -1226,18 +1234,9 @@ std::vector<UEdge> UnitigGraph::get_sources()
                 sources.push_back(f); // for every outedge of source start search
             }
         }
-        else if (in_degree == 1) // also add sources which have a self-loop (?)
+        else if (in_degree == 1 and src == target) // also add sources which have a self-loop
         {
-            auto inedges = boost::in_edges(src, g_);
-            for (auto ie : inedges)
-            {
-                auto source = boost::source(e, g_);
-                auto target = boost::target(e, g_);
-                if (source == target and std::find(sources.begin(), sources.end(), e) == sources.end())
-                {
-                    sources.push_back(ie);
-                }
-            }
+            sources.push_back(e);
         }
     }
     return sources;
@@ -1283,10 +1282,10 @@ std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std
     }
     for (unsigned int i = 0; i < std::min(unique_flows.size(), previous_flows.size()); i++) // don't change the average flow too mcuh by having changed some edges before
     {
-        if (test_hypothesis(unique_flows[i], previous_flows[i], 1))
-        {
+        //if (test_hypothesis(unique_flows[i], previous_flows[i], 1))
+        //{
             unique_flows[i] = previous_flows[i];
-        }
+        //}
     }
     if (unique_flows.empty()) //TODO
     {
@@ -1335,6 +1334,7 @@ std::vector<float> UnitigGraph::find_paths()
         return g_[e1].capacity > g_[e2].capacity;
     };
     std::sort(sources.begin(), sources.end(), edge_compare); // so that we search the highest source first
+    unsigned int used_sources = 1;
     unsigned int visits = 1;
     std::vector<std::vector<UEdge>> unique;
     std::vector<UEdge> started_from;
@@ -1342,7 +1342,7 @@ std::vector<float> UnitigGraph::find_paths()
     while (true)
     {
         unvisit();
-        std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, visits);
+        std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, used_sources);
         UEdge curr = unvisited.first;
         bool unblocked = unvisited.second;
         unique.push_back(std::vector<UEdge>{});
@@ -1367,18 +1367,25 @@ std::vector<float> UnitigGraph::find_paths()
         }
         auto size = unique[visits - 1].size();
         avg /= size;
-        unique_paths.push_back(remove_non_unique_paths(unique, blockedPath, visits - 1));
+        unique_paths.push_back(remove_non_unique_paths(unique, blockedPath, length, visits - 1));
+        auto source = boost::source(curr, g_);
+        auto target = boost::target(curr, g_);
+        auto indegree = boost::in_degree(source, g_);
+        if (indegree == 0 or (indegree == 1 and source == target))
+        {
+            used_sources++;
+        }
         visits++;
     }
     // we now have the tentative paths, now check how many edges are unique per path
     return unique_paths;
 }
 
-float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& unique, std::vector<UEdge>& blockedPath, unsigned int visits)
+float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& unique, std::vector<UEdge>& blockedPath, unsigned int length, unsigned int visits)
 {
     float median = 0.f;
     auto size = unique[visits].size();
-    if (size < 0.02 * boost::num_edges(g_) and size < 15)
+    if (size < 0.02 * boost::num_edges(g_) and size < 15 and length < 1000) //TODO parameters
     {
         for (auto e : blockedPath)
         {
@@ -1416,15 +1423,6 @@ void UnitigGraph::assemble(std::string fname)
     contractPaths();
     std::cerr << "Calculating paths" << std::endl;
     auto all_paths = find_paths();
-    /*for (auto e : boost::edges(g_))
-    {
-        if (g_[e].visits.empty())
-        {
-            auto src = boost::source(e, g_);
-            auto trg = boost::target(e, g_);
-            std::cerr << g_[src].index << " " << g_[trg].index << ": " << g_[e].last_visit << " " << g_[e].capacity << std::endl;
-        }
-    }*/
     /*DEBUG*/
     std::string filename = fname + "Graph.dot";
     std::ofstream outfile (filename);
