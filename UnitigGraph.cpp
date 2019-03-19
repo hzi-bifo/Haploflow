@@ -799,7 +799,7 @@ float UnitigGraph::out_capacity(UVertex target)
 }*/ //TODO: probably not needed anymore
 
 // run dijsktra with fatness as optimality criterion, marks the graph with the distances from seed
-void UnitigGraph::dijkstra(UEdge seed)
+void UnitigGraph::dijkstra(UEdge seed, bool residual)
 {
     auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest fatness
         return g_[e1].fatness < g_[e2].fatness;
@@ -812,7 +812,7 @@ void UnitigGraph::dijkstra(UEdge seed)
         if (e == seed) //
         {
             g_[e].distance = 0;
-            g_[e].fatness = g_[e].capacity;
+            g_[e].fatness = (residual ? g_[e].residual_capacity : g_[e].capacity);
         }
     }
     q.push_back(seed);
@@ -827,9 +827,9 @@ void UnitigGraph::dijkstra(UEdge seed)
         {
             float fat = g_[oe].fatness;
             auto trg = boost::target(oe, g_);
-            if (fat < std::min(g_[curr].fatness, g_[oe].capacity))
+            if (fat < std::min(g_[curr].fatness, (residual ? g_[oe].residual_capacity : g_[oe].capacity)))
             {
-                g_[oe].fatness = std::min(g_[curr].fatness, g_[oe].capacity);
+                g_[oe].fatness = std::min(g_[curr].fatness, (residual ? g_[oe].residual_capacity : g_[oe].capacity));
                 g_[oe].prev = curr;
                 g_[oe].distance = g_[curr].distance + g_[oe].name.size();
             }
@@ -899,9 +899,12 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
     auto source = boost::source(seed, g_);
     auto target = boost::target(seed, g_);
     std::cerr << "Source: " << g_[source].index << " -> " << g_[target].index << ": " << g_[seed].capacity << std::endl;
-    dijkstra(seed); // sets distance values from seed/source vertex
+    dijkstra(seed, false); // sets distance values from seed/source vertex
     auto trg = get_target(seed, false);
     auto last = trg.first;
+    auto source2 = boost::source(last, g_);
+    auto target2 = boost::target(last, g_);
+    std::cerr << "Target: " << g_[source2].index << " -> " << g_[target2].index << ": " << g_[last].capacity << std::endl;
     float max_dist = trg.second;
     if (max_dist == 0) // path is only one edge, no longest path
     {
@@ -1244,7 +1247,7 @@ std::vector<UEdge> UnitigGraph::get_sources() // also add edges with 0 residual_
 
 std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std::vector<float>& previous_flows)
 {
-    dijkstra(seed);
+    dijkstra(seed, false);
     auto target = get_target(seed, true); // get_target only makes sense after having run dijkstra!
     UEdge curr;
     if (target.second > 0)
@@ -1318,12 +1321,12 @@ std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std
             else if (!test_hypothesis(g_[e].capacity,old, 1.f))
             {
                 changes++;
-                std::cerr << g_[src].index << " -> " << g_[trg].index << ": " << old << " -> " << g_[e].capacity << std::endl;
+                //std::cerr << g_[src].index << " -> " << g_[trg].index << ": " << old << " -> " << g_[e].capacity << std::endl;
             }
         }
         length += g_[e].name.size();
     }
-    std::cerr << changes << " changes in flow" << std::endl;
+    //std::cerr << changes << " changes in flow" << std::endl;
     return std::make_pair(changes, unique_flows);
 }
 
@@ -1344,6 +1347,7 @@ std::vector<float> UnitigGraph::find_paths()
         unvisit();
         std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, used_sources);
         UEdge curr = unvisited.first;
+        dijkstra(curr, true);
         bool unblocked = unvisited.second;
         unique.push_back(std::vector<UEdge>{});
         std::vector<UEdge> blockedPath;
@@ -1385,7 +1389,7 @@ float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& uniq
 {
     float median = 0.f;
     auto size = unique[visits].size();
-    if (size < 0.02 * boost::num_edges(g_) and size < 15 and length < 1000) //TODO parameters
+    if (size < 0.02 * boost::num_edges(g_) and size < 15 and length < 500) //TODO parameters
     {
         for (auto e : blockedPath)
         {

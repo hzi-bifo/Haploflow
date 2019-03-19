@@ -106,7 +106,7 @@ public:
 	void debug(); // debug information
     void assemble(std::string);
     void printGraph(std::ostream&);
-    void dijkstra(UEdge seed);
+    void dijkstra(UEdge seed, bool residual);
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
