@@ -886,7 +886,6 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         g_[curr].last_visit++;
         path.push_front(curr);
     }
-    std::cerr << path.size() << std::endl;
     source = boost::source(path.front(), g_);
     unsigned int i = 0;
     unsigned int j = 1;
@@ -1010,7 +1009,12 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
             i++;
         }
     }
-    flow /= i; // average flow over unqiue edges of path
+    if (i > 0)
+        flow /= i; // average flow over unqiue edges of path
+    else
+    {
+        //TODO: only non-unique: remove some stuff!
+    }
     unsigned int len = g_[source].name.size();
     for (auto e : path)
     {
@@ -1036,7 +1040,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
         }
         else
         {
-            g_[e].capacity = 0;
+            /*g_[e].capacity = 0;
             if (g_[src].index == 228218)
             {
                 std::cerr << "Visits: " << g_[e].visits << std::endl;
@@ -1050,15 +1054,18 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
             }
             for (auto v : g_[e].visits)
             {
-                g_[e].capacity += flows[v - 1];
-            }
-            /*g_[e].capacity = std::max(0.f, g_[e].capacity - flow); // there might be paths, so leave a small amount
+                if (flows[v - 1] < val and g_[e].capacity < val)
+                {
+                    g_[e].capacity += flows[v - 1];
+                }
+            }*/
+            g_[e].capacity = std::max(0.f, g_[e].capacity - flow); // there might be paths, so leave a small amount
             if (g_[e].capacity <= threshold_ and val > threshold_)
             {
                 for (auto v : g_[e].visits)
                 {
-                    if (v < flows.size())
-                        g_[e].capacity += flows[v]; // this is the average flow of the remaining unique flows
+                    if (g_[e].capacity < val and flows[v - 1] < val)
+                        g_[e].capacity += flows[v - 1]; // this is the average flow of the remaining unique flows
                 }
             }
             if (g_[e].capacity <= threshold_ and val > threshold_) // no unique flows were on this edge, but some paths might still be remaining
@@ -1071,7 +1078,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
                 }
                 g_[e].capacity = threshold_;
             }
-            removed_coverage = val - g_[e].capacity;*/
+            removed_coverage = val - g_[e].capacity;
             //g_[e].capacity = std::max(threshold_, g_[e].capacity - flow); // there might be paths, so leave a small amount
         }
         len += g_[e].name.size();
@@ -1542,8 +1549,8 @@ void UnitigGraph::printGraph(std::ostream& os)
     }
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,g_)), boost::default_writer(), propmapIndex);
 }
