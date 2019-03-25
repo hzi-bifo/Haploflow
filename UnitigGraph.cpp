@@ -920,7 +920,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         j++;
         auto source = boost::source(e, g_);
         target = boost::target(e, g_);
-        if (boost::in_degree(source, g_) < 2 and (g_[e].capacity * 2 < avg or avg * 2 < g_[e].capacity))
+        if (boost::in_degree(source, g_) == 1 and (g_[e].capacity * 2 < avg or avg * 2 < g_[e].capacity))
         {
             // TODO output and that these two contigs might be united
             //auto target = boost::target(e,g_);
@@ -983,47 +983,28 @@ std::pair<float, float> UnitigGraph::calculate_gain(UVertex& v)
     return std::make_pair(outflow - inflow, outflow/inflow);
 } 
 
-// Given all the chosen edges and their coverage fraction, builds the contigs and reduces flow accordingly
-std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>& path, std::vector<float>& flows)
+void UnitigGraph::reduce_flow(std::vector<UEdge>& path, float flow, std::vector<float>& flows, std::set<unsigned int>& unique_paths)
 {
-    float flow = 0.;
-    float max_flow = 0.;
-    unsigned int i = 0;
-    UEdge curr = path.front();
-    UVertex source = boost::source(curr, g_);
-    //std::cerr << g_[source].index;
-    std::string contig = g_[source].name;
+    //float len = g_[path.front()].name.size();
+    float removed_coverage = g_[path.front()].capacity;
     for (auto e : path)
     {
-        //auto source = boost::source(e, g_);
-        //auto target = boost::target(e, g_);
-        //std::cerr << " -> " << g_[target].index;
-        contig += g_[e].name;
-        if (g_[e].visits.size() == 1)
+        // first find out which path we are on (we delete this because it has been used then)
+        auto to_remove = std::find(g_[e].visits.begin(), g_[e].visits.end(), *(unique_paths.begin()));
+        unsigned int removed_visit = 0;
+        // TODO fix multiple "unique" paths
+        if (to_remove != g_[e].visits.end())
         {
-            if (g_[e].capacity > max_flow)
-            {
-                max_flow = g_[e].capacity;
-            }
-            flow += g_[e].capacity;
-            i++;
+            removed_visit = *to_remove;
+            g_[e].visits.erase(to_remove);
         }
-    }
-    if (i > 0)
-        flow /= i; // average flow over unqiue edges of path
-    else
-    {
-        //TODO: only non-unique: remove some stuff!
-    }
-    unsigned int len = g_[source].name.size();
-    for (auto e : path)
-    {
-        auto src = boost::source(e, g_);
-        auto trg = boost::target(e, g_);
+        else
+        {
+            removed_visit = g_[e].visits.front();
+            g_[e].visits.erase(g_[e].visits.begin());
+        }
+        // now check whether this was the last path or there are remaining paths to reduce capacity
         float val = g_[e].capacity;
-        float removed_coverage = 0.f;
-        unsigned int removed_visit = g_[e].visits.front();
-        g_[e].visits.erase(g_[e].visits.begin());
         if (g_[e].visits.empty())
         {
             if (g_[e].capacity > 2 * flow) // if we remove current flow (and buffer), there is still the same amount of flow remaining
@@ -1040,26 +1021,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
         }
         else
         {
-            /*g_[e].capacity = 0;
-            if (g_[src].index == 228218)
-            {
-                std::cerr << "Visits: " << g_[e].visits << std::endl;
-                std::cerr << "All flows: " << flows << std::endl;
-                std::cerr << "Used flows: ";
-                for (auto v : g_[e].visits)
-                {
-                    std::cerr << flows[v - 1] << " ";
-                }
-                std::cerr << std::endl;
-            }
-            for (auto v : g_[e].visits)
-            {
-                if (flows[v - 1] < val and g_[e].capacity < val)
-                {
-                    g_[e].capacity += flows[v - 1];
-                }
-            }*/
-            g_[e].capacity = std::max(0.f, g_[e].capacity - flow); // there might be paths, so leave a small amount
+            g_[e].capacity = std::max(0.f, g_[e].capacity - removed_coverage); // there might be paths, so leave a small amount
             if (g_[e].capacity <= threshold_ and val > threshold_)
             {
                 for (auto v : g_[e].visits)
@@ -1068,23 +1030,93 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
                         g_[e].capacity += flows[v - 1]; // this is the average flow of the remaining unique flows
                 }
             }
-            if (g_[e].capacity <= threshold_ and val > threshold_) // no unique flows were on this edge, but some paths might still be remaining
+            /*if (g_[e].capacity <= threshold_ and val > threshold_) // no unique flows were on this edge, but some paths might still be remaining
             {
+                auto src = boost::source(e, g_);
                 float in_cap = in_capacity(src);
                 float out_cap = out_capacity(src);
                 if (in_cap < val and in_cap < out_cap)
                 {
                     g_[e].capacity = in_cap;
-                }
-                g_[e].capacity = threshold_;
-            }
+                } // set coverage to in capacity
+            }*/
             removed_coverage = val - g_[e].capacity;
-            //g_[e].capacity = std::max(threshold_, g_[e].capacity - flow); // there might be paths, so leave a small amount
         }
-        len += g_[e].name.size();
-        std::cerr << g_[src].index << " -> " << g_[trg].index << " length: " << len << std::endl;
-        std::cerr << g_[src].index << " -> " << g_[trg].index << " set to " << g_[e].capacity << " (was " << val << ", " << g_[e].visits.size() << " paths)" << std::endl;
+        //len += g_[e].name.size();
+        //std::cerr << g_[src].index << " -> " << g_[trg].index << " length: " << len << std::endl;
+        //std::cerr << g_[src].index << " -> " << g_[trg].index << " set to " << g_[e].capacity << " (was " << val << ", " << g_[e].visits.size() << " paths)" << std::endl;
     }
+}
+
+// Given all the chosen edges and their coverage fraction, builds the contigs and reduces flow accordingly
+std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>& path, std::vector<float>& flows)
+{
+    float flow = 0.;
+    float max_flow = 0.;
+    unsigned int i = 0;
+    UEdge curr = path.front();
+    UVertex source = boost::source(curr, g_);
+    std::set<unsigned int> paths;
+    std::string contig = g_[source].name;
+    for (auto e : path)
+    {
+        //auto source = boost::source(e, g_);
+        //auto target = boost::target(e, g_);
+        //std::cerr << " -> " << g_[target].index;
+        contig += g_[e].name;
+        if (g_[e].visits.size() == 1)
+        {
+            if (g_[e].capacity > max_flow)
+            {
+                max_flow = g_[e].capacity;
+            }
+            paths.insert(g_[e].visits[0]);
+            flow += g_[e].capacity;
+            i++;
+        }
+    }
+    /*std::cerr << "Unique paths: " << std::endl;
+    for (auto e : paths)
+    {
+        std::cerr << e << " ";
+    }
+    std::cerr << std::endl;
+    */
+    if (i > 0)
+    {
+        flow /= i; // average flow over unqiue edges of path
+    }
+    else // no unique edges on path, remove duplicate path as far as possible and calculate new flow based on removed path
+    {
+        flow = 0;
+        std::vector<unsigned int> to_remove = g_[path.front()].visits; // choose one of these visits to be removed;
+        for (auto e : path)
+        {
+            if (g_[e].visits.size() > 1)
+            {
+                bool removed = false;
+                for (auto v : to_remove)
+                {
+                    auto visit = std::find(g_[e].visits.begin(), g_[e].visits.end(), v);
+                    if (visit != g_[e].visits.end())
+                    {
+                        g_[e].visits.erase(visit);
+                        removed = true;
+                        flow += flows[*visit - 1];
+                        break;
+                    }
+                }
+                if (!removed)
+                {
+                    flow += flows[g_[e].visits.front() - 1];
+                    g_[e].visits.erase(g_[e].visits.begin());
+                }
+            }
+        }
+        std::cerr << "Possibly duplicated contig " << std::endl;
+        flow /= path.size();
+    }
+    reduce_flow(path, flow, flows, paths);
     return std::make_pair(contig, flow);
 }
 
