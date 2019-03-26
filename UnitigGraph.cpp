@@ -792,7 +792,6 @@ void UnitigGraph::dijkstra(UEdge seed, bool residual)
         for (auto oe : boost::out_edges(target, g_))
         {
             float fat = g_[oe].fatness;
-            auto trg = boost::target(oe, g_);
             if (fat < std::min(g_[curr].fatness, (residual ? g_[oe].residual_capacity : g_[oe].capacity)))
             {
                 g_[oe].fatness = std::min(g_[curr].fatness, (residual ? g_[oe].residual_capacity : g_[oe].capacity));
@@ -822,7 +821,7 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient)
     float running_distance = 0;
     UEdge last;
     auto visits = g_[seed].visits;
-    bool first_vertex = false;
+    //bool first_vertex = false;
     for (auto e : boost::edges(g_))
     {
         bool same_visit = false;
@@ -987,10 +986,24 @@ void UnitigGraph::reduce_flow(std::vector<UEdge>& path, float flow, std::vector<
 {
     //float len = g_[path.front()].name.size();
     float removed_coverage = g_[path.front()].capacity;
+    std::cerr << "Removing path(s) ";
+    for (auto p : unique_paths)
+    {
+        std::cerr << p << " ";
+    }
+    std::cerr << std::endl;
     for (auto e : path)
     {
         // first find out which path we are on (we delete this because it has been used then)
-        auto to_remove = std::find(g_[e].visits.begin(), g_[e].visits.end(), *(unique_paths.begin()));
+        auto to_remove = g_[e].visits.begin();
+        for (auto p : unique_paths)
+        {
+            to_remove = std::find(g_[e].visits.begin(), g_[e].visits.end(), p);
+            if (to_remove != g_[e].visits.end())
+            {
+                break; // TODO
+            }
+        }
         unsigned int removed_visit = 0;
         // TODO fix multiple "unique" paths
         if (to_remove != g_[e].visits.end())
@@ -1000,6 +1013,7 @@ void UnitigGraph::reduce_flow(std::vector<UEdge>& path, float flow, std::vector<
         }
         else
         {
+            std::cerr << "Removing path which was not present in node" << std::endl;
             removed_visit = g_[e].visits.front();
             g_[e].visits.erase(g_[e].visits.begin());
         }
@@ -1189,8 +1203,8 @@ UEdge UnitigGraph::get_next_source()
         float max = 0;
         for (auto e : boost::edges(g_))
         {
-            auto src = boost::source(e, g_);
-            auto trg = boost::target(e, g_);
+            //auto src = boost::source(e, g_);
+            //auto trg = boost::target(e, g_);
             if (/*g_[e].last_visit == 0 and calculate_gain(src).first > max*/g_[e].capacity > max)
             {
                 max = g_[e].capacity;//calculate_gain(src).first;
@@ -1289,8 +1303,6 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
             {
                 auto nextUnvisited = checkUnvisitedEdges(e);
                 auto potential_source = nextUnvisited.first;
-                auto source = boost::source(potential_source, g_);
-                auto target = boost::target(potential_source, g_);
                 if (nextUnvisited.second and g_[potential_source].residual_capacity > g_[curr].residual_capacity)
                 { // and check the highest capacity one
                     unblocked = true;
@@ -1382,8 +1394,8 @@ std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std
     unsigned int changes = 0;
     for (auto e : path)
     {
-        auto src = boost::source(e, g_);
-        auto trg = boost::target(e, g_);
+        //auto src = boost::source(e, g_);
+        //auto trg = boost::target(e, g_);
         if (g_[e].capacity == g_[e].fatness) // fatness was reduced here (fatness <= capacity per definition)
         {
             // check if fatness reduce was justified
@@ -1474,8 +1486,6 @@ float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& uniq
             if (g_[e].visits.size() > 1) // so we dont not visit some edges
             {
                 auto pos = std::find(g_[e].visits.begin(), g_[e].visits.end(), visits + 1);
-                auto source = boost::source(e, g_);
-                auto target = boost::target(e, g_);
                 if (pos != g_[e].visits.end())
                 {
                     g_[e].visits.erase(pos);
