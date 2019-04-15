@@ -130,7 +130,7 @@ float UnitigGraph::calculate_thresholds(const deBruijnGraph& dbg, float error_ra
         }
     }
     avg_coverage /= total_edges;
-    return middle_coverage * error_rate; //TODO
+    return std::max(3.f, middle_coverage * error_rate); //TODO
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -986,12 +986,12 @@ void UnitigGraph::reduce_flow(std::vector<UEdge>& path, float flow, std::vector<
 {
     //float len = g_[path.front()].name.size();
     float removed_coverage = g_[path.front()].capacity;
-    std::cerr << "Removing path(s) ";
+    /*std::cerr << "Removing path(s) ";
     for (auto p : unique_paths)
     {
         std::cerr << p << " ";
     }
-    std::cerr << std::endl;
+    std::cerr << std::endl;*/
     for (auto e : path)
     {
         // first find out which path we are on (we delete this because it has been used then)
@@ -1013,9 +1013,11 @@ void UnitigGraph::reduce_flow(std::vector<UEdge>& path, float flow, std::vector<
         }
         else
         {
-            std::cerr << "Removing path which was not present in node" << std::endl;
-            removed_visit = g_[e].visits.front();
-            g_[e].visits.erase(g_[e].visits.begin());
+            if (!g_[e].visits.empty())
+            {
+                removed_visit = g_[e].visits.front();
+                g_[e].visits.erase(g_[e].visits.begin());
+            }
         }
         // now check whether this was the last path or there are remaining paths to reduce capacity
         float val = g_[e].capacity;
