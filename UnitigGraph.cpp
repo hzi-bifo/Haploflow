@@ -171,7 +171,7 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 		// check if there might be valid paths
         for (const char& c : succ)
 		{	
-            if (junction->get_out_coverage(c) > error_rate*junction->get_total_out_coverage() and junction->get_out_coverage(c) > threshold_)
+            if (junction->get_out_coverage(c) > error_rate * junction->get_total_out_coverage()/* and junction->get_out_coverage(c) > threshold_*/)
 			{
 				to_search = true; break;
 			}
@@ -180,7 +180,7 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 		{
 			for (const char& c : pred)
 			{
-				if (junction->get_in_coverage(c) > error_rate * junction->get_total_in_coverage() and junction->get_in_coverage(c) > threshold_)
+				if (junction->get_in_coverage(c) > error_rate * junction->get_total_in_coverage()/* and junction->get_in_coverage(c) > threshold_*/)
 				{
 					to_search = true; break;
 				}
@@ -366,8 +366,8 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
             break;
 	}
 	avg /= float(length); // average coverage over the path
-	if (!nextV->is_visited() and avg >= threshold_) // if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
-	{
+	if (!nextV->is_visited() and (avg >= threshold_ or sequence.length() > 500)) // TODO if coverage is low but the (unique) sequence is long, still add
+	{// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
 		nextV->visit();
 		addVertex(index, prev); // the vertex is new and found to be relevant
 		nextV->index = *index;
@@ -381,6 +381,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 	// if edge has been added or the immediate neighbour is an unbalanced vertex, do not add edge
 	if ((!e.second or (e.second and g_[e.first].name != sequence)))
 	{
+        //set new edge's information
 		e = boost::add_edge(src,trg,g_);
 		std::reverse(sequence.begin(), sequence.end()); // we add the path from the found node to trg, the sequence was added in reverse order
 		std::string old_name = g_[e.first].name;
@@ -479,7 +480,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited() and avg >= threshold_)
+	if (!nextV->is_visited() and (avg >= threshold_ or sequence.length() > 500)) //TODO arbitrary value
 	{
 		nextV->visit();
 		addVertex(index, next);
