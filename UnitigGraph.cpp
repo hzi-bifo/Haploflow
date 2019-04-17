@@ -1438,9 +1438,11 @@ std::pair<unsigned int, std::vector<float>> UnitigGraph::fixFlow(UEdge seed, std
                 if (p - 1 < unique_flows.size()) // flow is unique in one vertex of the path
                     g_[e].capacity += unique_flows[p - 1]; // visits start at 1
             }
-            if (g_[e].capacity < old or test_hypothesis(g_[e].capacity, old, 1.f)) // only increase the flow and only significantly so
+            if (g_[e].capacity < old or test_hypothesis(g_[e].capacity, old, 1.2)) // only increase the flow if the difference is significant
+            {
                 g_[e].capacity = old;
-            else if (!test_hypothesis(g_[e].capacity,old, 1.f))
+            }
+            else
             {
                 changes++;
                 //std::cerr << g_[src].index << " -> " << g_[trg].index << ": " << old << " changed to " << g_[e].capacity << std::endl;
