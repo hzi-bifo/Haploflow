@@ -58,7 +58,7 @@ deBruijnGraph::deBruijnGraph(std::string filename)
     }
 }
 
-deBruijnGraph::deBruijnGraph(unsigned int k) : k_ (k)
+deBruijnGraph::deBruijnGraph(unsigned int k, std::unordered_map<Sequence, Vertex> vertices) : graph_(vertices), k_ (k)
 {
 }
 
@@ -264,6 +264,77 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 			}
 		}
 	}
+}
+
+std::vector<deBruijnGraph> deBruijnGraph::split_ccs()
+{
+    std::vector<deBruijnGraph> ccs;
+    for (auto& p : graph_)
+    {
+        Sequence s = p.first;
+        Vertex v = p.second;
+        if (!v.is_visited())
+        {
+            std::unordered_map<Sequence, Vertex> cc = dfs(p, true);
+            v.unvisit();
+            auto back = dfs(p, false);
+            cc.insert(back.begin(), back.end());
+            ccs.push_back(deBruijnGraph(k_, cc));
+        }
+    }
+    for (auto& p : graph_)
+    {
+        p.second.unvisit();
+    }
+    return ccs;
+}
+
+std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vertex> p, bool forward)
+{
+    std::unordered_map<Sequence, Vertex> cc = {p};
+    std::stack<std::pair<Sequence, Vertex>> to_search;
+    to_search.push(p);
+    while (!to_search.empty())
+    {
+        auto curr = to_search.top();
+        to_search.pop();
+        Vertex v = curr.second;
+        Sequence s = curr.first;
+        if (v.is_visited()) // cycle?
+        {
+            continue;
+        }
+        v.visit();
+        cc.insert(curr);
+        std::string seq = s.get_kmer();
+        std::string next = "";
+        Sequence nextS = *getSequence(seq); // to check whether sequence is reverse complement or not
+        Vertex nextV;
+
+        for (const auto& n : (forward ? v.get_successors() : v.get_predecessors()))
+        {
+            if (forward and nextS == seq)
+            {
+                next = seq.substr(1) + n;
+            }
+            else if (forward and nextS != seq)
+            {
+                next = complement(n) + seq.substr(0,seq.length() - 1);
+            }
+            else if (!forward and nextS == seq)
+            {
+                next = n + seq.substr(0,seq.length() - 1);
+            }
+            else
+            {
+                next = seq.substr(1) + deBruijnGraph::complement(n);
+            }
+            nextV = *getVertex(next);
+            nextS = *getSequence(next);
+            to_search.push(std::make_pair(nextS, nextV));
+        }
+    }
+    return cc;
 }
 
 // calculates some metrics on the de bruijn graph used for estimating cutoffs etc
