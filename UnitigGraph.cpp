@@ -1433,12 +1433,12 @@ std::vector<float> UnitigGraph::find_paths()
         unvisit();
         std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, used_sources);
         UEdge curr = unvisited.first;
-        dijkstra(curr, true);
         bool unblocked = unvisited.second;
-        unique.push_back(std::vector<UEdge>{});
         std::vector<UEdge> blockedPath;
         if (unblocked)
         {
+            unique.push_back(std::vector<UEdge>{});
+            dijkstra(curr, true);
             started_from.push_back(curr); // add the edge from which we started
             blockedPath = blockPath(curr, visits); //marks the first path
         }
