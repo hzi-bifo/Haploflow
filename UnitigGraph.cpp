@@ -880,9 +880,15 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         auto avg = 0.f;
         for (unsigned int k = i; k < j; k++)
         {
-            auto src = boost::source(path[k], g_);
+            /*auto src = boost::source(path[k], g_);
             unsigned int indegree = boost::in_degree(src, g_);
             if (indegree < 2)
+            {
+                avg += g_[path[k]].capacity;
+                ct++;
+            }*/
+            unsigned int visits = g_[path[k]].visits.size();
+            if (visits < 2)
             {
                 avg += g_[path[k]].capacity;
                 ct++;
@@ -902,7 +908,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         j++;
         auto source = boost::source(e, g_);
         target = boost::target(e, g_);
-        if (boost::in_degree(source, g_) == 1 and (g_[e].capacity * 2 < avg or avg * 2 < g_[e].capacity))
+        if (boost::in_degree(source, g_) == 1 and ((g_[e].capacity + threshold_ > avg or g_[e].capacity > avg + threshold_) and (g_[e].capacity * 2 < avg or avg * 2 < g_[e].capacity)))
         {
             // TODO output and that these two contigs might be united
             //auto target = boost::target(e,g_);
@@ -1275,11 +1281,11 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
             float max = -1;
             for (auto e : boost::edges(g_))
             {
-                if (g_[e].last_visit == 0 and g_[e].capacity > max)
+                if (g_[e].last_visit == 0 and g_[e].residual_capacity > max)
                 {
                     unblocked = true;
                     curr = e;
-                    max = g_[e].capacity;
+                    max = g_[e].residual_capacity;
                 }
             }
         }
