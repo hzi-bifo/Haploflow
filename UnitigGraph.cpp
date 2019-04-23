@@ -372,7 +372,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		addVertex(index, prev); // the vertex is new and found to be relevant
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or avg < threshold_ or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg < threshold_ and sequence.length() <= 500) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,""); // path has too low coverage
 	}
@@ -488,7 +488,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		addVertex(index, next);
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or avg < threshold_ or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg < threshold_ and sequence.length() <= 500) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
