@@ -372,7 +372,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		addVertex(index, prev); // the vertex is new and found to be relevant
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or avg < threshold_ or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg < threshold_ and sequence.length() <= 500) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,""); // path has too low coverage
 	}
@@ -472,6 +472,8 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		sequence += c; 
         starts_with += nextV->get_read_starts();
         ends_with += nextV->get_read_ends();
+        if (std::abs(last - cov) > threshold_)
+            break;
 	}
 	/* 
 	if nextV is visited then nextV may either be a junction, in which case it should have been
@@ -486,7 +488,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		addVertex(index, next);
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or avg < threshold_ or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg < threshold_ and sequence.length() <= 500) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
@@ -716,53 +718,6 @@ void UnitigGraph::cleanGraph()
 	removeStableSets();
 }
 
-// returns the seed vertex = vertex with the highest "coverage"
-/*UEdge UnitigGraph::getSeed() const
-{
-    UEdge seed;
-    UEdge source1;
-    UEdge source2;
-    UEdge source3;
-    float max = 0;
-    float max_diff = 0;
-    float max_rel = 0;
-    float max_start = 0;
-	for (auto&& e : boost::edges(g_))
-	{
-        auto cap = g_[e].cap_info;
-        float strt = cap.starting;
-        float abs = std::abs(cap.first - cap.last);
-        float rel = std::max(cap.first, cap.last) / std::min(cap.first, cap.last);
-        if (abs > max_diff)
-        {
-            max_diff = abs;
-            source1 = e;
-        }
-        if (rel > max_rel)
-        {
-            max_rel = rel;
-            source2 = e;
-        }
-        if (strt > max_start)
-        {
-            max_start = strt;
-            source3 = e;
-        }
-        if (g_[e].capacity > max)
-        {
-            max = g_[e].capacity;
-            seed = e;
-        }
-    }
-    auto src1 = boost::source(source1, g_);
-    auto src2 = boost::source(source2, g_);
-    auto src3 = boost::source(source3, g_);
-    //std::cerr << g_[src1].index << " " << max_diff << std::endl;
-    //std::cerr << g_[src2].index << " " << max_rel << std::endl;
-    //std::cerr << g_[src3].index << " " << max_start << std::endl;
-	return seed;
-}*/ //TODO probably not needed anymore
-
 // Tests whether two percentages "belong together"
 bool UnitigGraph::test_hypothesis(float to_test_num, float to_test_denom, float h0)
 {
@@ -925,9 +880,15 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         auto avg = 0.f;
         for (unsigned int k = i; k < j; k++)
         {
-            auto src = boost::source(path[k], g_);
+            /*auto src = boost::source(path[k], g_);
             unsigned int indegree = boost::in_degree(src, g_);
             if (indegree < 2)
+            {
+                avg += g_[path[k]].capacity;
+                ct++;
+            }*/
+            unsigned int visits = g_[path[k]].visits.size();
+            if (visits < 2)
             {
                 avg += g_[path[k]].capacity;
                 ct++;
@@ -947,7 +908,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         j++;
         auto source = boost::source(e, g_);
         target = boost::target(e, g_);
-        if (boost::in_degree(source, g_) == 1 and (g_[e].capacity * 2 < avg or avg * 2 < g_[e].capacity))
+        if (boost::in_degree(source, g_) == 1 and ((g_[e].capacity + threshold_ > avg or g_[e].capacity > avg + threshold_) and (g_[e].capacity * 2 < avg or avg * 2 < g_[e].capacity)))
         {
             // TODO output and that these two contigs might be united
             //auto target = boost::target(e,g_);
@@ -1108,7 +1069,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
     {
         //auto source = boost::source(e, g_);
         //auto target = boost::target(e, g_);
-        //std::cerr << " -> " << g_[target].index;
+        //std::cerr << g_[source].index << " -> " << g_[target].index << ": " << contig.size() << std::endl;
         contig += g_[e].name;
         if (g_[e].visits.size() == 1)
         {
@@ -1217,32 +1178,15 @@ std::vector<UEdge> UnitigGraph::blockPath(UEdge curr, unsigned int visits)
     }
 }
 
-UEdge UnitigGraph::get_next_source()
+UEdge UnitigGraph::get_next_source() /// just returns the highest capacity edge (TODO?)
 {
-    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
-        return g_[e1].capacity > g_[e2].capacity;
-    };
-    unvisit(); // does this destroy anything? TODO
-    auto sources = get_sources();
-    UEdge source;
-    std::queue<UEdge> to_check;
-    if (sources.size() > 0) // if there are sources, take highest possible source
+    float max = 0;
+    for (auto e : boost::edges(g_))
     {
-        std::sort(sources.begin(), sources.end(), edge_compare);
-        source = sources.front();
-    }
-    else // else take highest unvisited edge
-    {
-        float max = 0;
-        for (auto e : boost::edges(g_))
+        if (g_[e].capacity > max)
         {
-            //auto src = boost::source(e, g_);
-            //auto trg = boost::target(e, g_);
-            if (/*g_[e].last_visit == 0 and calculate_gain(src).first > max*/g_[e].capacity > max)
-            {
-                max = g_[e].capacity;//calculate_gain(src).first;
-                source = e;
-            }
+            max = g_[e].capacity;
+            source = e;
         }
     }
     return source;
@@ -1320,11 +1264,11 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
             float max = -1;
             for (auto e : boost::edges(g_))
             {
-                if (g_[e].last_visit == 0 and g_[e].capacity > max)
+                if (g_[e].last_visit == 0 and g_[e].residual_capacity > max)
                 {
                     unblocked = true;
                     curr = e;
-                    max = g_[e].capacity;
+                    max = g_[e].residual_capacity;
                 }
             }
         }
@@ -1472,12 +1416,12 @@ std::vector<float> UnitigGraph::find_paths()
         unvisit();
         std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, used_sources);
         UEdge curr = unvisited.first;
-        dijkstra(curr, true);
         bool unblocked = unvisited.second;
-        unique.push_back(std::vector<UEdge>{});
         std::vector<UEdge> blockedPath;
         if (unblocked)
         {
+            unique.push_back(std::vector<UEdge>{});
+            dijkstra(curr, true);
             started_from.push_back(curr); // add the edge from which we started
             blockedPath = blockPath(curr, visits); //marks the first path
         }
@@ -1513,6 +1457,9 @@ std::vector<float> UnitigGraph::find_paths()
 
 float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& unique, std::vector<UEdge>& blockedPath, unsigned int length, unsigned int visits)
 {
+    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
+        return g_[e1].capacity > g_[e2].capacity;
+    };
     float median = 0.f;
     auto size = unique[visits].size();
     if (size < 0.02 * boost::num_edges(g_) and size < 15 and length < 500) //TODO parameters
@@ -1535,7 +1482,11 @@ float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& uniq
     }
     else
     {
-        median = g_[unique[visits][size/2]].capacity; //roughly median
+        std::sort(unique[visits].begin(), unique[visits].end(), edge_compare);
+        if (visits == 0)
+            median = g_[unique[visits][(3*size)/4]].capacity; //first quartile so we get a "unique" edge more likely
+        else
+            median = g_[unique[visits][size/2]].capacity; //for the second run the median is fine
         for (auto e : unique[visits])
         {
             g_[e].residual_capacity = std::max(threshold_, g_[e].residual_capacity - median);
