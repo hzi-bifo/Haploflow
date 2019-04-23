@@ -1181,6 +1181,7 @@ std::vector<UEdge> UnitigGraph::blockPath(UEdge curr, unsigned int visits)
 UEdge UnitigGraph::get_next_source() /// just returns the highest capacity edge (TODO?)
 {
     float max = 0;
+    UEdge source;
     for (auto e : boost::edges(g_))
     {
         if (g_[e].capacity > max)
