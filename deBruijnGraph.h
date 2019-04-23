@@ -28,7 +28,7 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const deBruijnGraph& dbg);
 
 	void markCycles();
-    std::vector<deBruijnGraph> split_ccs();
+    std::vector<deBruijnGraph*> split_ccs();
 	std::unordered_map<unsigned int, unsigned int> coverageDistribution() const;
 	
 	std::vector<std::string> getSources() const; // returns all sources
@@ -44,7 +44,7 @@ public:
 	
 private:
 	unsigned int split_read(const std::string&); // given the read, inserts its kmers in the graph
-    std::unordered_map<Sequence, Vertex> dfs(std::pair<Sequence,Vertex>, bool); // depth first search
+    std::unordered_map<Sequence, Vertex> dfs(std::pair<Sequence,Vertex>); // depth first search
 
 	std::unordered_map<Sequence, Vertex> graph_;
 	

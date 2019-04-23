@@ -266,71 +266,88 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 	}
 }
 
-std::vector<deBruijnGraph> deBruijnGraph::split_ccs()
+std::vector<deBruijnGraph*> deBruijnGraph::split_ccs()
 {
-    std::vector<deBruijnGraph> ccs;
+    std::vector<deBruijnGraph*> ccs;
     for (auto& p : graph_)
     {
         Sequence s = p.first;
         Vertex v = p.second;
         if (!v.is_visited())
         {
-            std::unordered_map<Sequence, Vertex> cc = dfs(p, true);
-            v.unvisit();
-            auto back = dfs(p, false);
-            cc.insert(back.begin(), back.end());
-            ccs.push_back(deBruijnGraph(k_, cc));
+            std::unordered_map<Sequence, Vertex> cc = dfs(p);
+            for (auto& p : cc)
+            {
+                p.second.unvisit();
+            }
+            ccs.push_back(new deBruijnGraph(k_, cc));
         }
     }
-    for (auto& p : graph_)
-    {
-        p.second.unvisit();
-    }
+    std::cerr << ccs.size() << " total connected components" << std::endl;
     return ccs;
 }
 
-std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vertex> p, bool forward)
+std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vertex> p)
 {
     std::unordered_map<Sequence, Vertex> cc = {p};
-    std::stack<std::pair<Sequence, Vertex>> to_search;
-    to_search.push(p);
+    std::stack<std::pair<const Sequence*, Vertex*>> to_search;
+    to_search.push(std::make_pair(&(p.first), &(p.second)));
     while (!to_search.empty())
     {
         auto curr = to_search.top();
         to_search.pop();
-        Vertex v = curr.second;
-        Sequence s = curr.first;
-        if (v.is_visited()) // cycle?
+        Vertex* v = curr.second;
+        const Sequence* s = curr.first;
+        if (v->is_visited()) // has been sarched before
         {
             continue;
         }
-        v.visit();
-        cc.insert(curr);
-        std::string seq = s.get_kmer();
+        v->visit();
+        cc.emplace(std::make_pair(*s, *v));
+        std::string seq = s->get_kmer();
         std::string next = "";
-        Sequence nextS = *getSequence(seq); // to check whether sequence is reverse complement or not
-        Vertex nextV;
+        const Sequence* nextS = getSequence(seq); // to check whether sequence is reverse complement or not
+        Vertex* nextV;
+        bool reverse = (*nextS != seq);
 
-        for (const auto& n : (forward ? v.get_successors() : v.get_predecessors()))
+        for (auto& n : v->get_successors())
         {
-            if (forward and nextS == seq)
+            if (!reverse)
             {
                 next = seq.substr(1) + n;
             }
-            else if (forward and nextS != seq)
+            else
             {
                 next = complement(n) + seq.substr(0,seq.length() - 1);
             }
-            else if (!forward and nextS == seq)
+            nextV = getVertex(next);
+            if (nextV == 0)
             {
-                next = n + seq.substr(0,seq.length() - 1);
+                std::cerr << (reverse ? "reverse" : "not reverse") << std::endl;
+                v->print(true);
+                std::cerr << next << " not in graph" << std::endl;
+            }
+            nextS = getSequence(next);
+            to_search.push(std::make_pair(nextS, nextV));
+        }
+        for (auto& n : v->get_predecessors())
+        {
+            if (!reverse)
+            {
+                next = n + seq.substr(0, seq.length() - 1);
             }
             else
             {
-                next = seq.substr(1) + deBruijnGraph::complement(n);
+                next = seq.substr(1) + complement(n);
             }
-            nextV = *getVertex(next);
-            nextS = *getSequence(next);
+            nextV = getVertex(next);
+            if (nextV == 0)
+            {
+                std::cerr << (reverse ? "reverse" : "not reverse") << std::endl;
+                v->print(true);
+                std::cerr << next << " not in graph" << std::endl;
+            }
+            nextS = getSequence(next);
             to_search.push(std::make_pair(nextS, nextV));
         }
     }
