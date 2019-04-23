@@ -1069,7 +1069,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
     {
         //auto source = boost::source(e, g_);
         //auto target = boost::target(e, g_);
-        //std::cerr << " -> " << g_[target].index;
+        //std::cerr << g_[source].index << " -> " << g_[target].index << ": " << contig.size() << std::endl;
         contig += g_[e].name;
         if (g_[e].visits.size() == 1)
         {
@@ -1178,32 +1178,15 @@ std::vector<UEdge> UnitigGraph::blockPath(UEdge curr, unsigned int visits)
     }
 }
 
-UEdge UnitigGraph::get_next_source()
+UEdge UnitigGraph::get_next_source() /// just returns the highest capacity edge (TODO?)
 {
-    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
-        return g_[e1].capacity > g_[e2].capacity;
-    };
-    unvisit(); // does this destroy anything? TODO
-    auto sources = get_sources();
-    UEdge source;
-    std::queue<UEdge> to_check;
-    if (sources.size() > 0) // if there are sources, take highest possible source
+    float max = 0;
+    for (auto e : boost::edges(g_))
     {
-        std::sort(sources.begin(), sources.end(), edge_compare);
-        source = sources.front();
-    }
-    else // else take highest unvisited edge
-    {
-        float max = 0;
-        for (auto e : boost::edges(g_))
+        if (g_[e].capacity > max)
         {
-            //auto src = boost::source(e, g_);
-            //auto trg = boost::target(e, g_);
-            if (/*g_[e].last_visit == 0 and calculate_gain(src).first > max*/g_[e].capacity > max)
-            {
-                max = g_[e].capacity;//calculate_gain(src).first;
-                source = e;
-            }
+            max = g_[e].capacity;
+            source = e;
         }
     }
     return source;
@@ -1474,6 +1457,9 @@ std::vector<float> UnitigGraph::find_paths()
 
 float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& unique, std::vector<UEdge>& blockedPath, unsigned int length, unsigned int visits)
 {
+    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
+        return g_[e1].capacity > g_[e2].capacity;
+    };
     float median = 0.f;
     auto size = unique[visits].size();
     if (size < 0.02 * boost::num_edges(g_) and size < 15 and length < 500) //TODO parameters
@@ -1496,7 +1482,11 @@ float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& uniq
     }
     else
     {
-        median = g_[unique[visits][size/2]].capacity; //roughly median
+        std::sort(unique[visits].begin(), unique[visits].end(), edge_compare);
+        if (visits == 0)
+            median = g_[unique[visits][(3*size)/4]].capacity; //first quartile so we get a "unique" edge more likely
+        else
+            median = g_[unique[visits][size/2]].capacity; //for the second run the median is fine
         for (auto e : unique[visits])
         {
             g_[e].residual_capacity = std::max(threshold_, g_[e].residual_capacity - median);
