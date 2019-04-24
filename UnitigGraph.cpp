@@ -94,6 +94,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1), thresho
 		}
 	}
 	std::cerr << "Unitig graph successfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
+    std::cerr << "Unitig graph has " << boost::num_vertices(g_) << " vertices" << std::endl;
     t = clock();
     std::cerr << "Finding Strongly Connected Components" << std::endl;
     markCycles();
@@ -1180,14 +1181,29 @@ std::vector<UEdge> UnitigGraph::blockPath(UEdge curr, unsigned int visits)
 
 UEdge UnitigGraph::get_next_source() /// just returns the highest capacity edge (TODO?)
 {
-    float max = 0;
+    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
+        return g_[e1].capacity > g_[e2].capacity;
+    };
     UEdge source;
-    for (auto e : boost::edges(g_))
+
+    auto sources = get_sources();
+    if (sources.size() > 0) // if there are sources, take highest possible source
     {
-        if (g_[e].capacity > max)
+        std::sort(sources.begin(), sources.end(), edge_compare);
+        source = sources.front();
+    }
+    else // else take highest unvisited edge
+    {
+        float max = 0;
+        for (auto e : boost::edges(g_))
         {
-            max = g_[e].capacity;
-            source = e;
+            //auto src = boost::source(e, g_);
+            //auto trg = boost::target(e, g_);
+            if (/*g_[e].last_visit == 0 and calculate_gain(src).first > max*/g_[e].capacity > max)
+            {
+                max = g_[e].capacity;//calculate_gain(src).first;
+                source = e;
+            }
         }
     }
     return source;
@@ -1495,6 +1511,29 @@ float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& uniq
     }
     return median;
 }
+
+/*void UnitigGraph::reset_last_visits()
+{
+    for (auto e : boost::edges(g_))
+    {
+        g_[e].last_visit = 0;
+    }
+}
+
+unsigned int UnitigGraph::num_vertices()
+{
+    return boost::num_vertices(g_);
+}
+
+float UnitigGraph::get_edge_capacity(UEdge e)
+{
+    return g_[e].capacity;
+}
+
+float UnitigGraph::get_threshold()
+{
+    return threshold_;
+}*/
 
 // calculates the flows and corresponding paths through the graph
 void UnitigGraph::assemble(std::string fname)
