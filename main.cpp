@@ -21,13 +21,14 @@ int main (int argc, char* argv[])
 	//dbg.markCycles();
 	//std::cerr << "Cycle detection took " << (clock() - t)/1000000. << " seconds." << std::endl;
 	//dbg.debug();
+    unsigned int i = 0;
     for (auto&& d : dbgs)
     {
 	    UnitigGraph ug(*d, atof(argv[2]));
         delete d;
         //t = clock();
         //ug.debug();
-        ug.assemble(argv[3]);
+        ug.assemble(argv[3] + std::to_string(i++));
     }
 	std::cerr << "The complete assembly process took " << (clock() - t)/1000000. << " seconds." << std::endl;
     return 0;
