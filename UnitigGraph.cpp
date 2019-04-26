@@ -541,8 +541,8 @@ void UnitigGraph::contractPaths()
 	{
 		++next;
 		unsigned int indegree = boost::in_degree(*vi, g_);
-		unsigned int outdegree = boost::out_degree(*vi,g_);
-		
+		unsigned int outdegree = boost::out_degree(*vi, g_);
+
 		// if in and outdegree is 1, we are on a simple path and can contract again
 		if (outdegree == 1 and indegree == 1)
 		{
@@ -550,6 +550,10 @@ void UnitigGraph::contractPaths()
 			auto&& oe = boost::out_edges(*vi,g_);
 			auto&& new_source = boost::source(*ie.first,g_);
 			auto&& new_target = boost::target(*oe.first,g_);
+            if (new_source == new_target)
+            {
+                continue; // do not contract to single vertex (which might get deleted)
+            }
 			auto&& e = boost::edge(new_source,*vi,g_);
             auto&& f = boost::edge(*vi, new_target,g_); // coverage etc of second edge to be contracted
 			std::string seq = g_[e.first].name;
@@ -1568,7 +1572,7 @@ void UnitigGraph::assemble(std::string fname)
         std::vector<float> flows;
         for (unsigned int i = 0; i < 50; i++) // do that a few times? TODO 50 is arbitrary
         {
-            auto changed_flows = fixFlow(seed, all_paths/*flows*/);
+            auto changed_flows = fixFlow(seed, all_paths);
             flows = changed_flows.second;
             auto changes = changed_flows.first;
             if (changes == 0)
