@@ -71,6 +71,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1), thresho
 	auto&& out_unbalanced = junc.first;
 	auto&& in_unbalanced = junc.second;
     threshold_ = calculate_thresholds(dbg, error_rate);
+    std::cerr << "Threshold set to " << threshold_ << std::endl;
 	// starting from the sources, we build the unitig graph
 	for (auto& v : out_unbalanced)
 	{
@@ -1544,6 +1545,7 @@ void UnitigGraph::assemble(std::string fname)
     std::cerr << "Cleaning graph" << std::endl;
     cleanGraph();
     contractPaths();
+    std::cerr << boost::num_vertices(g_) << " vertices remaining" << std::endl;
     std::cerr << "Calculating paths" << std::endl;
     auto all_paths = find_paths();
     std::cerr << all_paths << std::endl;
