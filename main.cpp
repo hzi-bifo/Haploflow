@@ -4,6 +4,7 @@
 int main (int argc, char* argv[])
 {
 	clock_t t = clock();
+	clock_t t_start = clock();
 	std::cerr << "Building deBruijnGraph..." << std::endl;
 	//deBruijnGraph dbg = deBruijnGraph(std::string(argv[1]), atoi(argv[2])); // read file + k
 	deBruijnGraph *dbg = new deBruijnGraph(std::string(argv[1])); // dump file
@@ -30,6 +31,6 @@ int main (int argc, char* argv[])
         //ug.debug();
         ug.assemble(argv[3] + std::to_string(i++));
     }
-	std::cerr << "The complete assembly process took " << (clock() - t)/1000000. << " seconds." << std::endl;
+	std::cerr << "The complete assembly process took " << (clock() - t_start)/1000000. << " seconds." << std::endl;
     return 0;
 }
