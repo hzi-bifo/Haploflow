@@ -132,7 +132,7 @@ float UnitigGraph::calculate_thresholds(const deBruijnGraph& dbg, float error_ra
     }
     if (total_edges > 0)
         avg_coverage /= total_edges;
-    return middle_coverage * error_rate; //TODO
+    return std::max(1.f, middle_coverage * error_rate); //TODO
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -363,17 +363,15 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		sequence += lastchar;
         starts_with += nextV->get_read_starts();
         ends_with += nextV->get_read_ends();
-        if (std::abs(last - cov) > threshold_)
-            break;
 	}
 	avg /= float(length); // average coverage over the path
-	if (!nextV->is_visited() and (avg >= threshold_ or sequence.length() > 500)) // TODO if coverage is low but the (unique) sequence is long, still add
+	if (!nextV->is_visited()) // TODO if coverage is low but the (unique) sequence is long, still add
 	{// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
 		nextV->visit();
 		addVertex(index, prev); // the vertex is new and found to be relevant
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or (avg < threshold_ and sequence.length() <= 500) or nextV->index == 0)
+	else if (!nextV->is_visited() or nextV->index == 0)
 	{
 		return std::make_pair(nextV,""); // path has too low coverage
 	}
@@ -473,8 +471,6 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		sequence += c; 
         starts_with += nextV->get_read_starts();
         ends_with += nextV->get_read_ends();
-        if (std::abs(last - cov) > threshold_)
-            break;
 	}
 	/* 
 	if nextV is visited then nextV may either be a junction, in which case it should have been
@@ -483,13 +479,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited() and (avg >= threshold_ or sequence.length() > 500)) //TODO arbitrary value
+	if (!nextV->is_visited()) //TODO arbitrary value
 	{
 		nextV->visit();
 		addVertex(index, next);
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or (avg < threshold_ and sequence.length() <= 500) or nextV->index == 0)
+	else if (!nextV->is_visited() or nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
@@ -703,8 +699,10 @@ void UnitigGraph::removeEmpty()
     std::vector<UEdge> toDelete;
     for (auto&& e : boost::edges(g_))
     {
-        if (g_[e].capacity < threshold_)
+        if (g_[e].capacity == 0 or g_[e].capacity < threshold_) //to make sure empty edges are definitely deleted
+        {
             toDelete.push_back(e);
+        }
     }
     for (auto&& e : toDelete)
     {
