@@ -276,9 +276,9 @@ std::vector<deBruijnGraph*> deBruijnGraph::split_ccs()
         if (!v.is_visited())
         {
             std::unordered_map<Sequence, Vertex> cc = dfs(p);
-            for (auto& p : cc)
+            for (auto& q : cc)
             {
-                p.second.unvisit();
+                q.second.unvisit();
             }
             ccs.push_back(new deBruijnGraph(k_, cc));
         }
@@ -327,6 +327,10 @@ std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vert
                 v->print(true);
                 std::cerr << next << " not in graph" << std::endl;
             }
+            else if (nextV->is_visited())
+            {
+                continue;
+            }
             nextS = getSequence(next);
             to_search.push(std::make_pair(nextS, nextV));
         }
@@ -346,6 +350,10 @@ std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vert
                 std::cerr << (reverse ? "reverse" : "not reverse") << std::endl;
                 v->print(true);
                 std::cerr << next << " not in graph" << std::endl;
+            }
+            else if (nextV->is_visited())
+            {
+                continue;
             }
             nextS = getSequence(next);
             to_search.push(std::make_pair(nextS, nextV));

@@ -366,13 +366,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         ends_with += nextV->get_read_ends();
 	}
 	avg /= float(length); // average coverage over the path
-	if (!nextV->is_visited()) // TODO if coverage is low but the (unique) sequence is long, still add
+	if (!nextV->is_visited() and (avg >= threshold_ or sequence.length() > 500)) // TODO if coverage is low but the (unique) sequence is long, still add
 	{// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
 		nextV->visit();
 		addVertex(index, prev); // the vertex is new and found to be relevant
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg < threshold_ and sequence.length() <= 500) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,""); // path has too low coverage
 	}
@@ -480,13 +480,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited()) //TODO arbitrary value
+	if (!nextV->is_visited() and (avg >= threshold_ or sequence.length() > 500)) //TODO arbitrary value
 	{
 		nextV->visit();
 		addVertex(index, next);
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg < threshold_ and sequence.length() <= 500) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
