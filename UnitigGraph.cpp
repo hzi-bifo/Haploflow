@@ -910,9 +910,9 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
             i++;
         }
         j++;
-        auto source = boost::source(e, g_);
-        target = boost::target(e, g_);
-        if (boost::in_degree(source, g_) == 1 and ((g_[e].capacity + threshold_ > avg or g_[e].capacity > avg + threshold_) and (g_[e].capacity * 2 < avg or avg * 2 < g_[e].capacity)))
+        //auto source = boost::source(e, g_);
+        //target = boost::target(e, g_);
+        /*if (boost::in_degree(source, g_) == 1 and ((g_[e].capacity + threshold_ > avg or g_[e].capacity > avg + threshold_) and (g_[e].capacity * 2 < avg or avg * 2 < g_[e].capacity)))
         {
             // TODO output and that these two contigs might be united
             //auto target = boost::target(e,g_);
@@ -921,9 +921,9 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
             break;
         }
         else
-        {
+        {*/
             ret.push_back(e);
-        }
+        //}
     }
     /*std::cerr << g_[source].index;
     for (auto e : path)
@@ -1018,17 +1018,17 @@ void UnitigGraph::reduce_flow(std::vector<UEdge>& path, float flow, std::vector<
         float val = g_[e].capacity;
         if (g_[e].visits.empty())
         {
-            if (g_[e].capacity > 2 * flow) // if we remove current flow (and buffer), there is still the same amount of flow remaining
-            {
-                g_[e].capacity = threshold_; //might want to set this to flow instead
-                removed_coverage = val - threshold_;
-                g_[e].visits.push_back(removed_visit);
-            }
-            else
-            {
+            //if (g_[e].capacity > 2 * flow) // if we remove current flow (and buffer), there is still the same amount of flow remaining
+            //{
+            //    g_[e].capacity = threshold_; //might want to set this to flow instead
+            //    removed_coverage = val - threshold_;
+            //    g_[e].visits.push_back(removed_visit);
+            //}
+            //else
+            //{
                 g_[e].capacity = 0;
                 removed_coverage = val;
-            }
+            //}
         }
         else
         {
@@ -1568,16 +1568,16 @@ void UnitigGraph::assemble(std::string fname)
         {
             break;
         }
-        std::cerr << "Fixing flow..." << std::endl;
-        std::vector<float> flows;
-        for (unsigned int i = 0; i < 50; i++) // do that a few times? TODO 50 is arbitrary
-        {
-            auto changed_flows = fixFlow(seed, all_paths);
-            flows = changed_flows.second;
-            auto changes = changed_flows.first;
-            if (changes == 0)
-                break; //no changes in flow were made
-        }
+        //std::cerr << "Fixing flow..." << std::endl;
+        //std::vector<float> flows;
+        //for (unsigned int i = 0; i < 50; i++) // do that a few times? TODO 50 is arbitrary
+        //{
+        //    auto changed_flows = fixFlow(seed, all_paths);
+        //    flows = changed_flows.second;
+        //    auto changes = changed_flows.first;
+        //    if (changes == 0)
+        //        break; //no changes in flow were made
+        //}
         /*DEBUG*/
         std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
         std::ofstream outfile (filename);
@@ -1586,7 +1586,7 @@ void UnitigGraph::assemble(std::string fname)
         std::cerr << "Finding fattest path..." << std::endl;
         std::vector<UEdge> path = find_fattest_path(seed);
         std::cerr << "Calculating contig " << i << "..." << std::endl;
-        auto contig = calculate_contigs(path, flows);
+        auto contig = calculate_contigs(path, all_paths);
         if (contig.first.size() > 150)
         {
             std::cout << ">Contig_" << i << "_flow_" << contig.second << std::endl;
