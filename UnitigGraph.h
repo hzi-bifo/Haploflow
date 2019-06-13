@@ -10,6 +10,7 @@
 #include <boost/config.hpp>
 #include <boost/graph/graph_utility.hpp>
 #include <boost/graph/filtered_graph.hpp>
+#include <boost/range/combine.hpp>
 #include "deBruijnGraph.h"
 #include <unordered_set>
 #include <algorithm> // heap
@@ -117,12 +118,14 @@ private:
 
     std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&);
     void reduce_flow(std::vector<UEdge>&, float, std::vector<float>&, std::set<unsigned int>&);
-	float calculate_thresholds(const deBruijnGraph&, float);
     std::pair<float, float> calculate_gain(UVertex& v);
     //std::pair<float, std::vector<float> > calculate_flow(std::vector<UEdge>&);
 	std::vector<UEdge> find_fattest_path(UEdge seed);
     
 	//UEdge getSeed() const;
+	float calculate_thresholds(const deBruijnGraph&, float);
+    std::vector<float> rolling(std::vector<float> in, unsigned int len);
+    std::vector<float> cummin(std::vector<float> in);
 
     std::vector<UEdge> blockPath(UEdge, unsigned int);
     std::vector<float> find_paths();
@@ -133,10 +136,12 @@ private:
     std::pair<UEdge, float> get_target(UEdge, bool);
     UEdge get_next_source();
     void markCycles();
+    
     void cleanGraph();
 	void removeStableSets();
 	void contractPaths();
     void removeEmpty();
+    bool hasRelevance();
     void unvisit();
 
     float in_capacity(UVertex);
