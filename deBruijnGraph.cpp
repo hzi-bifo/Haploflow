@@ -266,9 +266,9 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 	}
 }
 
-std::vector<deBruijnGraph*> deBruijnGraph::split_ccs()
+std::vector<deBruijnGraph> deBruijnGraph::split_ccs()
 {
-    std::vector<deBruijnGraph*> ccs;
+    std::vector<deBruijnGraph> ccs;
     for (auto& p : graph_)
     {
         Sequence s = p.first;
@@ -280,7 +280,7 @@ std::vector<deBruijnGraph*> deBruijnGraph::split_ccs()
             {
                 q.second.unvisit();
             }
-            ccs.push_back(new deBruijnGraph(k_, cc));
+            ccs.push_back(deBruijnGraph(k_, cc));
         }
     }
     std::cerr << ccs.size() << " total connected components" << std::endl;
@@ -363,9 +363,9 @@ std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vert
 }
 
 // calculates some metrics on the de bruijn graph used for estimating cutoffs etc
-std::unordered_map<unsigned int, unsigned int> deBruijnGraph::coverageDistribution() const
+std::map<unsigned int, unsigned int> deBruijnGraph::coverageDistribution() const
 {
-	std::unordered_map<unsigned int, unsigned int> cov_dist;
+	std::map<unsigned int, unsigned int> cov_dist;
 	for (const auto& p : graph_)
 	{
 		auto& v = p.second;

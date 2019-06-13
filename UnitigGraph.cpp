@@ -105,35 +105,79 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1), thresho
 float UnitigGraph::calculate_thresholds(const deBruijnGraph& dbg, float error_rate)
 {
     auto&& cov_distr = dbg.coverageDistribution();
-    std::vector<std::pair<float, float> > sorted_coverage;
-    float total_edges = 0.;
-    float avg_coverage = 0.;
-    float median_coverage = 0.;
-    float middle_coverage = 0.;
-    for (const auto& cov : cov_distr)
+    std::vector<float> sorted_coverage;
+    sorted_coverage.resize(cov_distr.rbegin()->first); // get last (= biggest) element of map
+    for (auto&& cov : cov_distr)
     {
-        sorted_coverage.push_back(cov);
-        total_edges += cov.second; //counts all edges
-        avg_coverage += cov.first * cov.second; // adds up the coverage values
+        auto pos = cov.first;
+        auto val = cov.second;
+        sorted_coverage[pos] = val;
     }
-    std::sort(sorted_coverage.begin(), sorted_coverage.end());
-    float used_edges = 0.;
+    auto roll = rolling(sorted_coverage, 5); // TODO set window size?
+    auto cumm = cummin(roll);
+    unsigned int counter = 0;
     unsigned int i = 0;
-    for (const auto& cov : sorted_coverage)
+    for (auto zip : boost::combine(cumm, roll))
     {
-        used_edges += cov.second;
-        if (used_edges > total_edges/2 and !median_coverage)
+        float cummin_val;
+        float rolling_val;
+        boost::tie(cummin_val, rolling_val) = zip;
+        if (cummin_val < rolling_val)
         {
-            median_coverage = cov.first;
+            counter++;
         }
-        if (i++ > sorted_coverage.size()/2 and !middle_coverage)
+        else
         {
-            middle_coverage = cov.first;
+            counter = 0;
+        }
+        if (counter == 6) //TODO set value (window_size + 1 makes sense)
+            return float(i);
+        i++; //position
+    }
+    return 1.f; // no signal found TODO
+
+}
+
+// calculates cumulative minimum of in
+std::vector<float> UnitigGraph::cummin(std::vector<float> in)
+{
+    std::vector<float> cummin;
+    cummin.reserve(in.size());
+    float curr = in.front();
+    for (auto& val : in)
+    {
+        if (std::isnan(curr) or (val < curr and !std::isnan(val)))
+        {
+            curr = val;
+        }
+        cummin.push_back(curr);
+    }
+    return cummin;
+}
+
+// calculates rolling average over window size "len"
+std::vector<float> UnitigGraph::rolling(std::vector<float> in, unsigned int len)
+{
+    std::vector<float> rolling;
+    rolling.resize(in.size());
+    float total = 0.0;
+    for (unsigned int i = 0; i < in.size() ; i++)
+    {
+        total += float(in.at(i));
+        if (i >= len)
+        {
+            total -= in.at(i - len);
+        }
+        if (i >= (len - 1))
+        {
+            rolling[i] = total/float(len);
+        }
+        else
+        {
+            rolling[i] = std::nanf(""); //add nan values for first len - 1 elements
         }
     }
-    if (total_edges > 0)
-        avg_coverage /= total_edges;
-    return std::max(1.f, middle_coverage * error_rate); //TODO
+    return rolling;
 }
 
 // adds a vertex to the unitig graph: adds it to the boost graph, as well as to the mapping from index to vertex
@@ -709,6 +753,16 @@ void UnitigGraph::removeEmpty()
     {
         boost::remove_edge(e, g_);
     }
+}
+
+bool UnitigGraph::hasRelevance()
+{
+    unsigned int length = 0;
+    for (auto&& e : boost::edges(g_))
+    {
+        length += g_[e].name.size();
+    }
+    return length > 500;
 }
 
 // the graph might contain some unconnected vertices, clean up
@@ -1559,10 +1613,9 @@ void UnitigGraph::assemble(std::string fname)
     {
         g_[e].last_visit = 0; // reset last visit
     }
-    while (boost::num_vertices(g_) > 0)
+    while (hasRelevance())
     {
         unvisit(); // to track visits and residual capacity
-        std::cerr << "Getting source..." << std::endl;
         auto seed = get_next_source();
         if (g_[seed].capacity < threshold_)
         {
