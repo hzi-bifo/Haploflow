@@ -28,8 +28,8 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const deBruijnGraph& dbg);
 
 	void markCycles();
-    std::vector<deBruijnGraph*> split_ccs();
-	std::unordered_map<unsigned int, unsigned int> coverageDistribution() const;
+    std::vector<deBruijnGraph> split_ccs();
+	std::map<unsigned int, unsigned int> coverageDistribution() const;
 	
 	std::vector<std::string> getSources() const; // returns all sources
 	std::vector<std::string> getSinks() const; // returns all sinks in graph
