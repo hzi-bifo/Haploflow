@@ -109,11 +109,11 @@ public:
     void printGraph(std::ostream&);
     void dijkstra(UEdge seed, bool residual);
 private:
-	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float);
-	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&);
-	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
-	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float);
-	UVertex addVertex(unsigned int*, std::string name);
+	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float, float threshold);
+	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&, float threshold);
+	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float, float threshold);
+	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float, float threshold);
+	UVertex addVertex(unsigned int*, std::string name, unsigned int ccc);
     std::vector<UEdge> get_sources();
 
     std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&);
@@ -123,9 +123,9 @@ private:
 	std::vector<UEdge> find_fattest_path(UEdge seed);
     
 	//UEdge getSeed() const;
-	float calculate_thresholds(const deBruijnGraph&, float);
-    std::vector<float> rolling(std::vector<float> in, unsigned int len);
-    std::vector<float> cummin(std::vector<float> in);
+	std::vector<float> calculate_thresholds(deBruijnGraph&, float);
+    std::vector<float> rolling(std::vector<float>& in, unsigned int len);
+    std::vector<float> cummin(std::vector<float>& in);
 
     std::vector<UEdge> blockPath(UEdge, unsigned int);
     std::vector<float> find_paths();
@@ -147,12 +147,13 @@ private:
     float in_capacity(UVertex);
     float out_capacity(UVertex);
 
-	bool test_hypothesis(float to_test_num, float to_test_denom, float h0);
+	bool test_hypothesis(float to_test_num, float to_test_denom, float h0, float threshold);
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
 	UGraph g_;
 	std::unordered_map<unsigned int, UVertex> graph_;
-    float threshold_; // stores a treshold for edges to consider
+
+    std::vector<float> thresholds_; // TODO
 	
 };
 

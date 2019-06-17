@@ -200,7 +200,7 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 			if (!child) // this vertex is visited the first time this run
 			{
 				v.index = index;
-				v.scc = index;
+				v.cc = index;
 				index++;
 				v.onStack = true;
 				visit_stack.push(*cseq);
@@ -232,7 +232,7 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 				}
 				else if (w.onStack)
 				{
-					v.scc = std::min(v.scc, w.index);
+					v.cc = std::min(v.cc, w.index);
 				}
 			}
 			else  // all children have been visited in the stack
@@ -241,8 +241,8 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 				{
 					const Sequence* pseq = getSequence(prev);
 					Vertex& w = graph_[*pseq];
-					w.scc = std::min(w.scc, v.scc);
-					if (w.index == w.scc)
+					w.cc = std::min(w.cc, v.cc);
+					if (w.index == w.cc)
 					{
 						Sequence scc = visit_stack.top();
 						do
@@ -266,44 +266,43 @@ void deBruijnGraph::markCycles() //non-recusrive tarjan implementation
 	}
 }
 
-std::vector<deBruijnGraph> deBruijnGraph::split_ccs()
+unsigned int deBruijnGraph::split_ccs()
 {
-    std::vector<deBruijnGraph> ccs;
-    for (auto& p : graph_)
+    unsigned int cc = 1;
+    for (auto&& it = graph_.begin(); it != graph_.end(); ++it)
     {
-        Sequence s = p.first;
-        Vertex v = p.second;
-        if (!v.is_visited())
+        Sequence s = (*it).first;
+        Vertex v = (*it).second;
+        if (v.cc == 0)
         {
-            std::unordered_map<Sequence, Vertex> cc = dfs(p);
-            for (auto& q : cc)
-            {
-                q.second.unvisit();
-            }
-            ccs.push_back(deBruijnGraph(k_, cc));
+            auto members = dfs(s, cc++);
         }
     }
-    std::cerr << ccs.size() << " total connected components" << std::endl;
-    return ccs;
+    std::cerr << cc << " total connected components" << std::endl;
+    return cc;
 }
-
-std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vertex> p)
+    
+std::vector<const Sequence*> deBruijnGraph::dfs(Sequence& s, unsigned int cc)
 {
-    std::unordered_map<Sequence, Vertex> cc = {p};
+    const std::string kmer = s.get_kmer();
     std::stack<std::pair<const Sequence*, Vertex*>> to_search;
-    to_search.push(std::make_pair(&(p.first), &(p.second)));
+    const Sequence* seq = getSequence(kmer);
+    Vertex* v = getVertex(kmer);
+    to_search.push(std::make_pair(seq, v));
+
+    std::vector<const Sequence*> members;
     while (!to_search.empty())
     {
         auto curr = to_search.top();
         to_search.pop();
         Vertex* v = curr.second;
         const Sequence* s = curr.first;
-        if (v->is_visited()) // has been sarched before
+        if (v->cc != 0) // has been sarched before
         {
             continue;
         }
-        v->visit();
-        cc.emplace(std::make_pair(*s, *v));
+        v->cc = cc;
+        members.push_back(s);
         std::string seq = s->get_kmer();
         std::string next = "";
         const Sequence* nextS = getSequence(seq); // to check whether sequence is reverse complement or not
@@ -327,7 +326,7 @@ std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vert
                 v->print(true);
                 std::cerr << next << " not in graph" << std::endl;
             }
-            else if (nextV->is_visited())
+            else if (nextV->cc != 0)
             {
                 continue;
             }
@@ -351,7 +350,7 @@ std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vert
                 v->print(true);
                 std::cerr << next << " not in graph" << std::endl;
             }
-            else if (nextV->is_visited())
+            else if (nextV->cc != 0)
             {
                 continue;
             }
@@ -359,28 +358,29 @@ std::unordered_map<Sequence, Vertex> deBruijnGraph::dfs(std::pair<Sequence, Vert
             to_search.push(std::make_pair(nextS, nextV));
         }
     }
-    return cc;
+    return members;
 }
 
 // calculates some metrics on the de bruijn graph used for estimating cutoffs etc
-std::map<unsigned int, unsigned int> deBruijnGraph::coverageDistribution() const
+std::vector<std::map<unsigned int, unsigned int>> deBruijnGraph::coverageDistribution(unsigned int ccs) const
 {
-	std::map<unsigned int, unsigned int> cov_dist;
+    std::vector<std::map<unsigned int, unsigned int>> all_coverages(ccs - 1);
 	for (const auto& p : graph_)
 	{
 		auto& v = p.second;
-		//unsigned int coverage = std::max(v.get_total_in_coverage(), v.get_total_out_coverage());
-        unsigned int coverage = v.get_total_in_coverage() + v.get_total_out_coverage();
-		if (cov_dist.find(coverage) != cov_dist.end())
+        auto cc = v.cc - 1; //ccs start at 1
+		unsigned int coverage = std::max(v.get_total_in_coverage(), v.get_total_out_coverage());
+        //unsigned int coverage = v.get_total_in_coverage() + v.get_total_out_coverage();
+		if (all_coverages[cc].find(coverage) != all_coverages[cc].end())
 		{
-			cov_dist[coverage]++;
+			all_coverages[cc][coverage]++;
 		}
 		else
 		{
-			cov_dist[coverage] = 1;
+			all_coverages[cc][coverage] = 1;
 		}
 	}
-	return cov_dist;
+	return all_coverages;
 }
 
 std::vector<std::string> deBruijnGraph::getSources() const
@@ -462,7 +462,7 @@ void deBruijnGraph::debug()
 	/*std::unordered_map<unsigned int, unsigned int> sccs;
 	for (auto& p : graph_)
 	{
-		unsigned int scc = p.second.scc;
+		unsigned int scc = p.second.cc;
 		if (sccs.find(scc) != sccs.end())
 		{
 			sccs[scc]++;
@@ -483,17 +483,6 @@ void deBruijnGraph::debug()
 			small_sccs++;
 	}
 	std::cout << small_sccs << " SCCs of size 2" << std::endl;*/
-	auto cov_dist = coverageDistribution();
-	
-	float mean = 0.;
-	unsigned int num = 0;
-	for (auto& elem : cov_dist)
-	{
-		std::cout << elem.first << "\t" << elem.second << std::endl;
-		num += elem.second;
-		mean += elem.first;
-	}
-	mean /= num;
 	//std::cout << mean << std::endl;
 	/*std::cerr << "Vertices: " << getSize() << std::endl;
 	clock_t t = clock();

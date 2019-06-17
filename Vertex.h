@@ -23,7 +23,7 @@ public:
 	void unvisit();
 	void flag();
 	
-	unsigned int scc; // strongly connected component, to immediately filter cycles
+	unsigned int cc; // connected component
 	unsigned int index; // to possibly identify this vertex in the unitig graph
 	bool onStack; // dfs-specific variable
 
