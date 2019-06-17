@@ -2,7 +2,7 @@
 #include "deBruijnGraph.h"
 
 Vertex::Vertex() : 	
-										scc(0),
+										cc(0),
 										index(0),
 										onStack(false),
 										a_in(0),
@@ -23,7 +23,7 @@ Vertex::Vertex() :
 }
 
 Vertex::Vertex(int ain, int cin, int gin, int tin, int aout, int cout, int gout, int tout, std::pair<unsigned int, unsigned int> start):
-    scc(0),
+    cc(0),
     index(0),
     onStack(false),
     a_in(ain),
@@ -44,7 +44,7 @@ Vertex::Vertex(int ain, int cin, int gin, int tin, int aout, int cout, int gout,
 }
 
 Vertex::Vertex(const Vertex& v) : 
-	scc(v.scc),
+	cc(v.cc),
 	index(v.index),
 	onStack(v.onStack),
 	a_in(v.a_in),
