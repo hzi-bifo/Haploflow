@@ -118,9 +118,8 @@ private:
 
     std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&);
     void reduce_flow(std::vector<UEdge>&, float, std::vector<float>&, std::set<unsigned int>&);
-    std::pair<float, float> calculate_gain(UVertex& v);
-    //std::pair<float, std::vector<float> > calculate_flow(std::vector<UEdge>&);
 	std::vector<UEdge> find_fattest_path(UEdge seed);
+    std::vector<UEdge> fixFlow(UEdge);
     
 	//UEdge getSeed() const;
 	std::vector<float> calculate_thresholds(deBruijnGraph&, float);
@@ -131,11 +130,9 @@ private:
     std::vector<float> find_paths();
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
-    std::pair<unsigned int, std::vector<float>> fixFlow(UEdge seed, std::vector<float>&);
     float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int, unsigned int);
     std::pair<UEdge, float> get_target(UEdge, bool);
     UEdge get_next_source();
-    void markCycles();
     
     void cleanGraph();
 	void removeStableSets();
