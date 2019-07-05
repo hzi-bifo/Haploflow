@@ -740,8 +740,9 @@ void UnitigGraph::cleanGraph()
 bool UnitigGraph::test_hypothesis(float to_test_num, float to_test_denom, float h0, float threshold)
 {
     float diff = std::abs(to_test_num - h0 * to_test_denom); // the absolute difference between num and expected num
+    //bool less = to_test_num < to_test_denom * h0;
     //float perc = to_test_num/to_test_denom; //currently unused
-    return (diff < threshold); // they differ by less than threshold 
+    return (/*less or*/ diff < threshold); // they differ by less than threshold 
 }
 
 
@@ -828,7 +829,7 @@ void UnitigGraph::dijkstra(UEdge seed, bool init)
             {
                 g_[oe].fatness = std::min(g_[curr].fatness, (init ? g_[oe].residual_capacity : g_[oe].capacity));
                 g_[oe].prev = curr;
-                g_[oe].distance = std::min(g_[oe].distance, static_cast<unsigned int>(g_[curr].distance + g_[oe].name.size()));
+                g_[oe].distance = g_[curr].distance + g_[oe].name.size();
             }
             if (!g_[oe].visited)
             {
@@ -856,47 +857,57 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient)
     UEdge last;
     auto visits = g_[seed].visits;
     //bool first_vertex = false;
-    for (auto e : boost::edges(g_))
+    unvisit();
+    std::vector<UEdge> q = {seed};
+    while (!q.empty()) // classic dijsktra routine (cancelling when cycle found)
     {
+        auto curr = q.back();
+        q.pop_back();
+        
         bool same_visit = false;
-        for (auto v : g_[e].visits)
+        
+        for (auto v : g_[curr].visits)
         {
             same_visit = (std::find(visits.begin(), visits.end(), v) != visits.end());
             if (same_visit)
                 break;
         }
-        
-        unsigned int num_visits = g_[e].visits.size();
-        // case 2: no cycle, choose (TODO? unique) edge with the highest fatness/distance ratio
-        if (!lenient and same_visit /*and num_visits == 1*/)
+
+        g_[curr].visited = true;
+        unsigned int num_visits = g_[curr].visits.size();
+        auto target = boost::target(curr, g_);
+        /*if (same_visit and num_visits == 1 and g_[curr].distance < std::numeric_limits<unsigned int>::max() and (running_distance == 0 or (g_[curr].fatness > 0 and running_fatness/g_[curr].fatness < g_[curr].distance/running_distance)))
         {
-            //auto source = boost::source(e, g_);
-            //auto target = boost::target(e, g_);
-            //std::cerr << g_[source].index << " -> " << g_[target].index << ":" << std::endl;
-            //std::cerr << running_fatness << " / " << g_[e].fatness << " < " << g_[e].distance << " / " << running_distance << std::endl;
-            if (g_[e].distance < std::numeric_limits<unsigned int>::max() and (running_distance == 0 or (g_[e].fatness > 0 and running_fatness/g_[e].fatness < g_[e].distance/running_distance)))
-            {
-                running_fatness = g_[e].fatness;
-                running_distance = g_[e].distance;
-                last = e;
-                max_dist = g_[e].distance;
-            }
+            running_fatness = g_[curr].fatness;
+            running_distance = g_[curr].distance;
+            last = curr;
+            max_dist = g_[curr].distance;
+        }*/
+        if (g_[curr].distance > running_distance and g_[curr].distance != std::numeric_limits<unsigned int>::max() and same_visit)
+        {
+            running_distance = g_[curr].distance;
+            last = curr;
+            max_dist = g_[curr].distance;
         }
-        if (lenient and same_visit and g_[e].distance < std::numeric_limits<unsigned int>::max() and g_[e].distance > max_dist)
+        for (auto oe : boost::out_edges(target, g_))
         {
-            max_dist = g_[e].distance;
-            last = e;
+            if (!g_[oe].visited)
+            {
+                q.push_back(oe);
+            }
         }
     }
     if (max_dist == 0)
     {
         last = seed; // so we don't return nothing
     }
+    unvisit();
     return std::make_pair(last, max_dist);
 }
 
 std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed)
 {
+    unvisit();
     dijkstra(seed, false);
     auto path = find_fattest_path(seed);
     float flow = 0.;
@@ -918,10 +929,11 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed)
     {
         flow = g_[path.front()].capacity;
     }
+    unsigned int pos = 0;
     while (corrected)
     {
-        unvisit();
         bool eq = false;
+        unsigned int i = 0;
         for (auto& e : path)
         {
             auto trg = boost::target(e, g_);
@@ -937,19 +949,19 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed)
                     val = g_[oe].fatness;
                 }
             }
-            if (eq)
+            if (eq and i > pos)
             {
+                unvisit();
+                pos = i;
                 dijkstra(e, false);
                 break;
             }
+            i++;
         }
-        corrected = eq;
-        if (corrected)
-        {
-            path = find_fattest_path(path.front());
-        }
+        corrected = (eq and i == pos);
     }
-    std::vector<UEdge> return_path = find_fattest_path(path.front());
+    unvisit();
+    std::vector<UEdge> return_path = find_fattest_path(seed);
     return return_path;
 }
 
@@ -957,14 +969,13 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed)
 std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
 {
     auto source = boost::source(seed, g_);
-    auto target = boost::target(seed, g_);
-    std::cerr << "Source: " << g_[source].index << " -> " << g_[target].index << ": " << g_[seed].capacity << std::endl;
-    //dijkstra(seed, false); // sets distance values from seed/source vertex
+    //auto target = boost::target(seed, g_);
+    //std::cerr << "Source: " << g_[source].index << " -> " << g_[target].index << ": " << g_[seed].capacity << std::endl;
     auto trg = get_target(seed, false);
     auto last = trg.first;
-    auto source2 = boost::source(last, g_);
-    auto target2 = boost::target(last, g_);
-    std::cerr << "Target: " << g_[source2].index << " -> " << g_[target2].index << ": " << g_[last].capacity << std::endl;
+    //auto source2 = boost::source(last, g_);
+    //auto target2 = boost::target(last, g_);
+    //std::cerr << "Target: " << g_[source2].index << " -> " << g_[target2].index << ": " << g_[last].capacity << std::endl;
     float max_dist = trg.second;
     if (max_dist == 0) // path is only one edge, no longest path
     {
@@ -986,11 +997,11 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
     float seq_length = 0;
     std::vector<UEdge> ret;
     
-    std::cerr << g_[source].index; 
+    //std::cerr << g_[source].index; 
     for (auto e : path)
     {
         auto trg = boost::target(e, g_);
-        std::cerr << " -> " << g_[trg].index << "(" << g_[e].capacity << ")";
+        //std::cerr << " -> " << g_[trg].index << "(" << g_[e].capacity << " " << g_[e].fatness << ") ";
         seq_length += g_[e].name.size();
         auto ct = 0;
         auto avg = 0.f;
@@ -1017,7 +1028,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed)
         j++;
         ret.push_back(e);
     }
-    std::cerr << std::endl;
+    //std::cerr << std::endl;
     return ret;
 }
 
@@ -1049,41 +1060,71 @@ void UnitigGraph::reduce_flow(std::vector<UEdge>& path, float flow, std::vector<
                 break; // TODO
             }
         }
-        unsigned int removed_visit = 0;
         // TODO fix multiple "unique" paths
         if (to_remove != g_[e].visits.end())
         {
-            removed_visit = *to_remove;
             g_[e].visits.erase(to_remove);
         }
         else
         {
             if (!g_[e].visits.empty())
             {
-                removed_visit = g_[e].visits.front();
                 g_[e].visits.erase(g_[e].visits.begin());
             }
         }
         // now check whether this was the last path or there are remaining paths to reduce capacity
         float val = g_[e].capacity;
+        float val_last = g_[e].cap_info.last;
+        float val_first = g_[e].cap_info.first;
         auto cc = g_[boost::source(e, g_)].cc;
         auto threshold = thresholds_[cc];
+        
         if (g_[e].visits.empty())
         {
             g_[e].capacity = 0;
+            g_[e].cap_info.first = 0;
+            g_[e].cap_info.last = 0;
+            g_[e].cap_info.avg = 0;
+            removed_coverage = val;
         }
         else
         {
-            if (val > threshold)
+            bool not_decreasing = g_[e].cap_info.first <= 1.1 * g_[e].cap_info.last or std::abs(g_[e].cap_info.first - g_[e].cap_info.last) < threshold; //test_hypothesis(g_[e].cap_info.first, g_[e].cap_info.last, 1.2, threshold_); //not decreasing (first/last >= 1.2)
+            bool not_increasing = g_[e].cap_info.last <= 1.1 * g_[e].cap_info.first or std::abs(g_[e].cap_info.first - g_[e].cap_info.last) < threshold; //test_hypothesis(g_[e].cap_info.last, g_[e].cap_info.first, 1.2, threshold_); // not increasing (last/first >= 1.2)
+            //cannot both be false, but both be true (if close to 1.2)
+            if (val > threshold and not_decreasing and not_increasing)
             {
                 g_[e].capacity = std::max(threshold, g_[e].capacity - removed_coverage); // there might be paths, so leave a small amount
+                g_[e].cap_info.first = std::max(threshold, g_[e].cap_info.first - removed_coverage);
+                g_[e].cap_info.last = std::max(threshold, g_[e].cap_info.last - removed_coverage);
+                g_[e].cap_info.avg = g_[e].capacity;
+                removed_coverage = val - g_[e].capacity;
+            }
+            else if (val > threshold and not_decreasing and !not_increasing)
+            {
+                g_[e].capacity = std::max(threshold, g_[e].cap_info.first - removed_coverage);
+                g_[e].cap_info.first = g_[e].capacity;
+                g_[e].cap_info.last = std::max(threshold, g_[e].cap_info.last - (val - g_[e].capacity));
+                g_[e].cap_info.avg = g_[e].capacity;
+                removed_coverage = val_last - g_[e].capacity;
+            }
+            else if (val > threshold and !not_decreasing and not_increasing)
+            {
+                g_[e].capacity = std::max(threshold, g_[e].cap_info.last - removed_coverage);
+                g_[e].cap_info.last = g_[e].capacity;
+                g_[e].cap_info.first = std::max(threshold, g_[e].cap_info.first - (val - g_[e].capacity));
+                g_[e].cap_info.avg = g_[e].capacity;
+                removed_coverage = val_first - g_[e].capacity;
             }
             else
             {
+                g_[e].cap_info.first = 0;
+                g_[e].cap_info.last = 0;
                 g_[e].capacity = 0;
+                g_[e].cap_info.avg = 0;
+                removed_coverage = val;
             }
         }
-        removed_coverage = val - g_[e].capacity;
     }
 }
 
@@ -1493,8 +1534,8 @@ void UnitigGraph::printGraph(std::ostream& os)
         g_[e].v.visits = g_[e].visits;
     }
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::residual_capacity,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,g_)), boost::default_writer(), propmapIndex);
