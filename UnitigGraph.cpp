@@ -1183,7 +1183,9 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
                 }
             }
         }
-        std::cerr << "Possibly duplicated contig " << std::endl;
+        std::cerr << "Removed duplicated contig " << std::endl;
+        std::cerr << contig << std::endl;
+        contig = "";
         if (path.size() > 0)
             flow /= path.size();
     }
