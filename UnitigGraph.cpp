@@ -819,14 +819,14 @@ void UnitigGraph::dijkstra(UEdge seed, bool init)
             }
             if (!g_[oe].visited)
             {
-                q.push_back(oe);
+                auto pos = std::upper_bound(q.begin(), q.end(), oe, edge_compare);
+                q.insert(pos, oe);
             }
             else
             {
                 g_[oe].first_vertex = true; // this is the first vertex of a cycle
             }
         }
-        std::sort(q.begin(), q.end(), edge_compare);
     }
     g_[seed].fatness = (init ? g_[seed].residual_capacity : g_[seed].capacity);
     for (auto e : boost::edges(g_)) //unvisit for next run
