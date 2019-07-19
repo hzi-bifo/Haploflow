@@ -146,6 +146,8 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
             thresholds.push_back(0.f);
             continue;
         }
+        //std::cerr << "Coverages: " << std::endl;
+        //std::cerr << sorted_coverage << std::endl;
         auto roll = rolling(sorted_coverage, 5); // TODO set window size?
         auto cumm = cummin(roll);
         unsigned int counter = 0;
@@ -694,22 +696,6 @@ void UnitigGraph::removeStableSets()
 	}
 }
 
-void UnitigGraph::removeEmpty()
-{
-    std::vector<UEdge> toDelete;
-    for (auto&& e : boost::edges(g_))
-    {
-        auto&& src = boost::source(e, g_); //src and target always have the same cc
-        if (g_[e].capacity == 0 or g_[e].capacity < thresholds_[g_[src].cc]) //to make sure empty edges are definitely deleted
-        {
-            toDelete.push_back(e);
-        }
-    }
-    for (auto&& e : toDelete)
-    {
-        boost::remove_edge(e, g_);
-    }
-}
 
 bool UnitigGraph::hasRelevance()
 {
@@ -1514,10 +1500,50 @@ void UnitigGraph::assemble(std::string fname)
         }
         i++;
         std::cerr << "Cleaning graph again..." << std::endl;
-        removeEmpty();
-        removeStableSets();
+        cleanPath(path);
     }
     std::cerr << "Assembly complete" << std::endl;
+}
+
+void UnitigGraph::removeEmpty()
+{
+    std::vector<UEdge> toDelete;
+    for (auto&& e : boost::edges(g_))
+    {
+        auto&& src = boost::source(e, g_); //src and target always have the same cc
+        if (g_[e].capacity == 0 or g_[e].capacity < thresholds_[g_[src].cc]) //to make sure empty edges are definitely deleted
+        {
+            toDelete.push_back(e);
+        }
+    }
+    for (auto&& e : toDelete)
+    {
+        boost::remove_edge(e, g_);
+    }
+}
+
+void UnitigGraph::cleanPath(std::vector<UEdge>& path)
+{
+    std::set<UEdge> toDelete;
+    for (auto&& e : path)
+    {
+        auto&& source = boost::source(e, g_);
+        if (g_[e].capacity == 0 or g_[e].capacity < thresholds_[g_[source].cc])
+        {
+            toDelete.insert(e);
+        }
+    }
+    for (auto&& e : toDelete)
+    {
+        auto source = boost::source(e, g_);
+        boost::remove_edge(e, g_);
+		unsigned int indegree = boost::in_degree(source, g_);
+		unsigned int outdegree = boost::out_degree(source,g_);
+		if (outdegree == 0 and indegree == 0)
+		{
+			boost::remove_vertex(source,g_);
+		}
+    }
 }
 
 void UnitigGraph::printGraph(std::ostream& os)

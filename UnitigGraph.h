@@ -134,6 +134,7 @@ private:
     std::pair<UEdge, float> get_target(UEdge, bool);
     UEdge get_next_source();
     
+    void cleanPath(std::vector<UEdge>&);
     void cleanGraph();
 	void removeStableSets();
 	void contractPaths();
