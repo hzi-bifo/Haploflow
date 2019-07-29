@@ -1323,8 +1323,13 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
     {
         curr = sources.back();
         unblocked = (g_[curr].last_visit == 0);
+        auto cc = g_[boost::source(curr, g_)].cc;
         for (auto e : sources) // check all sources for unchecked edges
         {
+            if (g_[boost::source(e, g_)].cc != cc) // do not consider source from other CC (might be higher but does not interfere with this cc's assembly)
+            {
+                continue;
+            }
             auto nextUnvisited = checkUnvisitedEdges(e);
             auto potential_source = nextUnvisited.first;
             if (nextUnvisited.second and g_[potential_source].residual_capacity > g_[curr].residual_capacity)
