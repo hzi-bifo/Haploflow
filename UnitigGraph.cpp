@@ -143,7 +143,7 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
         if (members < 500) //less than 500 kmers
         {
             //std::cerr << "^skipped" << std::endl;
-            thresholds.push_back(0.f);
+            thresholds.push_back(std::numeric_limits<float>::max()); // skip graph in creation
             continue;
         }
         //std::cerr << "Coverages: " << std::endl;
@@ -1490,7 +1490,7 @@ void UnitigGraph::assemble(std::string fname)
         auto contig = calculate_contigs(path, all_paths);
         if (contig.first.size() > 150)
         {
-            std::cout << ">Contig_" << i << "_flow_" << contig.second << std::endl;
+            std::cout << ">Contig_" << i << "_flow_" << contig.second << "_cc_" << g_[boost::source(seed, g_)].cc << std::endl;
             std::cout << contig.first << std::endl;
         }
         else
