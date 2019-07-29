@@ -1339,25 +1339,25 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
 
 std::vector<UEdge> UnitigGraph::get_sources()
 {
-    std::vector<UEdge> sources;
+    std::set<UEdge> sources;
     for (auto e : boost::edges(g_))
     {
         auto src = boost::source(e, g_);
         auto target = boost::target(e, g_);
         auto in_degree = boost::in_degree(src, g_);
-        if (in_degree == 0 and std::find(sources.begin(), sources.end(), e) == sources.end()) // only add all source edges if they havent beed added before
+        if (in_degree == 0) // only add all source edges if they havent beed added before
         {
             for (auto f : boost::out_edges(src, g_))
             {
-                sources.push_back(f); // for every outedge of source start search
+                sources.insert(f); // for every outedge of source start search
             }
         }
         else if (in_degree == 1 and src == target) // also add sources which have a self-loop
         {
-            sources.push_back(e);
+            sources.insert(e);
         }
     }
-    return sources;
+    return std::vector<UEdge>(sources.begin(), sources.end());
 }
 
 std::vector<float> UnitigGraph::find_paths()
