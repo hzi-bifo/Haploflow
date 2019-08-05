@@ -1371,16 +1371,36 @@ std::vector<float> UnitigGraph::find_paths()
     auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
         return g_[e1].capacity > g_[e2].capacity;
     };
-    std::sort(sources.begin(), sources.end(), edge_compare); // so that we search the highest source first
+    std::map<int, std::vector<UEdge>> sources_by_cc;
+    for (auto e : sources)
+    {
+        auto source_v = boost::source(e, g_);
+        auto cc = g_[source_v].cc;
+        if (sources_by_cc.find(cc) != sources_by_cc.end())
+        {
+            sources_by_cc.at(cc).push_back(e);
+        }
+        else
+        {
+            std::vector<UEdge> new_cc{e};
+            sources_by_cc.emplace(cc, new_cc);
+        }
+    }
+    for (auto cc : sources_by_cc)
+    {
+        std::sort(cc.second.begin(), cc.second.end(), edge_compare); // so that we search the highest source first
+    }
     unsigned int used_sources = 1;
     unsigned int visits = 1;
     std::vector<std::vector<UEdge>> unique;
     std::vector<UEdge> started_from;
     std::vector<float> unique_paths;
-    while (true)
+    while (sources_by_cc.size() > 0)
     {
-        unvisit();
-        std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, used_sources);
+        unvisit(); // TODO only current cc
+        unsigned int current_cc = sources_by_cc.begin()->first;
+        auto current_sources = sources_by_cc.begin()->second;
+        std::pair<UEdge, bool> unvisited = getUnvisitedEdge(current_sources, used_sources);
         UEdge curr = unvisited.first;
         bool unblocked = unvisited.second;
         std::vector<UEdge> blockedPath;
@@ -1392,11 +1412,18 @@ std::vector<float> UnitigGraph::find_paths()
             blockedPath = blockPath(curr, visits); //marks the first path
         }
         else
-            break;
+        {
+            sources_by_cc.erase(sources_by_cc.begin());
+            continue;
+        }
         float avg = 0;
         unsigned int length = 0;
         for (auto e : boost::edges(g_))
         {
+            if (g_[boost::source(e, g_)].cc != current_cc)
+            {
+                continue;
+            }
             if (!g_[e].visits.empty() and g_[e].visits.front() == visits)
             {
                 unique[visits - 1].push_back(e);
@@ -1484,8 +1511,9 @@ void UnitigGraph::assemble(std::string fname)
     }
     while (hasRelevance())
     {
-        unvisit(); // to track visits and residual capacity
+        unvisit();
         auto seed = get_next_source();
+        //auto cc = g_[boost::source(seed, g_)].cc;
         std::cerr << "Fixing flow and finding fattest path" << std::endl;
         std::vector<UEdge> path = fixFlow(seed);
         std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
@@ -1506,6 +1534,7 @@ void UnitigGraph::assemble(std::string fname)
         i++;
         std::cerr << "Cleaning graph again..." << std::endl;
         cleanPath(path);
+        //unvisit(); // to track visits and residual capacity
     }
     std::cerr << "Assembly complete" << std::endl;
 }
@@ -1567,10 +1596,10 @@ void UnitigGraph::printGraph(std::ostream& os)
         g_[e].v.visits = g_[e].visits;
     }
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::residual_capacity,g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, g_, boost::make_label_writer(boost::get(&VertexProperties::index,g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,g_)), boost::default_writer(), propmapIndex);
 }
