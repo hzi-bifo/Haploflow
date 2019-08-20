@@ -104,52 +104,53 @@ public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
 	UnitigGraph(deBruijnGraph&, float); // TODO delete dBg after UnitigGraph creation?
 	UnitigGraph(); // debug
+    ~UnitigGraph();
 	void debug(); // debug information
     void assemble(std::string);
-    void printGraph(std::ostream&);
-    void dijkstra(UEdge seed, bool residual);
+    void printGraph(std::ostream&, unsigned int cc);
+    void dijkstra(UEdge seed, bool residual, unsigned int cc);
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float, float threshold);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&, float threshold);
 	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float, float threshold);
 	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float, float threshold);
 	UVertex addVertex(unsigned int*, std::string name, unsigned int ccc);
-    std::vector<UEdge> get_sources();
+    std::vector<UEdge> get_sources(unsigned int cc);
 
-    std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&);
-    void reduce_flow(std::vector<UEdge>&, float, std::vector<float>&, std::set<unsigned int>&);
-	std::vector<UEdge> find_fattest_path(UEdge seed);
-    std::vector<UEdge> fixFlow(UEdge);
+    std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&, unsigned int cc);
+    void reduce_flow(std::vector<UEdge>&, float, std::vector<float>&, std::set<unsigned int>&, unsigned int cc);
+	std::vector<UEdge> find_fattest_path(UEdge seed, unsigned int cc);
+    std::vector<UEdge> fixFlow(UEdge, unsigned int cc);
     
 	//UEdge getSeed() const;
 	std::vector<float> calculate_thresholds(deBruijnGraph&, float);
     std::vector<float> rolling(std::vector<float>& in, unsigned int len);
     std::vector<float> cummin(std::vector<float>& in);
 
-    std::vector<UEdge> blockPath(UEdge, unsigned int);
-    std::vector<float> find_paths();
-    std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
-    std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
-    float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int, unsigned int);
-    std::pair<UEdge, float> get_target(UEdge, bool);
-    UEdge get_next_source();
+    std::vector<UEdge> blockPath(UEdge, unsigned int, unsigned int cc);
+    std::vector<float> find_paths(unsigned int cc);
+    std::pair<UEdge, bool> checkUnvisitedEdges(UEdge, unsigned int cc);
+    std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int, unsigned int cc);
+    float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int, unsigned int, unsigned int cc);
+    std::pair<UEdge, float> get_target(UEdge, bool, unsigned int cc);
+    UEdge get_next_source(unsigned int cc);
     
-    void cleanPath(std::vector<UEdge>&);
-    void cleanGraph();
-	void removeStableSets();
-	void contractPaths();
-    void removeEmpty();
-    bool hasRelevance();
-    void unvisit();
+    void cleanPath(std::vector<UEdge>&, unsigned int cc);
+    void cleanGraph(unsigned int cc);
+	void removeStableSets(unsigned int cc);
+	void contractPaths(unsigned int cc);
+    void removeEmpty(unsigned int cc);
+    bool hasRelevance(unsigned int cc);
+    void unvisit(unsigned int cc);
 
-    float in_capacity(UVertex);
-    float out_capacity(UVertex);
+    float in_capacity(UVertex, unsigned int cc);
+    float out_capacity(UVertex, unsigned int cc);
 
 	bool test_hypothesis(float to_test_num, float to_test_denom, float h0, float threshold);
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
-	UGraph g_;
-	std::unordered_map<unsigned int, UVertex> graph_;
+	std::vector<UGraph*> graphs_;
+	std::vector<std::unordered_map<unsigned int, UVertex>> graph_map_;
 
     std::vector<float> thresholds_; // TODO
 	
