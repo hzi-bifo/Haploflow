@@ -936,22 +936,6 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
     float flow = 0.;
     unsigned int edges = 0;
     bool corrected = true;
-    for (auto& e : path)
-    {
-        if ((*g_)[e].visits.size() == 1)
-        {
-            flow += (*g_)[e].capacity;
-            edges++;
-        }
-    }
-    if (edges > 0) // if unique  edges are present calculate average flow over them
-    {
-        flow /= edges;
-    }
-    else // else take flow of first edge of path (TODO?)
-    {
-        flow = (*g_)[path.front()].capacity;
-    }
     unsigned int pos = 0;
     while (corrected)
     {
@@ -977,7 +961,6 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
                 unvisit(cc);
                 pos = i;
                 dijkstra(e, false, cc);
-                eq = false;
                 break;
             }
             i++;
