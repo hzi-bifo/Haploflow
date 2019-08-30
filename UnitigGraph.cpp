@@ -977,6 +977,7 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
                 unvisit(cc);
                 pos = i;
                 dijkstra(e, false, cc);
+                eq = false;
                 break;
             }
             i++;
@@ -1613,9 +1614,9 @@ void UnitigGraph::printGraph(std::ostream& os, unsigned int cc)
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::residual_capacity,*g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,*g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,*g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,*g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,*g_)), boost::default_writer(), propmapIndex);
 }
 
 void UnitigGraph::debug()
