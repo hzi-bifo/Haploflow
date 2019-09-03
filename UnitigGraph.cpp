@@ -787,14 +787,14 @@ float UnitigGraph::out_capacity(UVertex target, unsigned int cc)
 }
 
 // run dijsktra with fatness as optimality criterion, marks the graph with the distances from seed
-void UnitigGraph::dijkstra(UEdge seed, bool init, unsigned int cc)
+void UnitigGraph::dijkstra(UEdge seed, bool init, bool local, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
     auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest fatness
         return (*g_)[e1].fatness < (*g_)[e2].fatness;
     };
     std::vector<UEdge> q;
-    if (init)
+    if (!local)
     {
         for (auto e : boost::edges(*g_)) //initialise distances and fatness
         {
@@ -808,7 +808,7 @@ void UnitigGraph::dijkstra(UEdge seed, bool init, unsigned int cc)
             }
         }
     }
-    if (!init) // if fatness is not initialised for all vertices, initialize for all following
+    if (local) // if fatness is not initialised for all vertices, initialize for all following
     {
         q.push_back(seed);
         while (!q.empty()) // classic dijsktra routine (cancelling when cycle found)
@@ -930,7 +930,7 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient, unsign
 std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
 {
     unvisit(cc);
-    dijkstra(seed, false, cc);
+    dijkstra(seed, false, false, cc);
     auto path = find_fattest_path(seed, cc);
     UGraph* g_ = graphs_.at(cc);
     float flow = 0.;
@@ -1408,7 +1408,7 @@ std::vector<float> UnitigGraph::find_paths(unsigned int cc)
         if (unblocked)
         {
             unique.push_back(std::vector<UEdge>{});
-            dijkstra(curr, true, cc);
+            dijkstra(curr, true, false, cc);
             started_from.push_back(curr); // add the edge from which we started
             blockedPath = blockPath(curr, visits, cc); //marks the first path
         }
