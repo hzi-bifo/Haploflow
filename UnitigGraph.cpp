@@ -945,23 +945,26 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
         {
             auto trg = boost::target(e, *g_);
             float val = -1;
-            for (auto&& oe : boost::out_edges(trg, *g_))
+            if (i > pos)
             {
-                if ((*g_)[oe].fatness == val)
+                for (auto&& oe : boost::out_edges(trg, *g_))
                 {
-                    eq = true;
+                    if ((*g_)[oe].fatness == val)
+                    {
+                        eq = true;
+                    }
+                    else
+                    {
+                        val = (*g_)[oe].fatness;
+                    }
                 }
-                else
+                if (eq)
                 {
-                    val = (*g_)[oe].fatness;
+                    unvisit(cc);
+                    pos = i;
+                    dijkstra(e, false, true, cc);
+                    break;
                 }
-            }
-            if (eq and i > pos)
-            {
-                unvisit(cc);
-                pos = i;
-                dijkstra(e, false, cc);
-                break;
             }
             i++;
         }
