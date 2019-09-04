@@ -836,12 +836,19 @@ void UnitigGraph::dijkstra(UEdge seed, bool init, bool local, unsigned int cc)
     {
         (*g_)[e].visited = false;
     }
+    for (auto&& e : boost::edges(*g_))
+    {
+        if (e != seed)
+        {
+            q.push_back(e);
+        }
+    }
     q.push_back(seed);
     while (!q.empty()) // classic dijsktra routine (cancelling when cycle found)
     {
         auto curr = q.back();
         q.pop_back();
-        (*g_)[curr].visited = true;
+        //(*g_)[curr].visited = true;
         auto target = boost::target(curr, *g_);
         for (auto oe : boost::out_edges(target, *g_))
         {
@@ -851,8 +858,17 @@ void UnitigGraph::dijkstra(UEdge seed, bool init, bool local, unsigned int cc)
                 (*g_)[oe].fatness = std::min((*g_)[curr].fatness, (init ? (*g_)[oe].residual_capacity : (*g_)[oe].capacity));
                 (*g_)[oe].prev = curr;
                 (*g_)[oe].distance = (*g_)[curr].distance + (*g_)[oe].name.size();
+                auto old_pos = std::find(q.begin(), q.end(), oe);
+                if (old_pos != q.end())
+                {
+                    q.erase(old_pos);
+                }
+                auto pos = std::upper_bound(q.begin(), q.end(), oe, edge_compare);
+                q.insert(pos, oe);
             }
-            if (!(*g_)[oe].visited)
+            //std::sort(q.begin(), q.end(), edge_compare);
+            
+            /*if (!(*g_)[oe].visited)
             {
                 auto pos = std::upper_bound(q.begin(), q.end(), oe, edge_compare);
                 q.insert(pos, oe);
@@ -860,7 +876,7 @@ void UnitigGraph::dijkstra(UEdge seed, bool init, bool local, unsigned int cc)
             else
             {
                 (*g_)[oe].first_vertex = true; // this is the first vertex of a cycle
-            }
+            }*/
         }
     }
     (*g_)[seed].fatness = (init ? (*g_)[seed].residual_capacity : (*g_)[seed].capacity);
