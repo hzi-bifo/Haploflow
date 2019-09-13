@@ -145,6 +145,7 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
     auto&& cov_distr = dbg.coverageDistribution(dbgs);
     std::cerr << "Calculating coverage distribution took " << (clock() - t)/1000000. << " seconds" << std::endl;
     std::vector<float> thresholds;
+    unsigned int i = 0;
     for (auto& covs : cov_distr)
     {
         if (covs.empty())
@@ -203,13 +204,13 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
             }
             if ((j > 20 and counter == 6) or (counter == 6 and stored == 0)) //TODO set value (window_size + 1 makes sense)
             {
-                std::cerr << "Threshold set to: " << float(j - 4) << std::endl;
+                std::cerr << "Graph " << i << " threshold set to: " << float(j - 4) << std::endl;
                 thresholds.push_back(float(j - 4));
                 break;
             }
             else if (j <= 20 and counter == 6 and stored != 0)
             {
-                std::cerr << "Threshold reduced to: " << float(stored) << std::endl;
+                std::cerr << "Graph " << i << " threshold reduced to: " << float(stored) << std::endl;
                 thresholds.push_back(stored);
                 break;
             }
@@ -224,6 +225,7 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
         {
             thresholds.push_back(stored);
         }
+        i++;
     }
     return thresholds;
 }
