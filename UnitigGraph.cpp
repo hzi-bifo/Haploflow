@@ -171,13 +171,24 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
         //std::cerr << sorted_coverage << std::endl;
         auto roll = rolling(sorted_coverage, 5); // TODO set window size?
         auto cumm = cummin(roll);
+        auto cumm_orig = cummin(sorted_coverage);
         unsigned int counter = 0;
+        unsigned int counter_orig = 0;
+        unsigned int stored = 0;
         unsigned int j = 0;
         for (auto zip : boost::combine(cumm, roll))
         {
             float cummin_val;
             float rolling_val;
             boost::tie(cummin_val, rolling_val) = zip;
+            if (cumm_orig[j] < sorted_coverage[j])
+            {
+                counter_orig++;
+            }
+            else
+            {
+                counter_orig = 0;
+            }
             if (cummin_val < rolling_val)
             {
                 counter++;
@@ -186,18 +197,32 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
             {
                 counter = 0;
             }
-            if (counter == 6) //TODO set value (window_size + 1 makes sense)
+            if (counter_orig == 6)
             {
-                std::cerr << "Threshold set to: " << float(j) << std::endl;
-                thresholds.push_back(float(j));
+                stored = j - 4;
+            }
+            if ((j > 20 and counter == 6) or (counter == 6 and stored == 0)) //TODO set value (window_size + 1 makes sense)
+            {
+                std::cerr << "Threshold set to: " << float(j - 4) << std::endl;
+                thresholds.push_back(float(j - 4));
+                break;
+            }
+            else if (j <= 20 and counter == 6 and stored != 0)
+            {
+                std::cerr << "Threshold reduced to: " << float(stored) << std::endl;
+                thresholds.push_back(stored);
                 break;
             }
             j++; //position
         }
-        if (counter != 6) // no break was encountered (TODO: value)
+        if (counter != 6 and stored == 0) // no break was encountered (TODO: value)
         {
             //std::cerr << "No signal, threshold set to 1" << std::endl;
-            thresholds.push_back(1.f); // no signal found TODO
+            thresholds.push_back(2.f); // no signal found TODO
+        }
+        else if (stored != 0)
+        {
+            thresholds.push_back(stored);
         }
     }
     return thresholds;
@@ -866,17 +891,6 @@ void UnitigGraph::dijkstra(UEdge seed, bool init, bool local, unsigned int cc)
                 auto pos = std::upper_bound(q.begin(), q.end(), oe, edge_compare);
                 q.insert(pos, oe);
             }
-            //std::sort(q.begin(), q.end(), edge_compare);
-            
-            /*if (!(*g_)[oe].visited)
-            {
-                auto pos = std::upper_bound(q.begin(), q.end(), oe, edge_compare);
-                q.insert(pos, oe);
-            }
-            else
-            {
-                (*g_)[oe].first_vertex = true; // this is the first vertex of a cycle
-            }*/
         }
     }
     (*g_)[seed].fatness = (init ? (*g_)[seed].residual_capacity : (*g_)[seed].capacity);
@@ -1613,12 +1627,12 @@ void UnitigGraph::printGraph(std::ostream& os, unsigned int cc)
         (*g_)[e].v.visits = (*g_)[e].visits;
     }
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,*g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,*g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::residual_capacity,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,*g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,*g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,*g_)), boost::default_writer(), propmapIndex);
 }
 
 void UnitigGraph::debug()
