@@ -221,10 +221,6 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
             //std::cerr << "No signal, threshold set to 1" << std::endl;
             thresholds.push_back(2.f); // no signal found TODO
         }
-        else if (stored != 0)
-        {
-            thresholds.push_back(stored);
-        }
         i++;
     }
     return thresholds;
