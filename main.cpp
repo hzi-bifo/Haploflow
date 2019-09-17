@@ -10,7 +10,7 @@ int main (int argc, char* argv[])
 	//deBruijnGraph *dbg = new deBruijnGraph(std::string(argv[1])); // dump file
     std::cerr << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
     t = clock();
-    UnitigGraph ug = UnitigGraph(*dbg, atof(argv[3])); //argv[2] is k
+    UnitigGraph ug = UnitigGraph(*dbg, std::string(argv[5]), atof(argv[3])); //argv[2] is k
     delete dbg;
     //t = clock();
     std::cerr << "Assembling..." << std::endl;

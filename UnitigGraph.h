@@ -102,7 +102,7 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&, float); // TODO delete dBg after UnitigGraph creation?
+	UnitigGraph(deBruijnGraph&, std::string, float); // TODO delete dBg after UnitigGraph creation?
 	UnitigGraph(); // debug
     ~UnitigGraph();
 	void debug(); // debug information
@@ -123,7 +123,7 @@ private:
     std::vector<UEdge> fixFlow(UEdge, unsigned int cc);
     
 	//UEdge getSeed() const;
-	std::vector<float> calculate_thresholds(deBruijnGraph&, float);
+	std::vector<float> calculate_thresholds(deBruijnGraph&, std::string, float);
     std::vector<float> rolling(std::vector<float>& in, unsigned int len);
     std::vector<float> cummin(std::vector<float>& in);
 

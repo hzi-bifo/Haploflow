@@ -62,7 +62,7 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, float error_rate) : cc_(1)
 {
 	std::cerr << "deBruijnGraph has " << dbg.getSize() << " vertices" << std::endl;
 	std::cerr << "Building unitig graph from deBruijn graph..." << std::endl;
@@ -72,7 +72,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, float error_rate) : cc_(1)
 	unsigned int index = 1;
 	auto&& out_unbalanced = junc.first;
 	auto&& in_unbalanced = junc.second;
-    auto&& thresholds = calculate_thresholds(dbg, error_rate);
+    auto&& thresholds = calculate_thresholds(dbg, p, error_rate);
     thresholds_ = thresholds;
     graph_map_.resize(thresholds.size());
     graphs_.resize(thresholds.size());
@@ -133,7 +133,7 @@ UnitigGraph::~UnitigGraph()
     }
 }
 
-std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float error_rate)
+std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, float error_rate)
 {
     std::cerr << "Getting connected components" << std::endl;
     auto t = clock();
@@ -155,12 +155,15 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
         unsigned int members = 0;
         std::vector<float> sorted_coverage;
         sorted_coverage.resize(covs.rbegin()->first + 1, 0.f); // get last (= biggest) element of map
+        std::string filename = path + "Cov" + std::to_string(i) + ".tsv";
+        std::ofstream outfile (filename);
         for (auto&& cov : covs)
         {
             auto pos = cov.first;
             auto val = cov.second;
             members += val;
             sorted_coverage[pos] = val;
+            outfile << pos << '\t' << val << std::endl;
         }
         if (members < 500) //less than 500 kmers
         {
