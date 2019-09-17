@@ -177,6 +177,7 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
         unsigned int counter_orig = 0;
         unsigned int stored = 0;
         unsigned int j = 0;
+        bool set = false;
         for (auto zip : boost::combine(cumm, roll))
         {
             float cummin_val;
@@ -206,12 +207,14 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
             {
                 std::cerr << "Graph " << i << " threshold set to: " << float(j - 4) << std::endl;
                 thresholds.push_back(float(j - 4));
+                set = true;
                 break;
             }
             else if (j <= 20 and counter == 6 and stored != 0)
             {
                 std::cerr << "Graph " << i << " threshold reduced to: " << float(stored) << std::endl;
                 thresholds.push_back(stored);
+                set = true;
                 break;
             }
             j++; //position
@@ -220,6 +223,10 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, float e
         {
             //std::cerr << "No signal, threshold set to 1" << std::endl;
             thresholds.push_back(2.f); // no signal found TODO
+        }
+        else if (stored != 0 and !set)
+        {
+            thresholds.push_back(stored);
         }
         i++;
     }
