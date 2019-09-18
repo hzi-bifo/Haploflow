@@ -179,6 +179,7 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
         unsigned int counter = 0;
         unsigned int counter_orig = 0;
         unsigned int stored = 0;
+        unsigned int stored_orig = 0;
         unsigned int j = 0;
         bool set = false;
         for (auto zip : boost::combine(cumm, roll))
@@ -194,6 +195,10 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
             {
                 counter_orig = 0;
             }
+            if (counter_orig > 1 and stored_orig == 0)
+            {
+                stored_orig = j;
+            }
             if (cummin_val < rolling_val)
             {
                 counter++;
@@ -201,35 +206,32 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
             else
             {
                 counter = 0;
+                stored = j;
             }
-            if (counter_orig == 6)
+            if (j > 20 and counter == 6) //TODO set value (window_size + 1 makes sense)
             {
-                stored = j - 4;
-            }
-            if ((j > 20 and counter == 6) or (counter == 6 and stored == 0)) //TODO set value (window_size + 1 makes sense)
-            {
-                std::cerr << "Graph " << i << " threshold set to: " << float(j - 4) << std::endl;
-                thresholds.push_back(float(j - 4));
+                std::cerr << "Graph " << i << " threshold set to: " << float(stored) << std::endl;
+                thresholds.push_back(float(stored));
                 set = true;
                 break;
             }
-            else if (j <= 20 and counter == 6 and stored != 0)
+            else if (j <= 20 and counter == 6 and stored_orig != 0)
             {
-                std::cerr << "Graph " << i << " threshold reduced to: " << float(stored) << std::endl;
-                thresholds.push_back(stored);
+                std::cerr << "Graph " << i << " threshold reduced to: " << float(stored_orig) << std::endl;
+                thresholds.push_back(stored_orig);
                 set = true;
                 break;
             }
             j++; //position
         }
-        if (counter != 6 and stored == 0) // no break was encountered (TODO: value)
+        if (counter != 6 and stored_orig == 0) // no break was encountered (TODO: value)
         {
             //std::cerr << "No signal, threshold set to 1" << std::endl;
             thresholds.push_back(2.f); // no signal found TODO
         }
-        else if (stored != 0 and !set)
+        else if (stored_orig != 0 and !set)
         {
-            thresholds.push_back(stored);
+            thresholds.push_back(stored_orig);
         }
         i++;
     }
