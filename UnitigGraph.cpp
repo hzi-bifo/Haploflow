@@ -17,47 +17,6 @@ namespace std
 // unitig graph for debugging purposes
 UnitigGraph::UnitigGraph() : cc_(1)
 {
-    std::vector<UVertex> vertices;
-    UGraph g;
-    graphs_.push_back(&g);
-    for (unsigned int i = 1; i < 7; i++)
-    {
-        unsigned int index = 1;
-        vertices.push_back(addVertex(&index, std::to_string(i), 1));
-    }
-    boost::add_edge(vertices[0],vertices[1],g);
-    boost::add_edge(vertices[0],vertices[2],g);
-    boost::add_edge(vertices[1],vertices[3],g);
-    boost::add_edge(vertices[1],vertices[4],g);
-    boost::add_edge(vertices[2],vertices[3],g);
-    boost::add_edge(vertices[2],vertices[4],g);
-    boost::add_edge(vertices[3],vertices[5],g);
-    boost::add_edge(vertices[4],vertices[5],g);
-    /*boost::add_edge(vertices[0],vertices[1],*g_);
-    boost::add_edge(vertices[0],vertices[1],*g_);
-    boost::add_edge(vertices[1],vertices[2],*g_);
-    boost::add_edge(vertices[1],vertices[3],*g_);
-    boost::add_edge(vertices[1],vertices[12],*g_);
-    boost::add_edge(vertices[2],vertices[3],*g_);
-    boost::add_edge(vertices[2],vertices[4],*g_);
-    boost::add_edge(vertices[3],vertices[0],*g_);
-    boost::add_edge(vertices[4],vertices[5],*g_);
-    //boost::add_edge(vertices[4],vertices[5],*g_);
-    boost::add_edge(vertices[4],vertices[8],*g_);
-    boost::add_edge(vertices[5],vertices[6],*g_);
-    boost::add_edge(vertices[6],vertices[7],*g_);
-    boost::add_edge(vertices[7],vertices[6],*g_);
-    boost::add_edge(vertices[7],vertices[8],*g_);
-    boost::add_edge(vertices[8],vertices[9],*g_);
-    boost::add_edge(vertices[9],vertices[10],*g_);
-    boost::add_edge(vertices[9],vertices[11],*g_);
-    boost::add_edge(vertices[10],vertices[14],*g_);
-    boost::add_edge(vertices[10],vertices[14],*g_);
-    boost::add_edge(vertices[11],vertices[12],*g_);
-    boost::add_edge(vertices[11],vertices[13],*g_);
-    boost::add_edge(vertices[12],vertices[4],*g_);
-    boost::add_edge(vertices[14],vertices[13],*g_);
-    //boost::add_edge(vertices[14],vertices[15],*g_);*/
 }
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
@@ -144,6 +103,11 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
     std::cerr << "Calculating coverage distribution" << std::endl;
     auto&& cov_distr = dbg.coverageDistribution(dbgs);
     std::cerr << "Calculating coverage distribution took " << (clock() - t)/1000000. << " seconds" << std::endl;
+    return get_thresholds(cov_distr, path);
+}
+
+std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path)
+{
     std::vector<float> thresholds;
     unsigned int i = 0;
     for (auto& covs : cov_distr)
@@ -155,15 +119,15 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
         unsigned int members = 0;
         std::vector<float> sorted_coverage;
         sorted_coverage.resize(covs.rbegin()->first + 1, 0.f); // get last (= biggest) element of map
-        std::string filename = path + "Cov" + std::to_string(i) + ".tsv";
-        std::ofstream outfile (filename);
+        //std::string filename = path + "Cov" + std::to_string(i) + ".tsv";
+        //std::ofstream outfile (filename);
         for (auto&& cov : covs)
         {
             auto pos = cov.first;
             auto val = cov.second;
             members += val;
             sorted_coverage[pos] = val;
-            outfile << pos << '\t' << val << std::endl;
+            //outfile << pos << '\t' << val << std::endl;
         }
         if (members < 500) //less than 500 kmers
         {
@@ -174,8 +138,8 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
         //std::cerr << "Coverages: " << std::endl;
         //std::cerr << sorted_coverage << std::endl;
         auto roll = rolling(sorted_coverage, 5); // TODO set window size?
-        auto cumm = cummin(roll);
-        auto cumm_orig = cummin(sorted_coverage);
+        auto cumm = cummin(roll, 0);
+        auto cumm_orig = cummin(sorted_coverage, 1); //TODO first non-zero position?
         unsigned int counter = 0;
         unsigned int counter_orig = 0;
         unsigned int stored = 0;
@@ -195,9 +159,9 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
             {
                 counter_orig = 0;
             }
-            if (counter_orig > 1 and stored_orig == 0)
+            if (counter_orig > 0 and stored_orig == 0)
             {
-                stored_orig = j;
+                stored_orig = j - 1; // last value was minimum
             }
             if (cummin_val < rolling_val)
             {
@@ -239,13 +203,18 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
 }
 
 // calculates cumulative minimum of in
-std::vector<float> UnitigGraph::cummin(std::vector<float>& in)
+std::vector<float> UnitigGraph::cummin(std::vector<float>& in, unsigned int pos)
 {
     std::vector<float> cummin;
     cummin.reserve(in.size());
-    float curr = in.front();
-    for (auto& val : in)
+    float curr = in[pos];
+    for (unsigned int i = 0; i < pos; i++)
     {
+        cummin.push_back(0);
+    }
+    for (auto it = in.begin() + pos; it != in.end(); ++it)
+    {
+        auto val = *it;
         if (std::isnan(curr) or (val < curr and !std::isnan(val)))
         {
             curr = val;
@@ -1647,5 +1616,21 @@ void UnitigGraph::printGraph(std::ostream& os, unsigned int cc)
 
 void UnitigGraph::debug()
 {
+    std::string filename = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/Simulated_viromes/kmer_histograms/hcmv_1_10_kmers.tsv";
+    std::ifstream file(filename);
+    std::string line;
+    std::vector<std::map<unsigned int, unsigned int>> foo;
+    std::map<unsigned int, unsigned int> bar;
+    while (std::getline(file, line))
+    {
+        auto pos1 = line.find_first_of("\t ");
+        auto pos2 = line.find_last_of("\t ");
+        auto kmer = stoi(line.substr(0,pos1));
+        auto val = stoi(line.substr(pos2));
+        bar.insert(std::make_pair(kmer, val));
+    }
+    foo.push_back(bar);
+    std::string outp = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/Simulated_viromes/kmer_histograms/";
+    get_thresholds(foo, outp); 
 	// DEBUG
 }
