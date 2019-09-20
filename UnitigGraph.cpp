@@ -484,13 +484,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         ends_with += nextV->get_read_ends();
 	}
 	avg /= float(length); // average coverage over the path
-	if (!nextV->is_visited() and (avg >= threshold or sequence.length() > 500)) // TODO if coverage is low but the (unique) sequence is long, still add
+	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 500)) // TODO if coverage is low but the (unique) sequence is long, still add
 	{// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
 		nextV->visit();
 		addVertex(index, prev, nextV->cc); // the vertex is new and found to be relevant
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or (avg < threshold and sequence.length() <= 500) or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 500) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,""); // path has too low coverage
 	}
@@ -600,13 +600,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited() and (avg >= threshold or sequence.length() > 500)) //TODO arbitrary value
+	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 500))
 	{
 		nextV->visit();
 		addVertex(index, next, nextV->cc);
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or (avg < threshold and sequence.length() <= 500) or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 500) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
@@ -739,11 +739,11 @@ bool UnitigGraph::hasRelevance(unsigned int cc)
     {
         length += (*g_)[e].name.size();
     }
-    if (length <= 500)
+    if (length <= 150)
     {
-        std::cerr << "Graph undercutting threshold of 500 characters (" << length << ")" << std::endl;
+        std::cerr << "Graph undercutting threshold of 150 characters (" << length << ")" << std::endl;
     }
-    return length > 500;
+    return length > 150;
 }
 
 // the graph might contain some unconnected vertices, clean up
