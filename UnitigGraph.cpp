@@ -119,19 +119,19 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
         unsigned int members = 0;
         std::vector<float> sorted_coverage;
         sorted_coverage.resize(covs.rbegin()->first + 1, 0.f); // get last (= biggest) element of map
-        //std::string filename = path + "Cov" + std::to_string(i) + ".tsv";
-        //std::ofstream outfile (filename);
+        std::string filename = path + "Cov" + std::to_string(i) + ".tsv";
+        std::ofstream outfile (filename);
         for (auto&& cov : covs)
         {
             auto pos = cov.first;
             auto val = cov.second;
             members += val;
             sorted_coverage[pos] = val;
-            //outfile << pos << '\t' << val << std::endl;
+            outfile << pos << '\t' << val << std::endl;
         }
         if (members < 500) //less than 500 kmers
         {
-            //std::cerr << "^skipped" << std::endl;
+            i++;
             thresholds.push_back(std::numeric_limits<float>::max()); // skip graph in creation
             continue;
         }
@@ -151,6 +151,10 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             float cummin_val;
             float rolling_val;
             boost::tie(cummin_val, rolling_val) = zip;
+            if (cummin_val == 0)
+            {
+                break; // nothing good comes out if we compare against 0 cummin
+            }
             if (cumm_orig[j] < sorted_coverage[j])
             {
                 counter_orig++;
@@ -163,7 +167,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             {
                 stored_orig = j - 1; // last value was minimum
             }
-            if (cummin_val < rolling_val)
+            if (cummin_val < rolling_val and sorted_coverage[j] != 0)
             {
                 counter++;
             }
@@ -188,14 +192,10 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             }
             j++; //position
         }
-        if (counter != 6 and stored_orig == 0) // no break was encountered (TODO: value)
+        if (counter != 6) // no break was encountered (TODO: value)
         {
             //std::cerr << "No signal, threshold set to 1" << std::endl;
-            thresholds.push_back(2.f); // no signal found TODO
-        }
-        else if (stored_orig != 0 and !set)
-        {
-            thresholds.push_back(stored_orig);
+            thresholds.push_back(1.f); // no signal found TODO
         }
         i++;
     }
@@ -1382,6 +1382,13 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
         auto src = boost::source(e, *g_);
         auto target = boost::target(e, *g_);
         auto in_degree = boost::in_degree(src, *g_);
+        for (auto&& oe : boost::out_edges(target, *g_))
+        {
+            if (boost::target(oe, *g_) == src and in_degree == 1)
+            {
+                sources.insert(e);
+            }
+        }
         if (in_degree == 0) // only add all source edges if they havent beed added before
         {
             for (auto f : boost::out_edges(src, *g_))
