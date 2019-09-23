@@ -151,10 +151,6 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             float cummin_val;
             float rolling_val;
             boost::tie(cummin_val, rolling_val) = zip;
-            if (cummin_val == 0)
-            {
-                break; // nothing good comes out if we compare against 0 cummin
-            }
             if (cumm_orig[j] < sorted_coverage[j])
             {
                 counter_orig++;
@@ -176,7 +172,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                 counter = 0;
                 stored = j;
             }
-            if (j > 20 and counter == 6) //TODO set value (window_size + 1 makes sense)
+            if (j > 20 and counter == 6 and cummin_val != 0) //TODO set value (window_size + 1 makes sense)
             {
                 std::cerr << "Graph " << i << " threshold set to: " << float(stored) << std::endl;
                 thresholds.push_back(float(stored));
@@ -186,6 +182,13 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             else if (j <= 20 and counter == 6 and stored_orig != 0)
             {
                 std::cerr << "Graph " << i << " threshold reduced to: " << float(stored_orig) << std::endl;
+                thresholds.push_back(stored_orig);
+                set = true;
+                break;
+            }
+            else if (counter == 6 and cummin_val == 0 and stored_orig != 0)
+            {
+                std::cerr << "Graph " << i << " threshold ambiguous, reduced to: " << float(stored_orig) << std::endl;
                 thresholds.push_back(stored_orig);
                 set = true;
                 break;
@@ -1623,7 +1626,7 @@ void UnitigGraph::printGraph(std::ostream& os, unsigned int cc)
 
 void UnitigGraph::debug()
 {
-    std::string filename = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/Simulated_viromes/kmer_histograms/hcmv_1_10_kmers.tsv";
+    std::string filename = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/Simulated_viromes/kmer_histograms/Cov2.tsv";
     std::ifstream file(filename);
     std::string line;
     std::vector<std::map<unsigned int, unsigned int>> foo;
