@@ -172,7 +172,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                 counter = 0;
                 stored = j;
             }
-            if (j > 20 and counter == 6 and cummin_val != 0) //TODO set value (window_size + 1 makes sense)
+            if (j > 20 and counter == 6/* and cummin_val != 0*/) //TODO set value (window_size + 1 makes sense)
             {
                 std::cerr << "Graph " << i << " threshold set to: " << float(stored) << std::endl;
                 thresholds.push_back(float(stored));
@@ -186,13 +186,13 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                 set = true;
                 break;
             }
-            else if (counter == 6 and cummin_val == 0 and stored_orig != 0)
+            /*else if (counter == 6 and cummin_val == 0 and stored_orig != 0)
             {
                 std::cerr << "Graph " << i << " threshold ambiguous, reduced to: " << float(stored_orig) << std::endl;
                 thresholds.push_back(stored_orig);
                 set = true;
                 break;
-            }
+            }*/
             j++; //position
         }
         if (counter != 6) // no break was encountered (TODO: value)
