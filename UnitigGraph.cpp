@@ -47,7 +47,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, float error_rate) : 
         unsigned int cc = source->cc - 1; // cc start at 1
         float threshold = thresholds.at(cc);
 		// make a guess whether we are relevant already 
-		if (!source->is_flagged() and threshold > 0 and source->get_total_out_coverage() > threshold)
+		if (!source->is_flagged() and threshold > 0 and source->get_total_out_coverage() >= threshold)
 		{
 			connectUnbalanced(source, &index, curr, dbg, error_rate, threshold); 
 			cc_++; // new connected component found
@@ -64,7 +64,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, float error_rate) : 
 		Vertex* source = dbg.getVertex(curr);
         unsigned int cc = source->cc - 1;
         float threshold = thresholds.at(cc);
-		if (!source->is_flagged() and threshold > 0 and source->get_total_in_coverage() > threshold)
+		if (!source->is_flagged() and threshold > 0 and source->get_total_in_coverage() >= threshold)
 		{
 			connectUnbalanced(source, &index, curr, dbg, error_rate, threshold); 
 			cc_++; // new connected component found
@@ -129,7 +129,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             sorted_coverage[pos] = val;
             outfile << pos << '\t' << val << std::endl;
         }
-        if (members < 500) //less than 500 kmers
+        if (members < 150) //less than 500 kmers
         {
             i++;
             thresholds.push_back(std::numeric_limits<float>::max()); // skip graph in creation
@@ -174,6 +174,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             }
             if (j > 20 and counter == 6/* and cummin_val != 0*/) //TODO set value (window_size + 1 makes sense)
             {
+                stored = std::min(stored_orig, stored);
                 std::cerr << "Graph " << i << " threshold set to: " << float(stored) << std::endl;
                 thresholds.push_back(float(stored));
                 set = true;
@@ -487,13 +488,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         ends_with += nextV->get_read_ends();
 	}
 	avg /= float(length); // average coverage over the path
-	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 500)) // TODO if coverage is low but the (unique) sequence is long, still add
+	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 150)) // TODO if coverage is low but the (unique) sequence is long, still add
 	{// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
 		nextV->visit();
 		addVertex(index, prev, nextV->cc); // the vertex is new and found to be relevant
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 500) or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 150) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,""); // path has too low coverage
 	}
@@ -603,13 +604,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 500))
+	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 150))
 	{
 		nextV->visit();
 		addVertex(index, next, nextV->cc);
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 500) or nextV->index == 0)
+	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 150) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
@@ -1515,9 +1516,13 @@ void UnitigGraph::assemble(std::string fname)
     std::cerr << "Cleaning graph" << std::endl;
     for (unsigned int cc = 0; cc < graphs_.size(); cc++)
     {
+        UGraph* g_ = graphs_.at(cc);
+        std::string filename = fname + "CC" + std::to_string(cc) + "Graph.dot";
+        std::ofstream outfile (filename);
+        printGraph(outfile, cc);
         cleanGraph(cc);
         contractPaths(cc);
-        UGraph* g_ = graphs_.at(cc);
+        g_ = graphs_.at(cc);
         std::cerr << boost::num_vertices(*g_) << " vertices remaining" << std::endl;
         std::cerr << "Calculating paths" << std::endl;
         auto all_paths = find_paths(cc);
