@@ -103,10 +103,10 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
     std::cerr << "Calculating coverage distribution" << std::endl;
     auto&& cov_distr = dbg.coverageDistribution(dbgs);
     std::cerr << "Calculating coverage distribution took " << (clock() - t)/1000000. << " seconds" << std::endl;
-    return get_thresholds(cov_distr, path);
+    return get_thresholds(cov_distr, path, error_rate);
 }
 
-std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path)
+std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path, float error_rate)
 {
     std::vector<float> thresholds;
     unsigned int i = 0;
@@ -129,6 +129,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             sorted_coverage[pos] = val;
             outfile << pos << '\t' << val << std::endl;
         }
+        float max = sorted_coverage.back();
         if (members < 150) //less than 500 kmers
         {
             i++;
@@ -174,7 +175,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             }
             if (j > 20 and counter == 6/* and cummin_val != 0*/) //TODO set value (window_size + 1 makes sense)
             {
-                stored = std::min(stored_orig, stored);
+                stored = std::min(error_rate * max, float(stored));
                 std::cerr << "Graph " << i << " threshold set to: " << float(stored) << std::endl;
                 thresholds.push_back(float(stored));
                 set = true;
@@ -1646,6 +1647,6 @@ void UnitigGraph::debug()
     }
     foo.push_back(bar);
     std::string outp = "/home/afritz/Documents/Code/Graph/deBruijn_2.0/build/out/Simulated_viromes/kmer_histograms/";
-    get_thresholds(foo, outp); 
+    get_thresholds(foo, outp, 0.02); 
 	// DEBUG
 }
