@@ -129,7 +129,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             sorted_coverage[pos] = val;
             outfile << pos << '\t' << val << std::endl;
         }
-        float max = sorted_coverage.back();
+        float max = sorted_coverage.size() - 1;
         if (members < 150) //less than 500 kmers
         {
             i++;
@@ -143,8 +143,8 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
         auto cumm_orig = cummin(sorted_coverage, 1); //TODO first non-zero position?
         unsigned int counter = 0;
         unsigned int counter_orig = 0;
-        unsigned int stored = 0;
-        unsigned int stored_orig = 0;
+        float stored = 0;
+        float stored_orig = 0;
         unsigned int j = 0;
         bool set = false;
         for (auto zip : boost::combine(cumm, roll))
@@ -162,7 +162,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             }
             if (counter_orig > 0 and stored_orig == 0)
             {
-                stored_orig = j - 1; // last value was minimum
+                stored_orig = float(j - 1); // last value was minimum
             }
             if (cummin_val < rolling_val and sorted_coverage[j] != 0)
             {
@@ -171,19 +171,19 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             else
             {
                 counter = 0;
-                stored = j;
+                stored = float(j);
             }
             if (j > 20 and counter == 6/* and cummin_val != 0*/) //TODO set value (window_size + 1 makes sense)
             {
-                stored = std::min(error_rate * max, float(stored));
-                std::cerr << "Graph " << i << " threshold set to: " << float(stored) << std::endl;
-                thresholds.push_back(float(stored));
+                stored = std::min(error_rate * max, stored);
+                std::cerr << "Graph " << i << " threshold set to: " << stored << std::endl;
+                thresholds.push_back(stored);
                 set = true;
                 break;
             }
             else if (j <= 20 and counter == 6 and stored_orig != 0)
             {
-                std::cerr << "Graph " << i << " threshold reduced to: " << float(stored_orig) << std::endl;
+                std::cerr << "Graph " << i << " threshold reduced to: " << stored_orig << std::endl;
                 thresholds.push_back(stored_orig);
                 set = true;
                 break;
