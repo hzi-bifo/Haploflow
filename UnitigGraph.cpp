@@ -175,7 +175,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             }
             if (j > 20 and counter == 6/* and cummin_val != 0*/) //TODO set value (window_size + 1 makes sense)
             {
-                stored = std::min(error_rate * max, stored);
+                stored = std::min(0.66f * error_rate * max, stored);
                 std::cerr << "Graph " << i << " threshold set to: " << stored << std::endl;
                 thresholds.push_back(stored);
                 set = true;
@@ -332,7 +332,7 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 			uv = graph_map_.at(junction->cc - 1).at(idx);
 		}
 		junction->visit(); // make sure the next time we find it we dont add it another time
-		auto&& following = addNeighbours(seq, succ, pred, dbg, index, uv, threshold); // finding the next unbalanced vertices
+		auto&& following = addNeighbours(seq, succ, pred, dbg, index, uv, threshold, error_rate); // finding the next unbalanced vertices
 		for (auto v : following)
 		{	
 			// if no sequence is returned, no vertex was added, so we do not need to continue on this vertex
@@ -343,7 +343,7 @@ void UnitigGraph::connectUnbalanced(Vertex* source, unsigned int* index, std::st
 }
 
 // iterating over all neighbours of current node, build the different sequences to the next unbalanced node
-std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int* index, UVertex& uv, float threshold)
+std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::string& curr, const std::vector<char>& succ, const std::vector<char>& pred, deBruijnGraph& dbg, unsigned int* index, UVertex& uv, float threshold, float error_rate)
 {
 	std::vector<std::pair<Vertex*,std::string> > following;
 	Vertex* currV = dbg.getVertex(curr);
@@ -369,8 +369,10 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
                 Vertex* nextV = dbg.getVertex(next);
                 Sequence s = *dbg.getSequence(next);
                 sequence += n;
-                if (!nextV->is_flagged())
+                if (!nextV->is_flagged() and currV->get_out_coverage(n) > error_rate * currV->get_total_out_coverage())
+                {
                     following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, pcov, dbg, curr_start, threshold));
+                }
             }
             // if we are a reverse complement, we actually want to add the path in reverse order
             else
@@ -382,7 +384,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
                 Vertex* nextV = dbg.getVertex(next);
                 Sequence s = *dbg.getSequence(next);
                 sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr (by definition)
-                if (!nextV->is_flagged())
+                if (!nextV->is_flagged() and currV->get_out_coverage(n) > error_rate * currV->get_total_out_coverage())
                 {
                     following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, pcov, dbg, curr_end, threshold));
                 }
@@ -407,7 +409,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
                 Vertex* nextV = dbg.getVertex(prev);
                 Sequence s = *dbg.getSequence(prev);
                 sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr
-                if (!nextV->is_flagged())
+                if (!nextV->is_flagged() and currV->get_in_coverage(n) > error_rate * currV->get_total_in_coverage())
                     following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, pcov, dbg, curr_end, threshold));
             }
             else
@@ -419,7 +421,7 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
                 Vertex* nextV = dbg.getVertex(prev);
                 Sequence s = *dbg.getSequence(prev);
                 sequence += deBruijnGraph::complement(n);
-                if (!nextV->is_flagged())
+                if (!nextV->is_flagged() and currV->get_in_coverage(n) > error_rate * currV->get_total_in_coverage())
                     following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, pcov, dbg, curr_start, threshold));
             }
         }
