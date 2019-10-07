@@ -106,7 +106,7 @@ public:
 	UnitigGraph(); // debug
     ~UnitigGraph();
 	void debug(); // debug information
-    void assemble(std::string);
+    void assemble(std::string, float err);
     void printGraph(std::ostream&, unsigned int cc);
     void dijkstra(UEdge seed, bool residual, bool local, unsigned int cc);
 private:
@@ -137,8 +137,10 @@ private:
     UEdge get_next_source(unsigned int cc);
     
     void cleanPath(std::vector<UEdge>&, unsigned int cc);
-    void cleanGraph(unsigned int cc);
+    void cleanGraph(unsigned int cc, float err);
+    void removeLowEdges(unsigned int cc, float err);
 	void removeStableSets(unsigned int cc);
+	void removeShortPaths(unsigned int cc);
 	void contractPaths(unsigned int cc);
     void removeEmpty(unsigned int cc);
     bool hasRelevance(unsigned int cc);

@@ -364,12 +364,12 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
             {
                 float curr_start = 0.f;
                 if (currV->get_total_out_coverage() != 0)
-                    curr_start = currV->get_read_starts() * currV->get_out_coverage(n)/currV->get_total_out_coverage();
+                    curr_start = currV->get_read_starts() * currV->get_out_coverage(n)/total_out;
                 next = curr.substr(1) + n;
                 Vertex* nextV = dbg.getVertex(next);
                 Sequence s = *dbg.getSequence(next);
                 sequence += n;
-                if (!nextV->is_flagged() and currV->get_out_coverage(n) > error_rate * currV->get_total_out_coverage())
+                if (!nextV->is_flagged() and currV->get_out_coverage(n) > error_rate * total_out)
                 {
                     following.push_back(buildEdge(uv, nextV, next, sequence, index, coverage, pcov, dbg, curr_start, threshold));
                 }
@@ -379,12 +379,12 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
             {
                 float curr_end = 0.f;
                 if (currV->get_total_in_coverage() != 0)
-                    curr_end = currV->get_read_ends() * currV->get_in_coverage(deBruijnGraph::complement(n))/currV->get_total_in_coverage();
+                    curr_end = currV->get_read_ends() * currV->get_in_coverage(deBruijnGraph::complement(n))/total_in;
                 next = deBruijnGraph::complement(n) + curr.substr(0,curr.length() - 1);
                 Vertex* nextV = dbg.getVertex(next);
                 Sequence s = *dbg.getSequence(next);
                 sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr (by definition)
-                if (!nextV->is_flagged() and currV->get_out_coverage(n) > error_rate * currV->get_total_out_coverage())
+                if (!nextV->is_flagged() and currV->get_out_coverage(n) > error_rate * total_out)
                 {
                     following.push_back(buildEdgeReverse(uv, nextV, next, sequence, index, coverage, pcov, dbg, curr_end, threshold));
                 }
@@ -404,25 +404,29 @@ std::vector<std::pair<Vertex*,std::string> > UnitigGraph::addNeighbours(std::str
             {
                 float curr_end = 0.f;
                 if (currV->get_total_in_coverage() != 0)
-                    curr_end = currV->get_read_ends() * currV->get_in_coverage(n)/currV->get_total_in_coverage();
+                    curr_end = currV->get_read_ends() * currV->get_in_coverage(n)/total_in;
                 prev = n + curr.substr(0,curr.length() - 1);
                 Vertex* nextV = dbg.getVertex(prev);
                 Sequence s = *dbg.getSequence(prev);
                 sequence += curr.back(); // the predecessor points to the current vertex with the last char of curr
-                if (!nextV->is_flagged() and currV->get_in_coverage(n) > error_rate * currV->get_total_in_coverage())
+                if (!nextV->is_flagged() and currV->get_in_coverage(n) > error_rate * total_in)
+                {
                     following.push_back(buildEdgeReverse(uv, nextV, prev, sequence, index, coverage, pcov, dbg, curr_end, threshold));
+                }
             }
             else
             {
                 float curr_start = 0.f;
                 if (currV->get_total_out_coverage() != 0)
-                    curr_start = currV->get_read_starts() * currV->get_out_coverage(deBruijnGraph::complement(n))/currV->get_total_out_coverage();
+                    curr_start = currV->get_read_starts() * currV->get_out_coverage(deBruijnGraph::complement(n))/total_out;
                 prev = curr.substr(1) + deBruijnGraph::complement(n);
                 Vertex* nextV = dbg.getVertex(prev);
                 Sequence s = *dbg.getSequence(prev);
                 sequence += deBruijnGraph::complement(n);
-                if (!nextV->is_flagged() and currV->get_in_coverage(n) > error_rate * currV->get_total_in_coverage())
+                if (!nextV->is_flagged() and currV->get_in_coverage(n) > error_rate * total_in)
+                {
                     following.push_back(buildEdge(uv, nextV, prev, sequence, index, coverage, pcov, dbg, curr_start, threshold));
+                }
             }
         }
     }
@@ -754,15 +758,98 @@ bool UnitigGraph::hasRelevance(unsigned int cc)
 }
 
 // the graph might contain some unconnected vertices, clean up
-void UnitigGraph::cleanGraph(unsigned int cc)
+void UnitigGraph::cleanGraph(unsigned int cc, float error_rate)
 {
     UGraph* g_ = graphs_.at(cc);
     for (auto e : boost::edges(*g_))
     {
         (*g_)[e].last_visit = 0; // reusing for number of allowed paths
     }
+    removeLowEdges(cc, error_rate);
 	removeEmpty(cc);
 	removeStableSets(cc);
+    contractPaths(cc);
+    removeShortPaths(cc);
+	removeEmpty(cc);
+	removeStableSets(cc);
+    contractPaths(cc);
+}
+
+void UnitigGraph::removeShortPaths(unsigned int cc)
+{
+    UGraph* g_ = graphs_.at(cc);
+    std::vector<UEdge> toDelete;
+    for (auto&& e : boost::edges(*g_))
+    {
+        auto source = boost::source(e, *g_);
+        auto target = boost::target(e, *g_);
+        // we are a simple edge between two vertices, unconnected to the rest
+        if ((boost::out_degree(target, *g_) == 0 and boost::in_degree(source, *g_) == 0
+            and boost::out_degree(source, *g_) == 1 and boost::in_degree(target, *g_) == 1))
+        {
+            if ((*g_)[e].name.size() < 150)
+            {
+                toDelete.push_back(e);
+            }
+        }
+        else if ((boost::out_degree(target, *g_) == 1 and boost::in_degree(source, *g_) == 1
+            and boost::out_degree(source, *g_) == 1 and boost::in_degree(target, *g_) == 1))
+        {
+            float length = (*g_)[e].name.size();
+            auto rev_e = boost::edge(target, source, *g_);
+            if (rev_e.second)
+            {
+                length += (*g_)[rev_e.first].name.size();
+                if (length < 150)
+                {
+                    toDelete.push_back(e);
+                }
+            }
+        }
+    }
+    for (auto&& e : toDelete)
+    {
+        boost::remove_edge(e, *g_);
+    }
+}
+
+void UnitigGraph::removeLowEdges(unsigned int cc, float error_rate)
+{
+    UGraph* g_ = graphs_.at(cc);
+    std::set<UEdge> toDelete;
+    for (auto v : boost::vertices(*g_))
+    {
+        auto out_edges = boost::out_edges(v, *g_);
+        auto in_edges = boost::in_edges(v, *g_);
+        float out_degree = 0.f;
+        float in_degree = 0.f;
+        for (auto&& oe : out_edges)
+        {
+            out_degree += (*g_)[oe].capacity;
+        }
+        for (auto&& ie : in_edges)
+        {
+            in_degree += (*g_)[ie].capacity;
+        }
+        for (auto&& oe : out_edges)
+        {
+            if ((*g_)[oe].capacity < error_rate * out_degree)
+            {
+                toDelete.insert(oe);
+            }
+        }
+        for (auto&& ie : in_edges)
+        {
+            if ((*g_)[ie].capacity < error_rate * in_degree)
+            {
+                toDelete.insert(ie);
+            }
+        }
+    }
+    for (auto&& e : toDelete)
+    {
+        boost::remove_edge(e, *g_);
+    }
 }
 
 // Tests whether two percentages "belong together"
@@ -1513,7 +1600,7 @@ float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& uniq
 }
 
 // calculates the flows and corresponding paths through the graph
-void UnitigGraph::assemble(std::string fname)
+void UnitigGraph::assemble(std::string fname, float error_rate)
 {
     unsigned int i = 0;
     std::cerr << "Cleaning graph" << std::endl;
@@ -1523,8 +1610,7 @@ void UnitigGraph::assemble(std::string fname)
         std::string filename = fname + "CC" + std::to_string(cc) + "Graph.dot";
         std::ofstream outfile (filename);
         printGraph(outfile, cc);
-        cleanGraph(cc);
-        contractPaths(cc);
+        cleanGraph(cc, error_rate);
         g_ = graphs_.at(cc);
         std::cerr << boost::num_vertices(*g_) << " vertices remaining" << std::endl;
         std::cerr << "Calculating paths" << std::endl;

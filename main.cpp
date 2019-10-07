@@ -14,8 +14,9 @@ int main (int argc, char* argv[])
     delete dbg;
     //t = clock();
     std::cerr << "Assembling..." << std::endl;
-    ug.assemble(argv[4]); // path to graph files folder
+    ug.assemble(argv[4], atof(argv[3])); // path to graph files folder
     std::cerr << "Assembly took " << (clock() - t)/1000000. << " seconds" << std::endl;
 	std::cerr << "The complete assembly process took " << (clock() - t_start)/1000000. << " seconds." << std::endl;
     return 0;
+    /**/
 }
