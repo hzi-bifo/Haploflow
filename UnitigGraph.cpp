@@ -1356,7 +1356,7 @@ std::vector<UEdge> UnitigGraph::blockPath(UEdge curr, unsigned int visits, unsig
     }
 }
 
-UEdge UnitigGraph::get_next_source(unsigned int cc) /// just returns the highest capacity edge if no source found 
+UEdge UnitigGraph::get_next_source(unsigned int cc) /// just returns the highest capacity edge (TODO?)
 {
     UGraph* g_ = graphs_.at(cc);
     auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
@@ -1365,8 +1365,23 @@ UEdge UnitigGraph::get_next_source(unsigned int cc) /// just returns the highest
     UEdge source;
 
     auto sources = get_sources(cc);
-    std::sort(sources.begin(), sources.end(), edge_compare);
-    source = sources.front();
+    if (sources.size() > 0) // if there are sources, take highest possible source
+    {
+        std::sort(sources.begin(), sources.end(), edge_compare);
+        source = sources.front();
+    }
+    else // else take highest unvisited edge
+    {
+        float max = 0;
+        for (auto e : boost::edges(*g_))
+        {
+            if ((*g_)[e].capacity > max)
+            {
+                max = (*g_)[e].capacity;
+                source = e;
+            }
+        }
+    }
     return source;
 }
 
@@ -1421,16 +1436,32 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
     UGraph* g_ = graphs_.at(cc);
     UEdge curr;
     bool unblocked = false;
-    curr = sources.front();
-    unblocked = ((*g_)[curr].last_visit == 0);
-    for (auto e : sources) // check all sources for unchecked edges
+    if (sources.size() == 0) // there is no source -> we are complete cycle -> pick highest capacity edge
     {
-        auto nextUnvisited = checkUnvisitedEdges(e, cc);
-        auto potential_source = nextUnvisited.first;
-        if (nextUnvisited.second and (*g_)[potential_source].residual_capacity > (*g_)[curr].residual_capacity)
-        { // and check the highest capacity one
-            unblocked = true;
-            curr = potential_source;
+        float max = -1;
+        for (auto e : boost::edges(*g_))
+        {
+            if ((*g_)[e].last_visit == 0 and (*g_)[e].residual_capacity > max)
+            {
+                unblocked = true;
+                curr = e;
+                max = (*g_)[e].residual_capacity;
+            }
+        }
+    }
+    else // at least one source which has been visited before
+    {
+        curr = sources.back();
+        unblocked = ((*g_)[curr].last_visit == 0);
+        for (auto e : sources) // check all sources for unchecked edges
+        {
+            auto nextUnvisited = checkUnvisitedEdges(e, cc);
+            auto potential_source = nextUnvisited.first;
+            if (nextUnvisited.second and (*g_)[potential_source].residual_capacity > (*g_)[curr].residual_capacity)
+            { // and check the highest capacity one
+                unblocked = true;
+                curr = potential_source;
+            }
         }
     }
     return std::make_pair(curr, unblocked);
@@ -1440,15 +1471,8 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
     std::set<UEdge> sources;
-    UEdge max;
-    float max_c = 0.f;
     for (auto e : boost::edges(*g_))
     {
-        if ((*g_)[e].capacity > max_c)
-        {
-            max_c = (*g_)[e].capacity;
-            max = e;
-        }
         auto src = boost::source(e, *g_);
         auto target = boost::target(e, *g_);
         auto in_degree = boost::in_degree(src, *g_);
@@ -1471,10 +1495,6 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
             sources.insert(e);
         }
     }
-    if (sources.empty())
-    {
-        sources.insert(max); // so that there is at least one edge which is being searched
-    }
     return std::vector<UEdge>(sources.begin(), sources.end());
 }
 
@@ -1491,7 +1511,7 @@ std::vector<float> UnitigGraph::find_paths(unsigned int cc)
     std::vector<std::vector<UEdge>> unique;
     std::vector<UEdge> started_from;
     std::vector<float> unique_paths;
-    while (true)
+    while (sources.size() > 0)
     {
         unvisit(cc); // TODO only current cc
         std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, used_sources, cc);
