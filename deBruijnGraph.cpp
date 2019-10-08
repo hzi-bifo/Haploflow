@@ -325,6 +325,7 @@ std::vector<const Sequence*> deBruijnGraph::dfs(Sequence& s, unsigned int cc)
                 std::cerr << (reverse ? "reverse" : "not reverse") << std::endl;
                 v->print(true);
                 std::cerr << next << " not in graph" << std::endl;
+                continue;
             }
             else if (nextV->cc != 0)
             {
@@ -349,6 +350,7 @@ std::vector<const Sequence*> deBruijnGraph::dfs(Sequence& s, unsigned int cc)
                 std::cerr << (reverse ? "reverse" : "not reverse") << std::endl;
                 v->print(true);
                 std::cerr << next << " not in graph" << std::endl;
+                continue;
             }
             else if (nextV->cc != 0)
             {

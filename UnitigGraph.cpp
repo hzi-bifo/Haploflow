@@ -176,6 +176,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             if (j > 20 and counter == 6/* and cummin_val != 0*/) //TODO set value (window_size + 1 makes sense)
             {
                 stored = std::min(0.66f * error_rate * max, stored);
+                stored = std::max(1f, stored); // threshold should never be less than 1
                 std::cerr << "Graph " << i << " threshold set to: " << stored << std::endl;
                 thresholds.push_back(stored);
                 set = true;
@@ -1471,8 +1472,15 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
     std::set<UEdge> sources;
+    UEdge max;
+    float max_v = 0.f;
     for (auto e : boost::edges(*g_))
     {
+        if ((*g_)[e].capacity > max_v)
+        {
+            max_v = (*g_)[e].capacity;
+            max = e;
+        }
         auto src = boost::source(e, *g_);
         auto target = boost::target(e, *g_);
         auto in_degree = boost::in_degree(src, *g_);
@@ -1495,6 +1503,10 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
             sources.insert(e);
         }
     }
+    if (sources.empty())
+    {
+        sources.insert(max);
+    }
     return std::vector<UEdge>(sources.begin(), sources.end());
 }
 
@@ -1511,7 +1523,7 @@ std::vector<float> UnitigGraph::find_paths(unsigned int cc)
     std::vector<std::vector<UEdge>> unique;
     std::vector<UEdge> started_from;
     std::vector<float> unique_paths;
-    while (sources.size() > 0)
+    while (true)
     {
         unvisit(cc); // TODO only current cc
         std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, used_sources, cc);
@@ -1609,6 +1621,7 @@ void UnitigGraph::assemble(std::string fname, float error_rate)
         UGraph* g_ = graphs_.at(cc);
         std::string filename = fname + "CC" + std::to_string(cc) + "Graph.dot";
         std::ofstream outfile (filename);
+        contractPaths(cc); // TODO only for debug reasons
         printGraph(outfile, cc);
         cleanGraph(cc, error_rate);
         g_ = graphs_.at(cc);
