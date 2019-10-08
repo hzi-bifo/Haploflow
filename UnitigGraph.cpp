@@ -176,7 +176,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             if (j > 20 and counter == 6/* and cummin_val != 0*/) //TODO set value (window_size + 1 makes sense)
             {
                 stored = std::min(0.66f * error_rate * max, stored);
-                stored = std::max(1f, stored); // threshold should never be less than 1
+                stored = std::max(1.f, stored); // threshold should never be less than 1
                 std::cerr << "Graph " << i << " threshold set to: " << stored << std::endl;
                 thresholds.push_back(stored);
                 set = true;
