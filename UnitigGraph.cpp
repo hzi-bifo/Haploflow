@@ -1472,15 +1472,8 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
     std::set<UEdge> sources;
-    UEdge max;
-    float max_v = 0.f;
     for (auto e : boost::edges(*g_))
     {
-        if ((*g_)[e].capacity > max_v)
-        {
-            max_v = (*g_)[e].capacity;
-            max = e;
-        }
         auto src = boost::source(e, *g_);
         auto target = boost::target(e, *g_);
         auto in_degree = boost::in_degree(src, *g_);
@@ -1502,10 +1495,6 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
         {
             sources.insert(e);
         }
-    }
-    if (sources.empty())
-    {
-        sources.insert(max);
     }
     return std::vector<UEdge>(sources.begin(), sources.end());
 }
