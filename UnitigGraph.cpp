@@ -118,12 +118,12 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
         }
         unsigned int members = 0;
         std::vector<float> sorted_coverage;
-        sorted_coverage.resize(covs.rbegin()->first + 1, 0.f); // get last (= biggest) element of map
+        sorted_coverage.resize(covs.rbegin()->first, 0.f); // get last (= biggest) element of map
         std::string filename = path + "Cov" + std::to_string(i) + ".tsv";
         std::ofstream outfile (filename);
         for (auto&& cov : covs)
         {
-            auto pos = cov.first;
+            auto pos = cov.first - 1;
             auto val = cov.second;
             members += val;
             sorted_coverage[pos] = val;
@@ -136,76 +136,50 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             thresholds.push_back(std::numeric_limits<float>::max()); // skip graph in creation
             continue;
         }
-        //std::cerr << "Coverages: " << std::endl;
-        //std::cerr << sorted_coverage << std::endl;
-        auto roll = rolling(sorted_coverage, 5); // TODO set window size?
-        auto cumm = cummin(roll, 0);
-        auto cumm_orig = cummin(sorted_coverage, 1); //TODO first non-zero position?
-        unsigned int counter = 0;
-        unsigned int counter_orig = 0;
-        float stored = 0;
-        float stored_orig = 0;
-        unsigned int j = 0;
-        bool set = false;
-        for (auto zip : boost::combine(cumm, roll))
+        auto diffs = finite_difference(sorted_coverage, true);
+        std::vector<float> delta = diffs.first;
+        float inflexion_point = float(diffs.second);
+        if (inflexion_point > 1)
         {
-            float cummin_val;
-            float rolling_val;
-            boost::tie(cummin_val, rolling_val) = zip;
-            if (cumm_orig[j] < sorted_coverage[j])
-            {
-                counter_orig++;
-            }
-            else
-            {
-                counter_orig = 0;
-            }
-            if (counter_orig > 0 and stored_orig == 0)
-            {
-                stored_orig = float(j - 1); // last value was minimum
-            }
-            if (cummin_val < rolling_val and sorted_coverage[j] != 0)
-            {
-                counter++;
-            }
-            else
-            {
-                counter = 0;
-                stored = float(j);
-            }
-            if (j > 20 and counter == 6/* and cummin_val != 0*/) //TODO set value (window_size + 1 makes sense)
-            {
-                stored = std::min(0.66f * error_rate * max, stored);
-                stored = std::max(1.f, stored); // threshold should never be less than 1
-                std::cerr << "Graph " << i << " threshold set to: " << stored << std::endl;
-                thresholds.push_back(stored);
-                set = true;
-                break;
-            }
-            else if (j <= 20 and counter == 6 and stored_orig != 0)
-            {
-                std::cerr << "Graph " << i << " threshold reduced to: " << stored_orig << std::endl;
-                thresholds.push_back(stored_orig);
-                set = true;
-                break;
-            }
-            /*else if (counter == 6 and cummin_val == 0 and stored_orig != 0)
-            {
-                std::cerr << "Graph " << i << " threshold ambiguous, reduced to: " << float(stored_orig) << std::endl;
-                thresholds.push_back(stored_orig);
-                set = true;
-                break;
-            }*/
-            j++; //position
+            std::cerr << "Graph " << i << " threshold set to " << inflexion_point << std::endl;
         }
-        if (counter != 6) // no break was encountered (TODO: value)
-        {
-            //std::cerr << "No signal, threshold set to 1" << std::endl;
-            thresholds.push_back(1.f); // no signal found TODO
-        }
+        thresholds.push_back(inflexion_point);
         i++;
     }
     return thresholds;
+}
+
+// calculating finite differences, can only to 1st (false) and 2nd (true) order
+std::pair<std::vector<float>, unsigned int> UnitigGraph::finite_difference(std::vector<float> input, bool order)
+{
+    std::vector<float> ret;
+    if (input.size() < 2 or (input.size() < 3 and order))
+    {
+        return std::make_pair(ret, 1);
+    }
+    unsigned int inflexion = 0;
+    for (unsigned int i = (order ? 2 : 1); i < input.size(); i++)
+    {
+        float diff = 0.f;
+        if (order)
+        {
+            diff = input[i - 2] - 2 * input[i - 1] + input[i]; // 2nd finite derivative
+        }
+        else
+        {
+            diff = input[i - 1] - input[i]; //1st finite difference
+        }
+        ret.push_back(diff);
+        if (diff < 0 and inflexion == 0)
+        {
+            inflexion = i;
+        }
+    }
+    if (inflexion == 0)
+    {
+        inflexion = 1;
+    }
+    return std::make_pair(ret, inflexion);
 }
 
 // calculates cumulative minimum of in
@@ -1477,13 +1451,6 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
         auto src = boost::source(e, *g_);
         auto target = boost::target(e, *g_);
         auto in_degree = boost::in_degree(src, *g_);
-        for (auto&& oe : boost::out_edges(target, *g_))
-        {
-            if (boost::target(oe, *g_) == src and in_degree == 1)
-            {
-                sources.insert(e);
-            }
-        }
         if (in_degree == 0) // only add all source edges if they havent beed added before
         {
             for (auto f : boost::out_edges(src, *g_))
@@ -1494,6 +1461,22 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
         else if (in_degree == 1 and src == target) // also add sources which have a self-loop
         {
             sources.insert(e);
+        }
+    }
+    if (sources.empty()) //add perfect cycles if no other sources found
+    {
+        for (auto e : boost::edges(*g_))
+        {
+            auto src = boost::source(e, *g_);
+            auto target = boost::target(e, *g_);
+            auto in_degree = boost::in_degree(src, *g_);
+            for (auto&& oe : boost::out_edges(target, *g_))
+            {
+                if (boost::target(oe, *g_) == src and in_degree == 1)
+                {
+                    sources.insert(e);
+                }
+            }
         }
     }
     return std::vector<UEdge>(sources.begin(), sources.end());
@@ -1614,7 +1597,7 @@ void UnitigGraph::assemble(std::string fname, float error_rate)
         printGraph(outfile, cc);
         cleanGraph(cc, error_rate);
         g_ = graphs_.at(cc);
-        std::cerr << boost::num_vertices(*g_) << " vertices remaining" << std::endl;
+        std::cerr << "Graph " << cc << ": " << boost::num_vertices(*g_) << " vertices remaining" << std::endl;
         std::cerr << "Calculating paths" << std::endl;
         auto all_paths = find_paths(cc);
         UEdge seed;
@@ -1712,10 +1695,10 @@ void UnitigGraph::printGraph(std::ostream& os, unsigned int cc)
         (*g_)[e].v.visits = (*g_)[e].visits;
     }
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,*g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,*g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::residual_capacity,*g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,*g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,*g_)), boost::default_writer(), propmapIndex);
 }
