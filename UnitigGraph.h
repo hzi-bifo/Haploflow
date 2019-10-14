@@ -125,7 +125,7 @@ private:
 	//UEdge getSeed() const;
 	std::vector<float> calculate_thresholds(deBruijnGraph&, std::string, float);
     std::vector<float> get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string, float);
-    std::pair<std::vector<float>, unsigned int> finite_difference(std::vector<float>, bool);
+    std::pair<float, float> finite_difference(std::vector<float>);
     std::vector<float> rolling(std::vector<float>& in, unsigned int len);
     std::vector<float> cummin(std::vector<float>& in, unsigned int pos);
 

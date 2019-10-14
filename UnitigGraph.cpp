@@ -136,50 +136,52 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             thresholds.push_back(std::numeric_limits<float>::max()); // skip graph in creation
             continue;
         }
-        auto diffs = finite_difference(sorted_coverage, true);
-        std::vector<float> delta = diffs.first;
-        float inflexion_point = float(diffs.second);
-        if (inflexion_point > 1)
+        auto diffs = finite_difference(sorted_coverage);
+        float turning_point = diffs.first; 
+        float inflexion_point = diffs.second; 
+        if (inflexion_point > 1 and turning_point > 1)
         {
-            std::cerr << "Graph " << i << " threshold set to " << inflexion_point << std::endl;
+            std::cerr << "Graph " << i << " threshold set to " << std::max(1.f, std::min(turning_point, inflexion_point)) << std::endl;
         }
-        thresholds.push_back(inflexion_point);
+        thresholds.push_back(std::max(1.f, std::min(turning_point, inflexion_point))); // the threshold should never be less than 1
         i++;
     }
     return thresholds;
 }
 
 // calculating finite differences, can only to 1st (false) and 2nd (true) order
-std::pair<std::vector<float>, unsigned int> UnitigGraph::finite_difference(std::vector<float> input, bool order)
+std::pair<float, float> UnitigGraph::finite_difference(std::vector<float> input)
 {
-    std::vector<float> ret;
-    if (input.size() < 2 or (input.size() < 3 and order))
+    if (input.size() < 3)
     {
-        return std::make_pair(ret, 1);
+        return std::make_pair(1.f, 1.f);
     }
-    unsigned int inflexion = 0;
-    for (unsigned int i = (order ? 2 : 1); i < input.size(); i++)
+    float inflexion1 = 0;
+    float inflexion2 = 0;
+    for (unsigned int i = 2; i < input.size(); i++)
     {
-        float diff = 0.f;
-        if (order)
+        float diff1 = 0.f;
+        float diff2 = 0.f;
+        diff1 = input[i - 1] - input[i]; //1st finite difference
+        diff2 = input[i - 2] - 2 * input[i - 1] + input[i]; // 2nd finite derivative
+        if (diff1 < 0 and inflexion1 == 0)
         {
-            diff = input[i - 2] - 2 * input[i - 1] + input[i]; // 2nd finite derivative
+            inflexion1 = float(i - 1);// first diff is shifted by 1
         }
-        else
+        if (diff2 < 0 and inflexion2 == 0)
         {
-            diff = input[i - 1] - input[i]; //1st finite difference
-        }
-        ret.push_back(diff);
-        if (diff < 0 and inflexion == 0)
-        {
-            inflexion = i;
+            inflexion2 = float(i - 2);// second diff is shifted by 2
         }
     }
-    if (inflexion == 0)
+    if (inflexion1 == 0)
     {
-        inflexion = 1;
+        inflexion1 = 1.f;
     }
-    return std::make_pair(ret, inflexion);
+    if (inflexion2 == 0)
+    {
+        inflexion2 = 1.f;
+    }
+    return std::make_pair(inflexion1, inflexion2);
 }
 
 // calculates cumulative minimum of in
@@ -1593,7 +1595,7 @@ void UnitigGraph::assemble(std::string fname, float error_rate)
         UGraph* g_ = graphs_.at(cc);
         std::string filename = fname + "CC" + std::to_string(cc) + "Graph.dot";
         std::ofstream outfile (filename);
-        contractPaths(cc); // TODO only for debug reasons
+        //contractPaths(cc); // TODO only for debug reasons
         printGraph(outfile, cc);
         cleanGraph(cc, error_rate);
         g_ = graphs_.at(cc);
