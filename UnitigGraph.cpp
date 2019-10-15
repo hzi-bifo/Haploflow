@@ -1464,20 +1464,11 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
         {
             sources.insert(e);
         }
-    }
-    if (sources.empty()) //add perfect cycles if no other sources found
-    {
-        for (auto e : boost::edges(*g_))
+        for (auto&& oe : boost::out_edges(target, *g_))
         {
-            auto src = boost::source(e, *g_);
-            auto target = boost::target(e, *g_);
-            auto in_degree = boost::in_degree(src, *g_);
-            for (auto&& oe : boost::out_edges(target, *g_))
+            if (boost::target(oe, *g_) == src and in_degree == 1)
             {
-                if (boost::target(oe, *g_) == src and in_degree == 1)
-                {
-                    sources.insert(e);
-                }
+                sources.insert(e);
             }
         }
     }
