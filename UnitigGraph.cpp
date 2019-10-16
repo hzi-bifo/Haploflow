@@ -1434,7 +1434,7 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
         {
             auto nextUnvisited = checkUnvisitedEdges(e, cc);
             auto potential_source = nextUnvisited.first;
-            if (nextUnvisited.second and (*g_)[potential_source].residual_capacity > (*g_)[curr].residual_capacity)
+            if (nextUnvisited.second and ((*g_)[potential_source].residual_capacity > (*g_)[curr].residual_capacity or !unblocked))
             { // and check the highest capacity one
                 unblocked = true;
                 curr = potential_source;
