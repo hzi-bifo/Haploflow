@@ -26,8 +26,6 @@ struct Capacity {
     float max;
     float avg;
     float length;
-    float starting;
-    float ending;
     friend std::ostream& operator<<(std::ostream& os, const Capacity& cap)
     {
         return os << "(" << cap.avg << ", " << cap.first << "/" << cap.last << ", (length: " << cap.length << "), (min: " << cap.min << ", max: " << cap.max << ")";
@@ -75,8 +73,8 @@ struct EdgeProperties {
     float capacity;
     float residual_capacity;
     Capacity cap_info;
+    Capacity residual_cap_info;
     bool visited;
-    bool first_vertex;
     std::vector<unsigned int> visits;
     Visits v; //DEBUG ONLY
     unsigned int last_visit;
@@ -118,7 +116,7 @@ private:
     std::vector<UEdge> get_sources(unsigned int cc);
 
     std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&, unsigned int cc);
-    void reduce_flow(std::vector<UEdge>&, float, std::vector<float>&, std::set<unsigned int>&, unsigned int cc);
+    float reduce_flow(std::vector<UEdge>&, std::set<unsigned int>&, unsigned int cc, bool init);
 	std::vector<UEdge> find_fattest_path(UEdge seed, unsigned int cc);
     std::vector<UEdge> fixFlow(UEdge, unsigned int cc);
     
@@ -130,14 +128,14 @@ private:
     std::vector<float> cummin(std::vector<float>& in, unsigned int pos);
 
     std::vector<UEdge> blockPath(UEdge, unsigned int, unsigned int cc);
-    std::vector<float> find_paths(unsigned int cc);
+    std::pair<std::vector<UEdge>, std::vector<float>> find_paths(unsigned int cc);
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge, unsigned int cc);
-    std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int, unsigned int cc);
+    std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int cc);
     float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int, unsigned int, unsigned int cc);
     std::pair<UEdge, float> get_target(UEdge, bool, unsigned int cc);
     UEdge get_next_source(unsigned int cc);
     
-    void cleanPath(std::vector<UEdge>&, unsigned int cc);
+    void cleanPath(std::vector<UEdge>&, std::vector<UEdge>&, unsigned int cc);
     void cleanGraph(unsigned int cc, float err);
     void removeLowEdges(unsigned int cc, float err);
 	void removeStableSets(unsigned int cc);

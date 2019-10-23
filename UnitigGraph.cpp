@@ -129,7 +129,6 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             sorted_coverage[pos] = val;
             outfile << pos << '\t' << val << std::endl;
         }
-        float max = sorted_coverage.size() - 1;
         if (members < 150) //less than 500 kmers
         {
             i++;
@@ -508,18 +507,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         (*g_)[e.first].cap_info.first = first;
         (*g_)[e.first].cap_info.last = last;
         (*g_)[e.first].cap_info.length = (*g_)[e.first].name.length();
-        if ((*g_)[e.first].name.length() > 0 and avg > 0)
-        {
-            (*g_)[e.first].cap_info.starting = starts_with/((*g_)[e.first].cap_info.length * avg);
-            (*g_)[e.first].cap_info.ending = ends_with/((*g_)[e.first].cap_info.length * avg);
-        }
-        else // shouldn't end up here
-        {
-            (*g_)[e.first].cap_info.starting = starts_with;
-            (*g_)[e.first].cap_info.ending = ends_with;
-        }
+        (*g_)[e.first].residual_cap_info.avg = avg;
+        (*g_)[e.first].residual_cap_info.max = max;
+        (*g_)[e.first].residual_cap_info.min = min;
+        (*g_)[e.first].residual_cap_info.first = first;
+        (*g_)[e.first].residual_cap_info.last = last;
+        (*g_)[e.first].residual_cap_info.length = (*g_)[e.first].name.length();
         (*g_)[e.first].visited = false;
-        (*g_)[e.first].first_vertex = false;
 	}
 	return std::make_pair(nextV,prev);
 }
@@ -621,18 +615,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
         (*g_)[e.first].cap_info.first = first;
         (*g_)[e.first].cap_info.last = last;
         (*g_)[e.first].cap_info.length = (*g_)[e.first].name.length();
-        if ((*g_)[e.first].name.length() > 0 and avg > 0)
-        {
-            (*g_)[e.first].cap_info.starting = starts_with/((*g_)[e.first].cap_info.length * avg);
-            (*g_)[e.first].cap_info.ending = ends_with/((*g_)[e.first].cap_info.length * avg);
-        }
-        else // shouldn't end up here
-        {
-            (*g_)[e.first].cap_info.starting = starts_with;
-            (*g_)[e.first].cap_info.ending = ends_with;
-        }
+        (*g_)[e.first].residual_cap_info.avg = avg;
+        (*g_)[e.first].residual_cap_info.max = max;
+        (*g_)[e.first].residual_cap_info.min = min;
+        (*g_)[e.first].residual_cap_info.first = first;
+        (*g_)[e.first].residual_cap_info.last = last;
+        (*g_)[e.first].residual_cap_info.length = (*g_)[e.first].name.length();
         (*g_)[e.first].visited = false;
-        (*g_)[e.first].first_vertex = false;
 	}
 	return std::make_pair(nextV,next);
 }
@@ -694,8 +683,13 @@ void UnitigGraph::contractPaths(unsigned int cc)
             (*g_)[new_e.first].cap_info.first = first;
             (*g_)[new_e.first].cap_info.last = last;
             (*g_)[new_e.first].cap_info.length = (*g_)[new_e.first].name.length();
+            (*g_)[new_e.first].residual_cap_info.avg = capacity;
+            (*g_)[new_e.first].residual_cap_info.max = max;
+            (*g_)[new_e.first].residual_cap_info.min = min;
+            (*g_)[new_e.first].residual_cap_info.first = first;
+            (*g_)[new_e.first].residual_cap_info.last = last;
+            (*g_)[new_e.first].residual_cap_info.length = (*g_)[e.first].name.length();
             (*g_)[new_e.first].visited = false;
-            (*g_)[new_e.first].first_vertex = false;
             boost::clear_vertex(*vi,*g_);
             boost::remove_vertex(*vi,*g_);
         }
@@ -938,27 +932,21 @@ void UnitigGraph::dijkstra(UEdge seed, bool init, bool local, unsigned int cc)
                 {
                     q.erase(old_pos);
                 }
-                auto pos = std::upper_bound(q.begin(), q.end(), oe, edge_compare);
+                auto pos = std::lower_bound(q.begin(), q.end(), oe, edge_compare);
                 q.insert(pos, oe);
             }
         }
     }
     (*g_)[seed].fatness = (init ? (*g_)[seed].residual_capacity : (*g_)[seed].capacity);
-    for (auto e : boost::edges(*g_)) //unvisit for next run
-    {
-        (*g_)[e].visited = false;
-    }
 }
 
 std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
     float max_dist = 0;
-    float running_fatness = 0;
     float running_distance = 0;
     UEdge last;
     auto visits = (*g_)[seed].visits;
-    //bool first_vertex = false;
     unvisit(cc);
     std::vector<UEdge> q = {seed};
     while (!q.empty()) // classic dijsktra routine (cancelling when cycle found)
@@ -976,7 +964,6 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient, unsign
         }
 
         (*g_)[curr].visited = true;
-        unsigned int num_visits = (*g_)[curr].visits.size();
         auto target = boost::target(curr, *g_);
         /*if (same_visit and num_visits == 1 and (*g_)[curr].distance < std::numeric_limits<unsigned int>::max() and (running_distance == 0 or ((*g_)[curr].fatness > 0 and running_fatness/(*g_)[curr].fatness < (*g_)[curr].distance/running_distance)))
         {
@@ -1013,8 +1000,6 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
     dijkstra(seed, false, false, cc);
     auto path = find_fattest_path(seed, cc);
     UGraph* g_ = graphs_.at(cc);
-    float flow = 0.;
-    unsigned int edges = 0;
     bool corrected = true;
     unsigned int pos = 0;
     while (corrected)
@@ -1059,7 +1044,7 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
 std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
-    auto source = boost::source(seed, *g_);
+    //auto source = boost::source(seed, *g_);
     //auto target = boost::target(seed, *g_);
     //std::cerr << "Source: " << (*g_)[source].index << " -> " << (*g_)[target].index << ": " << (*g_)[seed].capacity << std::endl;
     auto trg = get_target(seed, false, cc);
@@ -1082,7 +1067,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed, unsigned int cc)
         (*g_)[curr].last_visit++;
         path.push_front(curr);
     }
-    source = boost::source(path.front(), *g_);
+    //source = boost::source(path.front(), *g_);
     unsigned int i = 0;
     unsigned int j = 1;
     float seq_length = 0;
@@ -1091,7 +1076,7 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed, unsigned int cc)
     //std::cerr << (*g_)[source].index; 
     for (auto e : path)
     {
-        auto trg = boost::target(e, *g_);
+        //auto trg = boost::target(e, *g_);
         //std::cerr << " -> " << (*g_)[trg].index << "(" << (*g_)[e].capacity << " " << (*g_)[e].fatness << ") ";
         seq_length += (*g_)[e].name.size();
         auto ct = 0;
@@ -1132,88 +1117,159 @@ void UnitigGraph::unvisit(unsigned int cc)
     }
 }
 
-void UnitigGraph::reduce_flow(std::vector<UEdge>& path, float flow, std::vector<float>& flows, std::set<unsigned int>& unique_paths, unsigned int cc)
+float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>& unique_paths, unsigned int cc, bool init)
 {
     UGraph* g_ = graphs_.at(cc);
     float removed_coverage = (*g_)[path.front()].capacity;
+    float average = 0.f;
+    unsigned int len = 0;
     for (auto e : path)
     {
-        // first find out which path we are on (we delete this because it has been used then)
-        auto to_remove = (*g_)[e].visits.begin();
-        for (auto p : unique_paths)
+        if (!init)
         {
-            to_remove = std::find((*g_)[e].visits.begin(), (*g_)[e].visits.end(), p);
+            // first find out which path we are on (we delete this because it has been used then)
+            auto to_remove = (*g_)[e].visits.begin();
+            for (auto p : unique_paths)
+            {
+                to_remove = std::find((*g_)[e].visits.begin(), (*g_)[e].visits.end(), p);
+                if (to_remove != (*g_)[e].visits.end())
+                {
+                    break; // TODO
+                }
+            }
+            // TODO fix multiple "unique" paths
             if (to_remove != (*g_)[e].visits.end())
             {
-                break; // TODO
+                (*g_)[e].visits.erase(to_remove);
             }
-        }
-        // TODO fix multiple "unique" paths
-        if (to_remove != (*g_)[e].visits.end())
-        {
-            (*g_)[e].visits.erase(to_remove);
-        }
-        else
-        {
-            if (!(*g_)[e].visits.empty())
+            else
             {
-                (*g_)[e].visits.erase((*g_)[e].visits.begin());
+                if (!(*g_)[e].visits.empty())
+                {
+                    (*g_)[e].visits.erase((*g_)[e].visits.begin());
+                }
             }
         }
         // now check whether this was the last path or there are remaining paths to reduce capacity
-        float val = (*g_)[e].capacity;
-        float val_last = (*g_)[e].cap_info.last;
-        float val_first = (*g_)[e].cap_info.first;
-        auto cc = (*g_)[boost::source(e, *g_)].cc;
+        float val = init ? (*g_)[e].residual_capacity : (*g_)[e].capacity;
+        float val_last = init ? (*g_)[e].residual_cap_info.last : (*g_)[e].cap_info.last;
+        float val_first = init ? (*g_)[e].residual_cap_info.first : (*g_)[e].cap_info.first;
+
         auto threshold = thresholds_.at(cc);
         
-        if ((*g_)[e].visits.empty())
+        bool not_decreasing = val_first <= 1.1 * val_last or std::abs(val_first - val_last) < threshold; //test_hypothesis((*g_)[e].cap_info.first, (*g_)[e].cap_info.last, 1.2, threshold_); //not decreasing (first/last >= 1.2)
+        bool not_increasing = val_last <= 1.1 * val_first or std::abs(val_first - val_last) < threshold; //test_hypothesis((*g_)[e].cap_info.last, (*g_)[e].cap_info.first, 1.2, threshold_); // not increasing (last/first >= 1.2)
+        //cannot both be false, but both be true (if close to 1.2)
+        
+        if (val > threshold and not_decreasing and not_increasing)
         {
-            (*g_)[e].capacity = 0;
-            (*g_)[e].cap_info.first = 0;
-            (*g_)[e].cap_info.last = 0;
-            (*g_)[e].cap_info.avg = 0;
-            removed_coverage = val;
+            if (!init)
+            {
+                if ((*g_)[e].visits.empty())
+                {
+                    (*g_)[e].capacity = 0;
+                    (*g_)[e].cap_info.first = 0;
+                    (*g_)[e].cap_info.last = 0;
+                }
+                else
+                {
+                    (*g_)[e].capacity = std::max(threshold, (*g_)[e].capacity - removed_coverage); // there might be paths, so leave a small amount
+                    (*g_)[e].cap_info.first = std::max(threshold, (*g_)[e].cap_info.first - removed_coverage);
+                    (*g_)[e].cap_info.last = std::max(threshold, (*g_)[e].cap_info.last - removed_coverage);
+                }
+                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
+            }
+            else
+            {
+                (*g_)[e].residual_capacity = std::max(threshold, (*g_)[e].residual_capacity - removed_coverage); // there might be paths, so leave a small amount
+                (*g_)[e].residual_cap_info.first = std::max(threshold, (*g_)[e].residual_cap_info.first - removed_coverage);
+                (*g_)[e].residual_cap_info.last = std::max(threshold, (*g_)[e].residual_cap_info.last - removed_coverage);
+                (*g_)[e].residual_cap_info.avg = (*g_)[e].residual_capacity;
+            }
+            removed_coverage = val - (init ? (*g_)[e].residual_capacity : (*g_)[e].capacity);
+        }
+        else if (val > threshold and not_decreasing and !not_increasing)
+        {
+            if (!init)
+            {
+                if ((*g_)[e].visits.empty())
+                {
+                    (*g_)[e].capacity = 0;
+                    (*g_)[e].cap_info.first = 0;
+                    (*g_)[e].cap_info.last = 0;
+                }
+                else
+                {
+                    (*g_)[e].capacity = std::max(threshold, (*g_)[e].cap_info.first - removed_coverage);
+                    (*g_)[e].cap_info.last = std::max(threshold, (*g_)[e].cap_info.last - (val - (*g_)[e].capacity));
+                }
+                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
+                (*g_)[e].cap_info.first = (*g_)[e].capacity;
+            }
+            else
+            {
+                (*g_)[e].residual_capacity = std::max(threshold, (*g_)[e].residual_cap_info.first - removed_coverage);
+                (*g_)[e].residual_cap_info.last = std::max(threshold, (*g_)[e].residual_cap_info.last - (val - (*g_)[e].residual_capacity));
+                (*g_)[e].residual_cap_info.avg = (*g_)[e].residual_capacity;
+                (*g_)[e].residual_cap_info.first = (*g_)[e].residual_capacity;
+            }
+            removed_coverage = val_last - (init ? (*g_)[e].residual_capacity : (*g_)[e].capacity);
+        }
+        else if (val > threshold and !not_decreasing and not_increasing)
+        {
+            if (!init)
+            {
+                if ((*g_)[e].visits.empty())
+                {
+                    (*g_)[e].capacity = 0;
+                    (*g_)[e].cap_info.first = 0;
+                    (*g_)[e].cap_info.last = 0;
+                }
+                else
+                {
+                    (*g_)[e].capacity = std::max(threshold, (*g_)[e].cap_info.last - removed_coverage);
+                    (*g_)[e].cap_info.first = std::max(threshold, (*g_)[e].cap_info.first - (val - (*g_)[e].capacity));
+                }
+                (*g_)[e].cap_info.last = (*g_)[e].capacity;
+                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
+            }
+            else
+            {
+                (*g_)[e].residual_capacity = std::max(threshold, (*g_)[e].residual_cap_info.last - removed_coverage);
+                (*g_)[e].residual_cap_info.first = std::max(threshold, (*g_)[e].residual_cap_info.first - (val - (*g_)[e].residual_capacity));
+                (*g_)[e].residual_cap_info.last = (*g_)[e].residual_capacity;
+                (*g_)[e].residual_cap_info.avg = (*g_)[e].residual_capacity;
+            }
+            removed_coverage = val_first - (init ? (*g_)[e].residual_capacity : (*g_)[e].capacity);
         }
         else
         {
-            bool not_decreasing = (*g_)[e].cap_info.first <= 1.1 * (*g_)[e].cap_info.last or std::abs((*g_)[e].cap_info.first - (*g_)[e].cap_info.last) < threshold; //test_hypothesis((*g_)[e].cap_info.first, (*g_)[e].cap_info.last, 1.2, threshold_); //not decreasing (first/last >= 1.2)
-            bool not_increasing = (*g_)[e].cap_info.last <= 1.1 * (*g_)[e].cap_info.first or std::abs((*g_)[e].cap_info.first - (*g_)[e].cap_info.last) < threshold; //test_hypothesis((*g_)[e].cap_info.last, (*g_)[e].cap_info.first, 1.2, threshold_); // not increasing (last/first >= 1.2)
-            //cannot both be false, but both be true (if close to 1.2)
-            if (val > threshold and not_decreasing and not_increasing)
-            {
-                (*g_)[e].capacity = std::max(threshold, (*g_)[e].capacity - removed_coverage); // there might be paths, so leave a small amount
-                (*g_)[e].cap_info.first = std::max(threshold, (*g_)[e].cap_info.first - removed_coverage);
-                (*g_)[e].cap_info.last = std::max(threshold, (*g_)[e].cap_info.last - removed_coverage);
-                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
-                removed_coverage = val - (*g_)[e].capacity;
-            }
-            else if (val > threshold and not_decreasing and !not_increasing)
-            {
-                (*g_)[e].capacity = std::max(threshold, (*g_)[e].cap_info.first - removed_coverage);
-                (*g_)[e].cap_info.first = (*g_)[e].capacity;
-                (*g_)[e].cap_info.last = std::max(threshold, (*g_)[e].cap_info.last - (val - (*g_)[e].capacity));
-                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
-                removed_coverage = val_last - (*g_)[e].capacity;
-            }
-            else if (val > threshold and !not_decreasing and not_increasing)
-            {
-                (*g_)[e].capacity = std::max(threshold, (*g_)[e].cap_info.last - removed_coverage);
-                (*g_)[e].cap_info.last = (*g_)[e].capacity;
-                (*g_)[e].cap_info.first = std::max(threshold, (*g_)[e].cap_info.first - (val - (*g_)[e].capacity));
-                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
-                removed_coverage = val_first - (*g_)[e].capacity;
-            }
-            else
+            if (!init)
             {
                 (*g_)[e].cap_info.first = 0;
                 (*g_)[e].cap_info.last = 0;
                 (*g_)[e].capacity = 0;
                 (*g_)[e].cap_info.avg = 0;
-                removed_coverage = val;
             }
+            else
+            {
+                (*g_)[e].residual_cap_info.first = 0;
+                (*g_)[e].residual_cap_info.last = 0;
+                (*g_)[e].residual_capacity = 0;
+                (*g_)[e].residual_cap_info.avg = 0;
+            }
+            removed_coverage = val;
+        }
+        average *= len;
+        average += removed_coverage * (*g_)[e].name.size();
+        len += (*g_)[e].name.size();
+        average /= len;
+        if (init)
+        {
+            removed_coverage = std::max(removed_coverage, average);
         }
     }
+    return average;
 }
 
 // Given all the chosen edges and their coverage fraction, builds the contigs and reduces flow accordingly
@@ -1278,7 +1334,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
         if (path.size() > 0)
             flow /= path.size();
     }
-    reduce_flow(path, flow, flows, paths, cc);
+    reduce_flow(path, paths, cc, false);
     return std::make_pair(contig, flow);
 }
 
@@ -1408,7 +1464,7 @@ std::pair<UEdge, bool> UnitigGraph::checkUnvisitedEdges(UEdge current_source, un
     return std::make_pair(curr, unblocked);
 }
 
-std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& sources, unsigned int visits, unsigned int cc)
+std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& sources, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
     UEdge curr;
@@ -1475,7 +1531,7 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
     return std::vector<UEdge>(sources.begin(), sources.end());
 }
 
-std::vector<float> UnitigGraph::find_paths(unsigned int cc)
+std::pair<std::vector<UEdge>, std::vector<float>> UnitigGraph::find_paths(unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
     std::vector<UEdge> sources = get_sources(cc); //get sources of the graph (indegree = 0)
@@ -1483,7 +1539,6 @@ std::vector<float> UnitigGraph::find_paths(unsigned int cc)
         return (*g_)[e1].capacity > (*g_)[e2].capacity;
     };
     std::sort(sources.begin(), sources.end(), edge_compare); // so that we search the highest source first
-    unsigned int used_sources = 1;
     unsigned int visits = 1;
     std::vector<std::vector<UEdge>> unique;
     std::vector<UEdge> started_from;
@@ -1491,7 +1546,7 @@ std::vector<float> UnitigGraph::find_paths(unsigned int cc)
     while (true)
     {
         unvisit(cc); // TODO only current cc
-        std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, used_sources, cc);
+        std::pair<UEdge, bool> unvisited = getUnvisitedEdge(sources, cc);
         UEdge curr = unvisited.first;
         bool unblocked = unvisited.second;
         std::vector<UEdge> blockedPath;
@@ -1506,42 +1561,26 @@ std::vector<float> UnitigGraph::find_paths(unsigned int cc)
         {
             break;
         }
-        float avg = 0;
         unsigned int length = 0;
         for (auto e : boost::edges(*g_))
         {
             if (!(*g_)[e].visits.empty() and (*g_)[e].visits.front() == visits)
             {
                 unique[visits - 1].push_back(e);
-                avg += (*g_)[e].residual_capacity; 
-                length += (*g_)[e].name.size();
             }
         }
-        auto size = unique[visits - 1].size();
-        if (size > 0)
-            avg /= size;
         // we now have the tentative paths, now check how many edges are unique per path
         unique_paths.push_back(remove_non_unique_paths(unique, blockedPath, length, visits - 1, cc));
-        auto source = boost::source(curr, *g_);
-        auto target = boost::target(curr, *g_);
-        auto indegree = boost::in_degree(source, *g_);
-        if (indegree == 0 or (indegree == 1 and source == target))
-        {
-            used_sources++;
-        }
         visits++;
     }
-    return unique_paths;
+    return std::make_pair(started_from, unique_paths);
 }
 
 float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& unique, std::vector<UEdge>& blockedPath, unsigned int length, unsigned int visits, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
-    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
-        return (*g_)[e1].capacity > (*g_)[e2].capacity;
-    };
-    float median = 0.f;
     auto size = unique[visits].size();
+    float median = 0.f;
     if (size < 0.02 * boost::num_edges(*g_) and size < 15 and length < 500) //TODO parameters
     {
         for (auto e : blockedPath)
@@ -1562,16 +1601,8 @@ float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& uniq
     }
     else
     {
-        std::sort(unique[visits].begin(), unique[visits].end(), edge_compare);
-        if (visits == 0)
-            median = (*g_)[unique[visits][(3*size)/4]].capacity; //first quartile so we get a "unique" edge more likely
-        else
-            median = (*g_)[unique[visits][size/2]].capacity; //for the second run the median is fine
-        for (auto e : unique[visits])
-        {
-            auto cc = (*g_)[boost::source(e, *g_)].cc;
-            (*g_)[e].residual_capacity = std::max(thresholds_.at(cc), (*g_)[e].residual_capacity - median);
-        }
+        std::set<unsigned int> uq; // placeholder
+        median = reduce_flow(blockedPath, uq, cc, true);
     }
     return median;
 }
