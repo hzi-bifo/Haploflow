@@ -1717,10 +1717,6 @@ void UnitigGraph::cleanPath(std::vector<UEdge>& path, std::vector<UEdge>& seeds,
 			boost::remove_vertex(source, *g_);
 		}
     }
-    if (!toDelete.empty() and boost::in_degree(last, *g_) == 0 and boost::out_degree(last, *g_) == 0)
-    {
-        boost::remove_vertex(last, *g_);
-    }
 }
 
 void UnitigGraph::printGraph(std::ostream& os, unsigned int cc)
