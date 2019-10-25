@@ -995,28 +995,37 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
     UGraph* g_ = graphs_.at(cc);
     bool corrected = true;
     unsigned int pos = 0;
-    while (corrected)
+    bool eq = false;
+    std::vector<UEdge> return_path;
+    while (corrected and !eq)
     {
-        bool eq = false;
+        std::vector<UEdge> tmp_path;
+        bool dip = false;
         unsigned int i = 0;
         for (auto& e : path)
         {
-            auto trg = boost::target(e, *g_);
-            float val = -1;
+            tmp_path.push_back(e);
             if (i > pos)
             {
+                auto trg = boost::target(e, *g_);
+                float val = -1;
+                float cap = -1;
+                bool less = false;
+                bool more = false;
                 for (auto&& oe : boost::out_edges(trg, *g_))
                 {
-                    if ((*g_)[oe].fatness == val)
-                    {
-                        eq = true;
-                    }
-                    else
-                    {
-                        val = (*g_)[oe].fatness;
-                    }
+                    less = cap < 1.05 * (*g_)[oe].capacity or cap < (*g_)[oe].capacity + thresholds_[cc];
+                    more = cap * 1.05 > (*g_)[oe].capacity or cap  + thresholds_[cc] > (*g_)[oe].capacity;
+                    dip = (*g_)[oe].fatness == val;
+                    eq = less and more;
+                    val = (*g_)[oe].fatness;
+                    cap = (*g_)[oe].capacity;
                 }
-                if (eq)
+                if (eq) // if two out edges are the same capacity: break immediately
+                {
+                    break;
+                }
+                if (dip) // if dip in between caused problems: try to fix flow downstream
                 {
                     unvisit(cc);
                     pos = i;
@@ -1025,11 +1034,16 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
                 }
             }
             i++;
+            return_path.push_back(e);
         }
-        corrected = (eq and i == pos);
+        return_path = tmp_path;
+        corrected = (dip and i == pos);
     }
-    unvisit(cc);
-    std::vector<UEdge> return_path = find_fattest_path(seed, cc);
+    if (!eq)
+    {
+        unvisit(cc);
+        return_path = find_fattest_path(seed, cc);
+    }
     return return_path;
 }
 
