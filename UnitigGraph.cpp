@@ -744,7 +744,13 @@ void UnitigGraph::cleanGraph(unsigned int cc, float error_rate)
 	removeEmpty(cc);
 	removeStableSets(cc);
     contractPaths(cc);
+    //expandCycles(cc);
 }
+
+/*void UnitigGraph::expandCycles(unsigned int cc)
+{
+    
+}*/
 
 void UnitigGraph::removeShortPaths(unsigned int cc)
 {
@@ -1290,10 +1296,12 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
     UVertex source = boost::source(curr, *g_);
     std::set<unsigned int> paths;
     std::string contig = (*g_)[source].name;
+    //std::cerr << (*g_)[source].index;
     for (auto e : path)
     {
         contig += (*g_)[e].name;
         UVertex target = boost::target(e, *g_);
+        //std::cerr << " -> " << (*g_)[target].index << " (" << (*g_)[e].capacity << ", " << contig.size() << ")";
         if ((*g_)[e].visits.size() == 1)
         {
             if ((*g_)[e].capacity > max_flow)
@@ -1305,6 +1313,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
             i++;
         }
     }
+    //std::cerr << std::endl;
     if (i > 0)
     {
         flow /= i; // average flow over unqiue edges of path
@@ -1528,9 +1537,25 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
         {
             sources.insert(e);
         }
-        for (auto&& oe : boost::out_edges(target, *g_))
+        bool eq1 = false;
+        bool eq2 = false;
+        if (in_degree == 1)
         {
-            if (boost::target(oe, *g_) == src and in_degree == 1)
+            for (auto&& ie : boost::in_edges(src, *g_))
+            {
+                if (boost::source(ie, *g_) == target)
+                {
+                    eq1 = true;
+                }
+            }
+            for (auto&& oe : boost::out_edges(target, *g_))
+            {
+                if (boost::target(oe, *g_) == src and boost::in_degree(target, *g_) == 1)
+                {
+                    eq2 = true;
+                }
+            }
+            if (eq1 and eq2)
             {
                 sources.insert(e);
             }
@@ -1580,6 +1605,19 @@ std::pair<std::vector<UEdge>, std::vector<float>> UnitigGraph::find_paths(unsign
         // we now have the tentative paths, now check how many edges are unique per path
         unique_paths.push_back(remove_non_unique_paths(unique, blockedPath, length, visits - 1, cc));
         visits++;
+    }
+    for (auto&& e : boost::edges(*g_))
+    {
+        if ((*g_)[e].visits.empty())
+        {
+            (*g_)[e].visits.push_back(visits);
+            started_from.push_back(e);
+            unique_paths.push_back(0.);
+            (*g_)[e].residual_capacity = 0; // there might be paths, so leave a small amount
+            (*g_)[e].residual_cap_info.first = 0;
+            (*g_)[e].residual_cap_info.last = 0;
+            (*g_)[e].residual_cap_info.avg = 0;
+        }
     }
     return std::make_pair(started_from, unique_paths);
 }
