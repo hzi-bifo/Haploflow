@@ -1014,18 +1014,26 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
             if (i > pos)
             {
                 auto trg = boost::target(e, *g_);
-                float val = -1;
-                float cap = -1;
                 bool less = false;
                 bool more = false;
-                for (auto&& oe : boost::out_edges(trg, *g_))
-                {
-                    less = cap < 1.05 * (*g_)[oe].capacity or cap < (*g_)[oe].capacity + thresholds_[cc];
-                    more = cap * 1.05 > (*g_)[oe].capacity or cap  + thresholds_[cc] > (*g_)[oe].capacity;
-                    dip = (*g_)[oe].fatness == val;
-                    eq = less and more;
-                    val = (*g_)[oe].fatness;
-                    cap = (*g_)[oe].capacity;
+                if (i < path.size() - 1)
+                {   
+                    UEdge next = path[i + 1];
+                    for (auto&& oe : boost::out_edges(trg, *g_))
+                    {
+                        if (oe != next)
+                        {
+                            dip = dip or ((*g_)[oe].fatness == (*g_)[next].fatness);
+                            less = (*g_)[next].capacity < 1.05 * (*g_)[oe].capacity or (*g_)[next].capacity < (*g_)[oe].capacity + thresholds_[cc];
+                            more = (*g_)[next].capacity * 1.05 > (*g_)[oe].capacity or (*g_)[next].capacity + thresholds_[cc] > (*g_)[oe].capacity;
+                            eq = less and more;
+                        }
+                        if (eq)
+                        {
+                            std::cerr << (*g_)[trg].index << std::endl;
+                            break;
+                        }
+                    }
                 }
                 if (eq) // if two out edges are the same capacity: break immediately
                 {
