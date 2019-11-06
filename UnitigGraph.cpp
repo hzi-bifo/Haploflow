@@ -1011,28 +1011,24 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
         for (auto& e : path)
         {
             tmp_path.push_back(e);
-            if (i > pos)
+            if (i > pos and i < path.size() - 1)
             {
                 auto trg = boost::target(e, *g_);
                 bool less = false;
                 bool more = false;
-                if (i < path.size() - 1)
-                {   
-                    UEdge next = path[i + 1];
-                    for (auto&& oe : boost::out_edges(trg, *g_))
+                UEdge next = path[i + 1];
+                for (auto&& oe : boost::out_edges(trg, *g_))
+                {
+                    if (oe != next)
                     {
-                        if (oe != next)
-                        {
-                            dip = dip or ((*g_)[oe].fatness == (*g_)[next].fatness);
-                            less = (*g_)[next].capacity < 1.05 * (*g_)[oe].capacity or (*g_)[next].capacity < (*g_)[oe].capacity + thresholds_[cc];
-                            more = (*g_)[next].capacity * 1.05 > (*g_)[oe].capacity or (*g_)[next].capacity + thresholds_[cc] > (*g_)[oe].capacity;
-                            eq = less and more;
-                        }
-                        if (eq)
-                        {
-                            std::cerr << (*g_)[trg].index << std::endl;
-                            break;
-                        }
+                        dip = dip or ((*g_)[oe].fatness == (*g_)[next].fatness);
+                        less = (*g_)[next].capacity < 1.05 * (*g_)[oe].capacity or (*g_)[next].capacity < (*g_)[oe].capacity + thresholds_[cc];
+                        more = (*g_)[next].capacity * 1.05 > (*g_)[oe].capacity or (*g_)[next].capacity + thresholds_[cc] > (*g_)[oe].capacity;
+                        eq = less and more;
+                    }
+                    if (eq)
+                    {
+                        break;
                     }
                 }
                 if (eq) // if two out edges are the same capacity: break immediately
@@ -1388,7 +1384,7 @@ std::vector<UEdge> UnitigGraph::blockPath(UEdge curr, unsigned int visits, unsig
                     max_e_unvisited = e;
                 }
             }
-            else if ((*g_)[e].residual_capacity > max) // maximal visited edge
+            if ((*g_)[e].residual_capacity > max) // maximal visited edge
             {
                 max = (*g_)[e].residual_capacity;
                 max_e = e;
@@ -1402,7 +1398,7 @@ std::vector<UEdge> UnitigGraph::blockPath(UEdge curr, unsigned int visits, unsig
         {
             curr = max_e_unvisited;
         }
-        else if (max != -1) // all out_edges are visited
+        if (max != -1) // all out_edges are visited
         {
             //check whether we want to continue
             curr = max_e;
@@ -1683,6 +1679,15 @@ void UnitigGraph::assemble(std::string fname, float error_rate)
         UEdge seed;
         for (auto e : boost::edges(*g_))
         {
+            float path_val = 0.f;
+            for (auto&& v : (*g_)[e].visits)
+            {
+                path_val += all_paths[v - 1];
+            }
+            if (path_val == 0)
+            {
+                //TODO
+            }
             (*g_)[e].last_visit = 0; // reset last visit
         }
         std::vector<UEdge> sources = get_sources(cc); //get sources of the graph (indegree = 0)
