@@ -895,7 +895,7 @@ void UnitigGraph::dijkstra(UEdge seed, bool init, bool local, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
     auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest fatness
-        return (*g_)[e1].fatness < (*g_)[e2].fatness;
+        return (*g_)[e1].fatness > (*g_)[e2].fatness;
     };
     std::vector<UEdge> q;
     if (!local)
