@@ -137,11 +137,10 @@ private:
     
     void cleanPath(std::vector<UEdge>&, std::vector<UEdge>&, unsigned int cc);
     void cleanGraph(unsigned int cc, float err);
-    void removeLowEdges(unsigned int cc, float err);
 	void removeStableSets(unsigned int cc);
 	void removeShortPaths(unsigned int cc);
 	void contractPaths(unsigned int cc);
-    void removeEmpty(unsigned int cc);
+    void removeLow_cutEnds(unsigned int cc, float error_rate);
     bool hasRelevance(unsigned int cc);
     void unvisit(unsigned int cc);
 
@@ -151,6 +150,8 @@ private:
 	bool test_hypothesis(float to_test_num, float to_test_denom, float h0, float threshold);
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
+    unsigned int k_;
+    unsigned int read_length_;
 	std::vector<UGraph*> graphs_;
 	std::vector<std::unordered_map<unsigned int, UVertex>> graph_map_;
 

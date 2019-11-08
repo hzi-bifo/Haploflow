@@ -15,13 +15,13 @@ namespace std
 }
 
 // unitig graph for debugging purposes
-UnitigGraph::UnitigGraph() : cc_(1)
+UnitigGraph::UnitigGraph() : cc_(1), k_(0), read_length_(0)
 {
 }
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, float error_rate) : cc_(1)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, float error_rate) : cc_(1), k_(dbg.k_), read_length_(dbg.read_length_)
 {
 	std::cerr << "deBruijnGraph has " << dbg.getSize() << " vertices" << std::endl;
 	std::cerr << "Building unitig graph from deBruijn graph..." << std::endl;
@@ -142,6 +142,14 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
         {
             std::cerr << "Graph " << i << " threshold set to " << std::max(1.f, std::min(turning_point, inflexion_point)) << std::endl;
         }
+        /*if (std::min(inflexion_point, turning_point) > 1.f)
+        {
+            thresholds.push_back(2.f);
+        }
+        else
+        {
+            thresholds.push_back(1.f);
+        }*/
         thresholds.push_back(std::max(1.f, std::min(turning_point, inflexion_point))); // the threshold should never be less than 1
         i++;
     }
@@ -471,13 +479,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         ends_with += nextV->get_read_ends();
 	}
 	avg /= float(length); // average coverage over the path
-	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 150)) // TODO if coverage is low but the (unique) sequence is long, still add
+	if (!nextV->is_visited()) // TODO if coverage is low but the (unique) sequence is long, still add
 	{// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
 		nextV->visit();
 		addVertex(index, prev, nextV->cc); // the vertex is new and found to be relevant
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 150) or nextV->index == 0)
+	else if (nextV->index == 0)
 	{
 		return std::make_pair(nextV,""); // path has too low coverage
 	}
@@ -582,13 +590,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 150))
+	if (!nextV->is_visited())
 	{
 		nextV->visit();
 		addVertex(index, next, nextV->cc);
 		nextV->index = *index;
 	}
-	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 150) or nextV->index == 0)
+	else if (nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
@@ -736,15 +744,75 @@ void UnitigGraph::cleanGraph(unsigned int cc, float error_rate)
     {
         (*g_)[e].last_visit = 0; // reusing for number of allowed paths
     }
-    removeLowEdges(cc, error_rate);
-	removeEmpty(cc);
+    removeLow_cutEnds(cc, error_rate);
 	removeStableSets(cc);
     contractPaths(cc);
     removeShortPaths(cc);
-	removeEmpty(cc);
 	removeStableSets(cc);
     contractPaths(cc);
     //expandCycles(cc);
+}
+
+void UnitigGraph::removeLow_cutEnds(unsigned int cc, float error_rate)
+{
+    UGraph* g_ = graphs_.at(cc);
+    std::set<UEdge> toDelete;
+    for (auto&& v : boost::vertices(*g_))
+    {
+        float out_degree = 0.f;
+        float in_degree = 0.f;
+        for (auto&& oe : boost::out_edges(v, *g_))
+        {
+            out_degree += (*g_)[oe].capacity;
+        }
+        for (auto&& ie : boost::in_edges(v, *g_))
+        {
+            in_degree += (*g_)[ie].capacity;
+        }
+        for (auto&& oe : boost::out_edges(v, *g_))
+        {
+            if ((*g_)[oe].cap_info.max < thresholds_[cc] or (*g_)[oe].capacity < error_rate * out_degree)
+            {
+                toDelete.insert(oe);
+            }
+        }
+        for (auto&& ie : boost::in_edges(v, *g_))
+        {
+            if ((*g_)[ie].cap_info.max < thresholds_[cc] or (*g_)[ie].capacity < error_rate * in_degree)
+            {
+                toDelete.insert(ie);
+            }
+        }
+    }
+    for (auto&& e : toDelete)
+    {
+        boost::remove_edge(e, *g_);
+    }
+    toDelete.clear();
+    contractPaths(cc);
+    for (auto&& v : boost::vertices(*g_))
+    {
+        if (boost::in_degree(v, *g_) == 0)
+        {
+            for (auto&& oe : boost::out_edges(v, *g_))
+            {
+                if ((*g_)[oe].capacity < thresholds_[cc])
+                {
+                    toDelete.insert(oe);
+                }
+            }
+        }
+        else if (boost::out_degree(v, *g_) == 0)
+        {
+            for (auto&& ie : boost::in_edges(v, *g_))
+            {
+                if ((*g_)[ie].capacity < thresholds_[cc])
+                {
+                    toDelete.insert(ie);
+                }
+            }
+        }
+    }
 }
 
 /*void UnitigGraph::expandCycles(unsigned int cc)
@@ -764,7 +832,7 @@ void UnitigGraph::removeShortPaths(unsigned int cc)
         if ((boost::out_degree(target, *g_) == 0 and boost::in_degree(source, *g_) == 0
             and boost::out_degree(source, *g_) == 1 and boost::in_degree(target, *g_) == 1))
         {
-            if ((*g_)[e].name.size() < 150)
+            if ((*g_)[e].name.size() < read_length_)
             {
                 toDelete.push_back(e);
             }
@@ -777,49 +845,10 @@ void UnitigGraph::removeShortPaths(unsigned int cc)
             if (rev_e.second)
             {
                 length += (*g_)[rev_e.first].name.size();
-                if (length < 150)
+                if (length < read_length_)
                 {
                     toDelete.push_back(e);
                 }
-            }
-        }
-    }
-    for (auto&& e : toDelete)
-    {
-        boost::remove_edge(e, *g_);
-    }
-}
-
-void UnitigGraph::removeLowEdges(unsigned int cc, float error_rate)
-{
-    UGraph* g_ = graphs_.at(cc);
-    std::set<UEdge> toDelete;
-    for (auto v : boost::vertices(*g_))
-    {
-        auto out_edges = boost::out_edges(v, *g_);
-        auto in_edges = boost::in_edges(v, *g_);
-        float out_degree = 0.f;
-        float in_degree = 0.f;
-        for (auto&& oe : out_edges)
-        {
-            out_degree += (*g_)[oe].capacity;
-        }
-        for (auto&& ie : in_edges)
-        {
-            in_degree += (*g_)[ie].capacity;
-        }
-        for (auto&& oe : out_edges)
-        {
-            if ((*g_)[oe].capacity < error_rate * out_degree)
-            {
-                toDelete.insert(oe);
-            }
-        }
-        for (auto&& ie : in_edges)
-        {
-            if ((*g_)[ie].capacity < error_rate * in_degree)
-            {
-                toDelete.insert(ie);
             }
         }
     }
@@ -979,7 +1008,7 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient, unsign
         }
         for (auto oe : boost::out_edges(target, *g_))
         {
-            if (!(*g_)[oe].visited)
+            if (!(*g_)[oe].visited and (*g_)[oe].prev == curr)
             {
                 q.push_back(oe);
             }
@@ -1182,7 +1211,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         {
             if (!init)
             {
-                if ((*g_)[e].visits.empty())
+                if ((*g_)[e].visits.empty() or (*g_)[e].capacity <= threshold)
                 {
                     (*g_)[e].capacity = 0;
                     (*g_)[e].cap_info.first = 0;
@@ -1209,7 +1238,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         {
             if (!init)
             {
-                if ((*g_)[e].visits.empty())
+                if ((*g_)[e].visits.empty() or (*g_)[e].capacity <= threshold)
                 {
                     (*g_)[e].capacity = 0;
                     (*g_)[e].cap_info.first = 0;
@@ -1236,7 +1265,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         {
             if (!init)
             {
-                if ((*g_)[e].visits.empty())
+                if ((*g_)[e].visits.empty() or (*g_)[e].capacity <= threshold)
                 {
                     (*g_)[e].capacity = 0;
                     (*g_)[e].cap_info.first = 0;
@@ -1300,12 +1329,12 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
     UVertex source = boost::source(curr, *g_);
     std::set<unsigned int> paths;
     std::string contig = (*g_)[source].name;
-    //std::cerr << (*g_)[source].index;
+    std::cerr << (*g_)[source].index;
     for (auto e : path)
     {
         contig += (*g_)[e].name;
         UVertex target = boost::target(e, *g_);
-        //std::cerr << " -> " << (*g_)[target].index << " (" << (*g_)[e].capacity << ", " << contig.size() << ")";
+        std::cerr << " -> " << (*g_)[target].index << " (" << (*g_)[e].capacity << ", " << contig.size() << ")";
         if ((*g_)[e].visits.size() == 1)
         {
             if ((*g_)[e].capacity > max_flow)
@@ -1317,7 +1346,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
             i++;
         }
     }
-    //std::cerr << std::endl;
+    std::cerr << std::endl;
     if (i > 0)
     {
         flow /= i; // average flow over unqiue edges of path
@@ -1739,24 +1768,6 @@ void UnitigGraph::assemble(std::string fname, float error_rate)
     std::cerr << "Assembly complete" << std::endl;
 }
 
-void UnitigGraph::removeEmpty(unsigned int cc)
-{
-    UGraph* g_ = graphs_.at(cc);
-    std::vector<UEdge> toDelete;
-    for (auto&& e : boost::edges(*g_))
-    {
-        auto&& src = boost::source(e, *g_); //src and target always have the same cc
-        if ((*g_)[e].capacity == 0 or (*g_)[e].capacity < thresholds_[(*g_)[src].cc]) //to make sure empty edges are definitely deleted
-        {
-            toDelete.push_back(e);
-        }
-    }
-    for (auto&& e : toDelete)
-    {
-        boost::remove_edge(e, *g_);
-    }
-}
-
 void UnitigGraph::cleanPath(std::vector<UEdge>& path, std::vector<UEdge>& seeds, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
@@ -1769,11 +1780,9 @@ void UnitigGraph::cleanPath(std::vector<UEdge>& path, std::vector<UEdge>& seeds,
             seeds.erase(std::remove(seeds.begin(), seeds.end(), e), seeds.end()); // dont use deleted edge as seed
         }
     }
-    UVertex last;
     for (auto&& e : toDelete)
     {
         auto source = boost::source(e, *g_);
-        last = boost::target(e, *g_);
         boost::remove_edge(e, *g_);
 		unsigned int indegree = boost::in_degree(source, *g_);
 		unsigned int outdegree = boost::out_degree(source,*g_);
