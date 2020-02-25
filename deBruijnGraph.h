@@ -26,6 +26,7 @@ public:
 	deBruijnGraph(std::string filename, unsigned int k); // builds the deBruijn graph from file
 	inline static char complement(const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};}
     friend std::ostream& operator<<(std::ostream& os, const deBruijnGraph& dbg);
+    friend class UnitigGraph;
 
 	void markCycles();
     unsigned int split_ccs();
