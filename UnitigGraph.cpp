@@ -15,17 +15,20 @@ namespace std
 }
 
 // unitig graph for debugging purposes
-UnitigGraph::UnitigGraph() : cc_(1), k_(0), read_length_(0)
+UnitigGraph::UnitigGraph() : cc_(1)
 {
 }
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, float error_rate) : cc_(1), k_(dbg.k_), read_length_(dbg.read_length_)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate) : cc_(1), logfile_(log)
 {
-	std::cerr << "deBruijnGraph has " << dbg.getSize() << " vertices" << std::endl;
-	std::cerr << "Building unitig graph from deBruijn graph..." << std::endl;
-    
+    std::ofstream l;
+    l.open(logfile_, std::ofstream::out | std::ofstream::app);
+	l << "deBruijnGraph has " << dbg.getSize() << " vertices" << std::endl;
+	l << "Building unitig graph from deBruijn graph..." << std::endl;
+    l.close();
+
 	clock_t t = clock();
 	auto&& junc = dbg.getJunctions();
 	unsigned int index = 1;
@@ -55,7 +58,6 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, float error_rate) : 
         else
         {
             source->flag();
-            //std::cerr << "Skipped small/erroneous dBg" << std::endl;
         }
 	}
 	for (auto& v : in_unbalanced)
@@ -72,16 +74,17 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, float error_rate) : 
         else
         {
             source->flag();
-            //std::cerr << "Skipped small/erroneous dBg" << std::endl;
         }
 	}
-	std::cerr << "Unitig graph successfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
+    l.open(logfile_, std::ofstream::out | std::ofstream::app);
+	l << "Unitig graph successfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
     unsigned int total_size = 0;
     for (unsigned int cc = 0; cc < graphs_.size(); cc++)
     {
         total_size += boost::num_vertices(*(graphs_.at(cc)));
     }
-    std::cerr << "Unitig graph has " << total_size << " vertices" << std::endl;
+    l << "Unitig graph has " << total_size << " vertices" << std::endl;
+    l.close();
 }
 
 UnitigGraph::~UnitigGraph()
@@ -94,15 +97,22 @@ UnitigGraph::~UnitigGraph()
 
 std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, float error_rate)
 {
-    std::cerr << "Getting connected components" << std::endl;
+    std::ofstream log;
+    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+    log << "Getting connected components" << std::endl;
+    log.close();
     auto t = clock();
     auto dbgs = dbg.split_ccs();
     //delete dbg; // we split it up and can delete the original
-    std::cerr << "Getting CCs took " << (clock() - t)/1000000. << " seconds" << std::endl;
+    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+    log << "Getting CCs took " << (clock() - t)/1000000. << " seconds" << std::endl;
     t = clock();
-    std::cerr << "Calculating coverage distribution" << std::endl;
+    log << "Calculating coverage distribution" << std::endl;
+    log.close();
     auto&& cov_distr = dbg.coverageDistribution(dbgs);
-    std::cerr << "Calculating coverage distribution took " << (clock() - t)/1000000. << " seconds" << std::endl;
+    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+    log << "Calculating coverage distribution took " << (clock() - t)/1000000. << " seconds" << std::endl;
+    log.close();
     return get_thresholds(cov_distr, path, error_rate);
 }
 
@@ -140,16 +150,11 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
         float inflexion_point = diffs.second; 
         if (inflexion_point > 1 and turning_point > 1)
         {
-            std::cerr << "Graph " << i << " threshold set to " << std::max(1.f, std::min(turning_point, inflexion_point)) << std::endl;
+            std::ofstream log;
+            log.open(logfile_, std::ofstream::out | std::ofstream::app);
+            log << "Graph " << i << " threshold set to " << std::max(1.f, std::min(turning_point, inflexion_point)) << std::endl;
+            log.close();
         }
-        /*if (std::min(inflexion_point, turning_point) > 1.f)
-        {
-            thresholds.push_back(2.f);
-        }
-        else
-        {
-            thresholds.push_back(1.f);
-        }*/
         thresholds.push_back(std::max(1.f, std::min(turning_point, inflexion_point))); // the threshold should never be less than 1
         i++;
     }
@@ -479,13 +484,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
         ends_with += nextV->get_read_ends();
 	}
 	avg /= float(length); // average coverage over the path
-	if (!nextV->is_visited()) // TODO if coverage is low but the (unique) sequence is long, still add
+	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 150)) // TODO if coverage is low but the (unique) sequence is long, still add
 	{// if the next vertex has been visited it already is part of the unitiggraph, otherwise add it
 		nextV->visit();
 		addVertex(index, prev, nextV->cc); // the vertex is new and found to be relevant
 		nextV->index = *index;
 	}
-	else if (nextV->index == 0)
+	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 150) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,""); // path has too low coverage
 	}
@@ -590,13 +595,13 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 	If nextV still isn't visited we found a junction which has not been considered before
 	*/
 	avg /= float(length);
-	if (!nextV->is_visited())
+	if (!nextV->is_visited() and (avg > threshold or sequence.length() > 150))
 	{
 		nextV->visit();
 		addVertex(index, next, nextV->cc);
 		nextV->index = *index;
 	}
-	else if (nextV->index == 0)
+	else if (!nextV->is_visited() or (avg <= threshold and sequence.length() <= 150) or nextV->index == 0)
 	{
 		return std::make_pair(nextV,"");
 	}
@@ -731,7 +736,10 @@ bool UnitigGraph::hasRelevance(unsigned int cc)
     }
     if (length <= 150)
     {
-        std::cerr << "Graph undercutting threshold of 150 characters (" << length << ")" << std::endl;
+        std::ofstream log;
+        log.open(logfile_, std::ofstream::out | std::ofstream::app);
+        log << "Graph undercutting threshold of 150 characters (" << length << ")" << std::endl;
+        log.close();
     }
     return length > 150;
 }
@@ -744,81 +752,15 @@ void UnitigGraph::cleanGraph(unsigned int cc, float error_rate)
     {
         (*g_)[e].last_visit = 0; // reusing for number of allowed paths
     }
-    removeLow_cutEnds(cc, error_rate);
+    removeLowEdges(cc, error_rate);
+	removeEmpty(cc);
 	removeStableSets(cc);
     contractPaths(cc);
     removeShortPaths(cc);
+	removeEmpty(cc);
 	removeStableSets(cc);
     contractPaths(cc);
-    //expandCycles(cc);
 }
-
-void UnitigGraph::removeLow_cutEnds(unsigned int cc, float error_rate)
-{
-    UGraph* g_ = graphs_.at(cc);
-    std::set<UEdge> toDelete;
-    for (auto&& v : boost::vertices(*g_))
-    {
-        float out_degree = 0.f;
-        float in_degree = 0.f;
-        for (auto&& oe : boost::out_edges(v, *g_))
-        {
-            out_degree += (*g_)[oe].capacity;
-        }
-        for (auto&& ie : boost::in_edges(v, *g_))
-        {
-            in_degree += (*g_)[ie].capacity;
-        }
-        for (auto&& oe : boost::out_edges(v, *g_))
-        {
-            if ((*g_)[oe].cap_info.max < thresholds_[cc] or (*g_)[oe].capacity < error_rate * out_degree)
-            {
-                toDelete.insert(oe);
-            }
-        }
-        for (auto&& ie : boost::in_edges(v, *g_))
-        {
-            if ((*g_)[ie].cap_info.max < thresholds_[cc] or (*g_)[ie].capacity < error_rate * in_degree)
-            {
-                toDelete.insert(ie);
-            }
-        }
-    }
-    for (auto&& e : toDelete)
-    {
-        boost::remove_edge(e, *g_);
-    }
-    toDelete.clear();
-    contractPaths(cc);
-    for (auto&& v : boost::vertices(*g_))
-    {
-        if (boost::in_degree(v, *g_) == 0)
-        {
-            for (auto&& oe : boost::out_edges(v, *g_))
-            {
-                if ((*g_)[oe].capacity < thresholds_[cc])
-                {
-                    toDelete.insert(oe);
-                }
-            }
-        }
-        else if (boost::out_degree(v, *g_) == 0)
-        {
-            for (auto&& ie : boost::in_edges(v, *g_))
-            {
-                if ((*g_)[ie].capacity < thresholds_[cc])
-                {
-                    toDelete.insert(ie);
-                }
-            }
-        }
-    }
-}
-
-/*void UnitigGraph::expandCycles(unsigned int cc)
-{
-    
-}*/
 
 void UnitigGraph::removeShortPaths(unsigned int cc)
 {
@@ -832,7 +774,7 @@ void UnitigGraph::removeShortPaths(unsigned int cc)
         if ((boost::out_degree(target, *g_) == 0 and boost::in_degree(source, *g_) == 0
             and boost::out_degree(source, *g_) == 1 and boost::in_degree(target, *g_) == 1))
         {
-            if ((*g_)[e].name.size() < read_length_)
+            if ((*g_)[e].name.size() < 150)
             {
                 toDelete.push_back(e);
             }
@@ -845,10 +787,49 @@ void UnitigGraph::removeShortPaths(unsigned int cc)
             if (rev_e.second)
             {
                 length += (*g_)[rev_e.first].name.size();
-                if (length < read_length_)
+                if (length < 150)
                 {
                     toDelete.push_back(e);
                 }
+            }
+        }
+    }
+    for (auto&& e : toDelete)
+    {
+        boost::remove_edge(e, *g_);
+    }
+}
+
+void UnitigGraph::removeLowEdges(unsigned int cc, float error_rate)
+{
+    UGraph* g_ = graphs_.at(cc);
+    std::set<UEdge> toDelete;
+    for (auto v : boost::vertices(*g_))
+    {
+        auto out_edges = boost::out_edges(v, *g_);
+        auto in_edges = boost::in_edges(v, *g_);
+        float out_degree = 0.f;
+        float in_degree = 0.f;
+        for (auto&& oe : out_edges)
+        {
+            out_degree += (*g_)[oe].capacity;
+        }
+        for (auto&& ie : in_edges)
+        {
+            in_degree += (*g_)[ie].capacity;
+        }
+        for (auto&& oe : out_edges)
+        {
+            if ((*g_)[oe].capacity < error_rate * out_degree)
+            {
+                toDelete.insert(oe);
+            }
+        }
+        for (auto&& ie : in_edges)
+        {
+            if ((*g_)[ie].capacity < error_rate * in_degree)
+            {
+                toDelete.insert(ie);
             }
         }
     }
@@ -890,12 +871,54 @@ float UnitigGraph::out_capacity(UVertex target, unsigned int cc)
     return capacity;
 }
 
+// for two strains no dijkstra is needed - use greedy instead
+std::vector<UEdge> UnitigGraph::greedy(UEdge seed, bool init, bool local, unsigned int cc)
+{
+    UGraph* g_ = graphs_.at(cc);
+    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest fatness
+        return (*g_)[e1].fatness < (*g_)[e2].fatness;
+    };
+    std::vector<UEdge> path = {seed};
+    (*g_)[seed].visited = true;
+    while (true)
+    {
+        auto target = boost::target(path.back(), *g_);
+        float max = 0.;
+        UEdge max_edge;
+        float sum = 0.;
+        for (auto oe : boost::out_edges(target, *g_))
+        {
+            float cap = (*g_)[oe].capacity;
+            if (cap > max)
+            {
+                max = cap;
+                max_edge = oe;
+            }
+            sum += cap;
+        }
+        if (max > 0 and !(*g_)[max_edge].visited and (max/sum > 0.55 or !test_hypothesis(2*max, sum, 1, 100))) //TODO thresholds
+        {
+            (*g_)[max_edge].visited = true;
+            path.push_back(max_edge);
+        }
+        else
+        {
+            break;
+        }
+    }
+    for (auto e : boost::edges(*g_)) //unvisit for next run
+    {
+        (*g_)[e].visited = false;
+    }
+    return path;
+}
+
 // run dijsktra with fatness as optimality criterion, marks the graph with the distances from seed
 void UnitigGraph::dijkstra(UEdge seed, bool init, bool local, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
     auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest fatness
-        return (*g_)[e1].fatness > (*g_)[e2].fatness;
+        return (*g_)[e1].fatness < (*g_)[e2].fatness;
     };
     std::vector<UEdge> q;
     if (!local)
@@ -1008,7 +1031,7 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient, unsign
         }
         for (auto oe : boost::out_edges(target, *g_))
         {
-            if (!(*g_)[oe].visited and (*g_)[oe].prev == curr)
+            if (!(*g_)[oe].visited)
             {
                 q.push_back(oe);
             }
@@ -1030,41 +1053,28 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
     UGraph* g_ = graphs_.at(cc);
     bool corrected = true;
     unsigned int pos = 0;
-    bool eq = false;
-    std::vector<UEdge> return_path;
-    while (corrected and !eq)
+    while (corrected)
     {
-        std::vector<UEdge> tmp_path;
-        bool dip = false;
+        bool eq = false;
         unsigned int i = 0;
         for (auto& e : path)
         {
-            tmp_path.push_back(e);
-            if (i > pos and i < path.size() - 1)
+            auto trg = boost::target(e, *g_);
+            float val = -1;
+            if (i > pos)
             {
-                auto trg = boost::target(e, *g_);
-                bool less = false;
-                bool more = false;
-                UEdge next = path[i + 1];
                 for (auto&& oe : boost::out_edges(trg, *g_))
                 {
-                    if (oe != next)
+                    if ((*g_)[oe].fatness == val)
                     {
-                        dip = dip or ((*g_)[oe].fatness == (*g_)[next].fatness);
-                        less = (*g_)[next].capacity < 1.05 * (*g_)[oe].capacity or (*g_)[next].capacity < (*g_)[oe].capacity + thresholds_[cc];
-                        more = (*g_)[next].capacity * 1.05 > (*g_)[oe].capacity or (*g_)[next].capacity + thresholds_[cc] > (*g_)[oe].capacity;
-                        eq = less and more;
+                        eq = true;
                     }
-                    if (eq)
+                    else
                     {
-                        break;
+                        val = (*g_)[oe].fatness;
                     }
                 }
-                if (eq) // if two out edges are the same capacity: break immediately
-                {
-                    break;
-                }
-                if (dip) // if dip in between caused problems: try to fix flow downstream
+                if (eq)
                 {
                     unvisit(cc);
                     pos = i;
@@ -1073,16 +1083,11 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
                 }
             }
             i++;
-            return_path.push_back(e);
         }
-        return_path = tmp_path;
-        corrected = (dip and i == pos);
+        corrected = (eq and i == pos);
     }
-    if (!eq)
-    {
-        unvisit(cc);
-        return_path = find_fattest_path(seed, cc);
-    }
+    unvisit(cc);
+    std::vector<UEdge> return_path = find_fattest_path(seed, cc);
     return return_path;
 }
 
@@ -1090,14 +1095,8 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
 std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
-    //auto source = boost::source(seed, *g_);
-    //auto target = boost::target(seed, *g_);
-    //std::cerr << "Source: " << (*g_)[source].index << " -> " << (*g_)[target].index << ": " << (*g_)[seed].capacity << std::endl;
     auto trg = get_target(seed, false, cc);
     auto last = trg.first;
-    //auto source2 = boost::source(last, *g_);
-    //auto target2 = boost::target(last, *g_);
-    //std::cerr << "Target: " << (*g_)[source2].index << " -> " << (*g_)[target2].index << ": " << (*g_)[last].capacity << std::endl;
     float max_dist = trg.second;
     if (max_dist == 0) // path is only one edge, no longest path
     {
@@ -1113,17 +1112,13 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed, unsigned int cc)
         (*g_)[curr].last_visit++;
         path.push_front(curr);
     }
-    //source = boost::source(path.front(), *g_);
     unsigned int i = 0;
     unsigned int j = 1;
     float seq_length = 0;
     std::vector<UEdge> ret;
     
-    //std::cerr << (*g_)[source].index; 
     for (auto e : path)
     {
-        //auto trg = boost::target(e, *g_);
-        //std::cerr << " -> " << (*g_)[trg].index << "(" << (*g_)[e].capacity << " " << (*g_)[e].fatness << ") ";
         seq_length += (*g_)[e].name.size();
         auto ct = 0;
         auto avg = 0.f;
@@ -1150,7 +1145,6 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed, unsigned int cc)
         j++;
         ret.push_back(e);
     }
-    //std::cerr << std::endl;
     return ret;
 }
 
@@ -1211,7 +1205,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         {
             if (!init)
             {
-                if ((*g_)[e].visits.empty() or (*g_)[e].capacity <= threshold)
+                if ((*g_)[e].visits.empty())
                 {
                     (*g_)[e].capacity = 0;
                     (*g_)[e].cap_info.first = 0;
@@ -1238,7 +1232,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         {
             if (!init)
             {
-                if ((*g_)[e].visits.empty() or (*g_)[e].capacity <= threshold)
+                if ((*g_)[e].visits.empty())
                 {
                     (*g_)[e].capacity = 0;
                     (*g_)[e].cap_info.first = 0;
@@ -1265,7 +1259,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         {
             if (!init)
             {
-                if ((*g_)[e].visits.empty() or (*g_)[e].capacity <= threshold)
+                if ((*g_)[e].visits.empty())
                 {
                     (*g_)[e].capacity = 0;
                     (*g_)[e].cap_info.first = 0;
@@ -1329,12 +1323,10 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
     UVertex source = boost::source(curr, *g_);
     std::set<unsigned int> paths;
     std::string contig = (*g_)[source].name;
-    std::cerr << (*g_)[source].index;
     for (auto e : path)
     {
         contig += (*g_)[e].name;
-        UVertex target = boost::target(e, *g_);
-        std::cerr << " -> " << (*g_)[target].index << " (" << (*g_)[e].capacity << ", " << contig.size() << ")";
+        //UVertex target = boost::target(e, *g_);
         if ((*g_)[e].visits.size() == 1)
         {
             if ((*g_)[e].capacity > max_flow)
@@ -1346,7 +1338,6 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
             i++;
         }
     }
-    std::cerr << std::endl;
     if (i > 0)
     {
         flow /= i; // average flow over unqiue edges of path
@@ -1378,8 +1369,11 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
                 }
             }
         }
-        std::cerr << "Removed duplicated contig " << std::endl;
-        std::cerr << contig << std::endl;
+        std::ofstream log;
+        log.open(logfile_, std::ofstream::out | std::ofstream::app);
+        log << "Removed duplicated contig " << std::endl;
+        log << contig << std::endl;
+        log.close();
         contig = "";
         if (path.size() > 0)
             flow /= path.size();
@@ -1413,7 +1407,7 @@ std::vector<UEdge> UnitigGraph::blockPath(UEdge curr, unsigned int visits, unsig
                     max_e_unvisited = e;
                 }
             }
-            if ((*g_)[e].residual_capacity > max) // maximal visited edge
+            else if ((*g_)[e].residual_capacity > max) // maximal visited edge
             {
                 max = (*g_)[e].residual_capacity;
                 max_e = e;
@@ -1427,7 +1421,7 @@ std::vector<UEdge> UnitigGraph::blockPath(UEdge curr, unsigned int visits, unsig
         {
             curr = max_e_unvisited;
         }
-        if (max != -1) // all out_edges are visited
+        else if (max != -1) // all out_edges are visited
         {
             //check whether we want to continue
             curr = max_e;
@@ -1570,25 +1564,9 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
         {
             sources.insert(e);
         }
-        bool eq1 = false;
-        bool eq2 = false;
-        if (in_degree == 1)
+        for (auto&& oe : boost::out_edges(target, *g_))
         {
-            for (auto&& ie : boost::in_edges(src, *g_))
-            {
-                if (boost::source(ie, *g_) == target)
-                {
-                    eq1 = true;
-                }
-            }
-            for (auto&& oe : boost::out_edges(target, *g_))
-            {
-                if (boost::target(oe, *g_) == src and boost::in_degree(target, *g_) == 1)
-                {
-                    eq2 = true;
-                }
-            }
-            if (eq1 and eq2)
+            if (boost::target(oe, *g_) == src and in_degree == 1)
             {
                 sources.insert(e);
             }
@@ -1597,7 +1575,7 @@ std::vector<UEdge> UnitigGraph::get_sources(unsigned int cc)
     return std::vector<UEdge>(sources.begin(), sources.end());
 }
 
-std::pair<std::vector<UEdge>, std::vector<float>> UnitigGraph::find_paths(unsigned int cc)
+std::pair<std::vector<UEdge>, std::vector<float>> UnitigGraph::find_paths(unsigned int cc, bool two_strain)
 {
     UGraph* g_ = graphs_.at(cc);
     std::vector<UEdge> sources = get_sources(cc); //get sources of the graph (indegree = 0)
@@ -1619,7 +1597,14 @@ std::pair<std::vector<UEdge>, std::vector<float>> UnitigGraph::find_paths(unsign
         if (unblocked)
         {
             unique.push_back(std::vector<UEdge>{});
-            dijkstra(curr, true, false, cc);
+            if (two_strain)
+            {
+                greedy(curr, true, false, cc);
+            }
+            else
+            {
+                dijkstra(curr, true, false, cc);
+            }
             started_from.push_back(curr); // add the edge from which we started
             blockedPath = blockPath(curr, visits, cc); //marks the first path
         }
@@ -1639,18 +1624,9 @@ std::pair<std::vector<UEdge>, std::vector<float>> UnitigGraph::find_paths(unsign
         unique_paths.push_back(remove_non_unique_paths(unique, blockedPath, length, visits - 1, cc));
         visits++;
     }
-    for (auto&& e : boost::edges(*g_))
+    for (auto e : boost::edges(*g_))
     {
-        if ((*g_)[e].visits.empty())
-        {
-            (*g_)[e].visits.push_back(visits);
-            started_from.push_back(e);
-            unique_paths.push_back(0.);
-            (*g_)[e].residual_capacity = 0; // there might be paths, so leave a small amount
-            (*g_)[e].residual_cap_info.first = 0;
-            (*g_)[e].residual_cap_info.last = 0;
-            (*g_)[e].residual_cap_info.avg = 0;
-        }
+        (*g_)[e].last_visit = 0; // reset last visit
     }
     return std::make_pair(started_from, unique_paths);
 }
@@ -1687,43 +1663,31 @@ float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& uniq
 }
 
 // calculates the flows and corresponding paths through the graph
-void UnitigGraph::assemble(std::string fname, float error_rate)
+void UnitigGraph::assemble(std::string fname, float error_rate, std::string contigs, bool two_strain)
 {
     unsigned int i = 0;
-    std::cerr << "Cleaning graph" << std::endl;
+    std::ofstream log;
+    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+    log << "Cleaning graph" << std::endl;
+    log.close();
     for (unsigned int cc = 0; cc < graphs_.size(); cc++)
     {
         UGraph* g_ = graphs_.at(cc);
-        std::string filename = fname + "CC" + std::to_string(cc) + "Graph.dot";
+        std::string filename = fname + "Graph.dot";
         std::ofstream outfile (filename);
         //contractPaths(cc); // TODO only for debug reasons
         printGraph(outfile, cc);
         cleanGraph(cc, error_rate);
-        g_ = graphs_.at(cc);
-        std::cerr << "Graph " << cc << ": " << boost::num_vertices(*g_) << " vertices remaining" << std::endl;
-        std::cerr << "Calculating paths" << std::endl;
-        auto paths = find_paths(cc);
-        auto seeds = paths.first;
-        auto all_paths = paths.second;
-        UEdge seed;
-        for (auto e : boost::edges(*g_))
-        {
-            float path_val = 0.f;
-            for (auto&& v : (*g_)[e].visits)
-            {
-                path_val += all_paths[v - 1];
-            }
-            if (path_val == 0)
-            {
-                //TODO
-            }
-            (*g_)[e].last_visit = 0; // reset last visit
-        }
-        std::vector<UEdge> sources = get_sources(cc); //get sources of the graph (indegree = 0)
-        auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
-            return (*g_)[e1].capacity > (*g_)[e2].capacity;
-        };
-        std::sort(sources.begin(), sources.end(), edge_compare); // so that we search the highest source first
+        log.open(logfile_, std::ofstream::out | std::ofstream::app);
+        log << "Graph " << cc << ": " << boost::num_vertices(*g_) << " vertices remaining" << std::endl;
+        log << "Calculating paths" << std::endl;
+        log.close();
+        auto prep = find_paths(cc, two_strain);
+        log.open(logfile_, std::ofstream::out | std::ofstream::app);
+        log << "Paths calculated" << std::endl;
+        log.close();
+        auto seeds = prep.first;
+        auto all_paths = prep.second;
         while (hasRelevance(cc))
         {
             unvisit(cc);
@@ -1742,30 +1706,67 @@ void UnitigGraph::assemble(std::string fname, float error_rate)
             {
                 seed = get_next_source(cc);
             }
-            std::cerr << "Fixing flow and finding fattest path" << std::endl;
-            std::string filename = fname + "CC" + std::to_string(cc) + "Graph" + std::to_string(i) + ".dot";
+            log.open(logfile_, std::ofstream::out | std::ofstream::app);
+            log << "Fixing flow and finding fattest path" << std::endl;
+            log.close();
+            std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
             std::ofstream outfile (filename);
             printGraph(outfile, cc);
-            std::vector<UEdge> path = fixFlow(seed, cc);
-            std::cerr << "Calculating contig " << i << "..." << std::endl;
-            auto contig = calculate_contigs(path, all_paths, cc);
-            if (contig.first.size() > 150)
+            std::vector<UEdge> path;
+            if (!two_strain)
             {
-                std::cout << ">Contig_" << i << "_flow_" << contig.second << "_cc_" << cc << std::endl;
-                std::cout << contig.first << std::endl;
+                path = fixFlow(seed, cc);
             }
             else
             {
-                std::cerr << "Removed short contig" << std::endl;
-                std::cerr << contig.first << std::endl;
+                path = greedy(seed, true, false, cc);
+            }
+            log.open(logfile_, std::ofstream::out | std::ofstream::app);
+            log << "Calculating contig " << i << "..." << std::endl;
+            log.close();
+            auto contig = calculate_contigs(path, all_paths, cc);
+            if (contig.first.size() > 150)
+            {
+                std::ofstream c;
+                c.open(contigs);
+                c << ">Contig_" << i << "_flow_" << contig.second << "_cc_" << cc << std::endl;
+                c << contig.first << std::endl;
+                c.close();
+            }
+            else
+            {
+                log.open(logfile_, std::ofstream::out | std::ofstream::app);
+                log << "Removed short contig" << std::endl;
+                log << contig.first << std::endl;
             }
             i++;
-            std::cerr << "Cleaning graph again..." << std::endl;
+            log << "Cleaning graph again..." << std::endl;
+            log.close();
             cleanPath(path, seeds, cc);
             removeStableSets(cc);
         }
     }
-    std::cerr << "Assembly complete" << std::endl;
+    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+    log << "Assembly complete" << std::endl;
+    log.close();
+}
+
+void UnitigGraph::removeEmpty(unsigned int cc)
+{
+    UGraph* g_ = graphs_.at(cc);
+    std::vector<UEdge> toDelete;
+    for (auto&& e : boost::edges(*g_))
+    {
+        auto&& src = boost::source(e, *g_); //src and target always have the same cc
+        if ((*g_)[e].capacity == 0 or (*g_)[e].capacity < thresholds_[(*g_)[src].cc]) //to make sure empty edges are definitely deleted
+        {
+            toDelete.push_back(e);
+        }
+    }
+    for (auto&& e : toDelete)
+    {
+        boost::remove_edge(e, *g_);
+    }
 }
 
 void UnitigGraph::cleanPath(std::vector<UEdge>& path, std::vector<UEdge>& seeds, unsigned int cc)
@@ -1780,9 +1781,11 @@ void UnitigGraph::cleanPath(std::vector<UEdge>& path, std::vector<UEdge>& seeds,
             seeds.erase(std::remove(seeds.begin(), seeds.end(), e), seeds.end()); // dont use deleted edge as seed
         }
     }
+    UVertex last;
     for (auto&& e : toDelete)
     {
         auto source = boost::source(e, *g_);
+        last = boost::target(e, *g_);
         boost::remove_edge(e, *g_);
 		unsigned int indegree = boost::in_degree(source, *g_);
 		unsigned int outdegree = boost::out_degree(source,*g_);

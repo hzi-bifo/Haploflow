@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-find_package(Boost 1.55 COMPONENTS program_options REQUIRED)
+find_package(Boost 1.55 COMPONENTS system filesystem program_options REQUIRED)
 
 include_directories(
 	${Boost_INCLUDE_DIRS}

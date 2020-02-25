@@ -100,13 +100,14 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&, std::string, float); // TODO delete dBg after UnitigGraph creation?
+	UnitigGraph(deBruijnGraph&, std::string, std::string, float); // TODO delete dBg after UnitigGraph creation?
 	UnitigGraph(); // debug
     ~UnitigGraph();
 	void debug(); // debug information
-    void assemble(std::string, float err);
+    void assemble(std::string, float err, std::string contigs, bool two_strain);
     void printGraph(std::ostream&, unsigned int cc);
     void dijkstra(UEdge seed, bool residual, bool local, unsigned int cc);
+    std::vector<UEdge> greedy(UEdge seed, bool residual, bool local, unsigned int cc);
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float, float threshold);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&, float threshold, float error);
@@ -128,7 +129,7 @@ private:
     std::vector<float> cummin(std::vector<float>& in, unsigned int pos);
 
     std::vector<UEdge> blockPath(UEdge, unsigned int, unsigned int cc);
-    std::pair<std::vector<UEdge>, std::vector<float>> find_paths(unsigned int cc);
+    std::pair<std::vector<UEdge>, std::vector<float>> find_paths(unsigned int cc, bool two_strain);
     std::pair<UEdge, bool> checkUnvisitedEdges(UEdge, unsigned int cc);
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int cc);
     float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int, unsigned int, unsigned int cc);
@@ -156,6 +157,7 @@ private:
 	std::vector<std::unordered_map<unsigned int, UVertex>> graph_map_;
 
     std::vector<float> thresholds_; // TODO
+    std::string logfile_;
 	
 };
 
