@@ -79,7 +79,7 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 		else if (next_read)
 		{
 			next_read = false;
-			if (line.length() >= k_ and line.find_first_not_of("ACGT") == std::string::npos)
+			if (line.length() > k_ and line.find_first_not_of("ACGT") == std::string::npos)
 			{
 				split_read(line);
 				i++;
