@@ -79,13 +79,11 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 		else if (next_read)
 		{
 			next_read = false;
-			if (line.length() >= k_ and line.find_first_not_of("ACGT") == std::string::npos)
+			if (line.length() > k_ and line.find_first_not_of("ACGT") == std::string::npos)
 			{
 				split_read(line);
 				i++;
 			}
-			//else 
-			//	std::cerr << "Read length less than k, skipping" << std::endl; 
 		}
 	}
 }
@@ -278,7 +276,6 @@ unsigned int deBruijnGraph::split_ccs()
             auto members = dfs(s, cc++);
         }
     }
-    std::cerr << cc << " total connected components" << std::endl;
     return cc;
 }
     
@@ -322,9 +319,11 @@ std::vector<const Sequence*> deBruijnGraph::dfs(Sequence& s, unsigned int cc)
             nextV = getVertex(next);
             if (nextV == 0)
             {
+                std::cerr << "Graph might be corrupt. DEBUG INFO: " << std::endl;
                 std::cerr << (reverse ? "reverse" : "not reverse") << std::endl;
                 v->print(true);
                 std::cerr << next << " not in graph" << std::endl;
+                continue;
             }
             else if (nextV->cc != 0)
             {
@@ -346,9 +345,12 @@ std::vector<const Sequence*> deBruijnGraph::dfs(Sequence& s, unsigned int cc)
             nextV = getVertex(next);
             if (nextV == 0)
             {
+                std::cerr << "Graph might be corrupt. DEBUG INFO: " << std::endl;
+                std::cerr << (reverse ? "reverse" : "not reverse") << std::endl;
                 std::cerr << (reverse ? "reverse" : "not reverse") << std::endl;
                 v->print(true);
                 std::cerr << next << " not in graph" << std::endl;
+                continue;
             }
             else if (nextV->cc != 0)
             {

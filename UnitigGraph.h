@@ -26,8 +26,6 @@ struct Capacity {
     float max;
     float avg;
     float length;
-    float starting;
-    float ending;
     friend std::ostream& operator<<(std::ostream& os, const Capacity& cap)
     {
         return os << "(" << cap.avg << ", " << cap.first << "/" << cap.last << ", (length: " << cap.length << "), (min: " << cap.min << ", max: " << cap.max << ")";
@@ -75,8 +73,8 @@ struct EdgeProperties {
     float capacity;
     float residual_capacity;
     Capacity cap_info;
+    Capacity residual_cap_info;
     bool visited;
-    bool first_vertex;
     std::vector<unsigned int> visits;
     Visits v; //DEBUG ONLY
     unsigned int last_visit;
@@ -102,56 +100,64 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&, float); // TODO delete dBg after UnitigGraph creation?
+	UnitigGraph(deBruijnGraph&, std::string, std::string, float); // TODO delete dBg after UnitigGraph creation?
 	UnitigGraph(); // debug
+    ~UnitigGraph();
 	void debug(); // debug information
-    void assemble(std::string);
-    void printGraph(std::ostream&);
-    void dijkstra(UEdge seed, bool residual);
+    void assemble(std::string, float err, std::string contigs, bool two_strain);
+    void printGraph(std::ostream&, unsigned int cc);
+    void dijkstra(UEdge seed, bool residual, bool local, unsigned int cc);
+    std::vector<UEdge> greedy(UEdge seed, bool residual, bool local, unsigned int cc);
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float, float threshold);
-	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&, float threshold);
+	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&, float threshold, float error);
 	std::pair<Vertex*,std::string> buildEdge(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float, float threshold);
 	std::pair<Vertex*,std::string> buildEdgeReverse(UVertex, Vertex*, std::string, std::string&, unsigned int*, float, float, deBruijnGraph&, float, float threshold);
 	UVertex addVertex(unsigned int*, std::string name, unsigned int ccc);
-    std::vector<UEdge> get_sources();
+    std::vector<UEdge> get_sources(unsigned int cc);
 
-    std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&);
-    void reduce_flow(std::vector<UEdge>&, float, std::vector<float>&, std::set<unsigned int>&);
-	std::vector<UEdge> find_fattest_path(UEdge seed);
-    std::vector<UEdge> fixFlow(UEdge);
+    std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&, unsigned int cc);
+    float reduce_flow(std::vector<UEdge>&, std::set<unsigned int>&, unsigned int cc, bool init);
+	std::vector<UEdge> find_fattest_path(UEdge seed, unsigned int cc);
+    std::vector<UEdge> fixFlow(UEdge, unsigned int cc);
     
 	//UEdge getSeed() const;
-	std::vector<float> calculate_thresholds(deBruijnGraph&, float);
+	std::vector<float> calculate_thresholds(deBruijnGraph&, std::string, float);
+    std::vector<float> get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string, float);
+    std::pair<float, float> finite_difference(std::vector<float>);
     std::vector<float> rolling(std::vector<float>& in, unsigned int len);
-    std::vector<float> cummin(std::vector<float>& in);
+    std::vector<float> cummin(std::vector<float>& in, unsigned int pos);
 
-    std::vector<UEdge> blockPath(UEdge, unsigned int);
-    std::vector<float> find_paths();
-    std::pair<UEdge, bool> checkUnvisitedEdges(UEdge);
-    std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int);
-    float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int, unsigned int);
-    std::pair<UEdge, float> get_target(UEdge, bool);
-    UEdge get_next_source();
+    std::vector<UEdge> blockPath(UEdge, unsigned int, unsigned int cc);
+    std::pair<std::vector<UEdge>, std::vector<float>> find_paths(unsigned int cc, bool two_strain);
+    std::pair<UEdge, bool> checkUnvisitedEdges(UEdge, unsigned int cc);
+    std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int cc);
+    float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int, unsigned int, unsigned int cc);
+    std::pair<UEdge, float> get_target(UEdge, bool, unsigned int cc);
+    UEdge get_next_source(unsigned int cc);
     
-    void cleanPath(std::vector<UEdge>&);
-    void cleanGraph();
-	void removeStableSets();
-	void contractPaths();
-    void removeEmpty();
-    bool hasRelevance();
-    void unvisit();
+    void cleanPath(std::vector<UEdge>&, std::vector<UEdge>&, unsigned int cc);
+    void cleanGraph(unsigned int cc, float err);
+	void removeStableSets(unsigned int cc);
+	void removeShortPaths(unsigned int cc);
+	void contractPaths(unsigned int cc);
+    void removeLow_cutEnds(unsigned int cc, float error_rate);
+    bool hasRelevance(unsigned int cc);
+    void unvisit(unsigned int cc);
 
-    float in_capacity(UVertex);
-    float out_capacity(UVertex);
+    float in_capacity(UVertex, unsigned int cc);
+    float out_capacity(UVertex, unsigned int cc);
 
 	bool test_hypothesis(float to_test_num, float to_test_denom, float h0, float threshold);
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
-	UGraph g_;
-	std::unordered_map<unsigned int, UVertex> graph_;
+    unsigned int k_;
+    unsigned int read_length_;
+	std::vector<UGraph*> graphs_;
+	std::vector<std::unordered_map<unsigned int, UVertex>> graph_map_;
 
     std::vector<float> thresholds_; // TODO
+    std::string logfile_;
 	
 };
 
