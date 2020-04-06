@@ -21,7 +21,7 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate) : cc_(1), logfile_(log)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate, bool strict) : cc_(1), logfile_(log)
 {
     std::ofstream l;
     l.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -34,7 +34,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, flo
 	unsigned int index = 1;
 	auto&& out_unbalanced = junc.first;
 	auto&& in_unbalanced = junc.second;
-    auto&& thresholds = calculate_thresholds(dbg, p, error_rate);
+    auto&& thresholds = calculate_thresholds(dbg, p, strict);
     thresholds_ = thresholds;
     graph_map_.resize(thresholds.size());
     graphs_.resize(thresholds.size());
@@ -95,7 +95,7 @@ UnitigGraph::~UnitigGraph()
     }
 }
 
-std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, float error_rate)
+std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, bool strict)
 {
     std::ofstream log;
     log.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -113,10 +113,10 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
     log.open(logfile_, std::ofstream::out | std::ofstream::app);
     log << "Calculating coverage distribution took " << (clock() - t)/1000000. << " seconds" << std::endl;
     log.close();
-    return get_thresholds(cov_distr, path, error_rate);
+    return get_thresholds(cov_distr, path, strict);
 }
 
-std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path, float error_rate)
+std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path, bool strict)
 {
     std::vector<float> thresholds;
     unsigned int i = 0;

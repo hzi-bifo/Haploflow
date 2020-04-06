@@ -16,6 +16,7 @@ int main (int argc, char* argv[])
     float e;
     std::string create_dump;
     std::string from_dump;
+    bool strict;
     bool two_strain;
     desc.add_options()
         ("help", "Produce this help message")
@@ -28,6 +29,7 @@ int main (int argc, char* argv[])
         ("create-dump", go::value<std::string>(&create_dump), "create dump of the deBruijn graph. WARNING: This file may be huge")
         ("from-dump", go::value<std::string>(&from_dump), "run from a Haploflow dump of the deBruijn graph.")
         ("two-strain, 2", go::value<bool>(&two_strain)->default_value(false), "mode for known two-strain mixtures")
+        ("strict, S", go::value<bool>(&strict)->default_value(true), "more strict error correction, should be set to true in first run on new data set to reduce run time. Set to false if low abundant strains are expected to be present")
     ;
     go::positional_options_description p;
     p.add("read-file", -1);
@@ -69,7 +71,7 @@ int main (int argc, char* argv[])
     logfile << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
     logfile.close();
     t = clock();
-    UnitigGraph ug = UnitigGraph(*dbg, g, log, e); //argv[2] is k
+    UnitigGraph ug = UnitigGraph(*dbg, g, log, e, strict); //argv[2] is k
     delete dbg;
     //t = clock();
     logfile.open(log, std::ofstream::out | std::ofstream::app);
