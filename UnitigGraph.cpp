@@ -1728,7 +1728,7 @@ void UnitigGraph::assemble(std::string fname, float error_rate, std::string cont
             if (contig.first.size() > 150)
             {
                 std::ofstream c;
-                c.open(contigs);
+                c.open(contigs, std::ofstream::out | std::ofstream::app);
                 c << ">Contig_" << i << "_flow_" << contig.second << "_cc_" << cc << std::endl;
                 c << contig.first << std::endl;
                 c.close();
