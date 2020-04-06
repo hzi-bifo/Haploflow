@@ -140,8 +140,9 @@ private:
     void cleanGraph(unsigned int cc, float err);
 	void removeStableSets(unsigned int cc);
 	void removeShortPaths(unsigned int cc);
+	void removeEmpty(unsigned int cc);
 	void contractPaths(unsigned int cc);
-    void removeLow_cutEnds(unsigned int cc, float error_rate);
+    void removeLowEdges(unsigned int cc, float error_rate);
     bool hasRelevance(unsigned int cc);
     void unvisit(unsigned int cc);
 
