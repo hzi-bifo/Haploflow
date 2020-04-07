@@ -145,18 +145,35 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             thresholds.push_back(std::numeric_limits<float>::max()); // skip graph in creation
             continue;
         }
-        auto diffs = finite_difference(sorted_coverage);
-        float turning_point = diffs.first; 
-        float inflexion_point = diffs.second; 
-        if (inflexion_point > 1 and turning_point > 1)
+        if (!strict)
         {
-            std::ofstream log;
-            log.open(logfile_, std::ofstream::out | std::ofstream::app);
-            log << "Graph " << i << " threshold set to " << std::max(1.f, std::min(turning_point, inflexion_point)) << std::endl;
-            log.close();
+            auto diffs = finite_difference(sorted_coverage);
+            float turning_point = diffs.first; 
+            float inflexion_point = diffs.second; 
+            if (inflexion_point > 1 and turning_point > 1)
+            {
+                std::ofstream log;
+                log.open(logfile_, std::ofstream::out | std::ofstream::app);
+                log << "Graph " << i << " threshold set to " << std::max(1.f, std::min(turning_point, inflexion_point)) << std::endl;
+                log.close();
+            }
+            thresholds.push_back(std::max(1.f, std::min(turning_point, inflexion_point))); // the threshold should never be less than 1
+            i++;
         }
-        thresholds.push_back(std::max(1.f, std::min(turning_point, inflexion_point))); // the threshold should never be less than 1
-        i++;
+        else
+        {
+            unsigned int pos = 0;
+            for (auto& j : sorted_coverage)
+            {
+                if (pos > 0 and sorted_coverage[pos - 1] < j)
+                {
+                    break;
+                }
+                pos++;
+            }
+            thresholds.push_back(float(pos - 1));
+            i++;
+        }
     }
     return thresholds;
 }
