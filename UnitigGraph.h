@@ -100,7 +100,7 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&, std::string, std::string, float, bool); // TODO delete dBg after UnitigGraph creation?
+	UnitigGraph(deBruijnGraph&, std::string, std::string, float, bool, unsigned int); // TODO delete dBg after UnitigGraph creation?
 	UnitigGraph(); // debug
     ~UnitigGraph();
 	void debug(); // debug information
@@ -153,12 +153,12 @@ private:
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
     unsigned int k_;
-    unsigned int read_length_;
 	std::vector<UGraph*> graphs_;
 	std::vector<std::unordered_map<unsigned int, UVertex>> graph_map_;
 
     std::vector<float> thresholds_; // TODO
     std::string logfile_;
+    unsigned int filter_length_;
 	
 };
 

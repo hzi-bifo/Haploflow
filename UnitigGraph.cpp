@@ -21,7 +21,7 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate, bool strict) : cc_(1), logfile_(log)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate, bool strict, unsigned int filter) : cc_(1), logfile_(log), filter_length_(filter)
 {
     std::ofstream l;
     l.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -1742,7 +1742,7 @@ void UnitigGraph::assemble(std::string fname, float error_rate, std::string cont
             log << "Calculating contig " << i << "..." << std::endl;
             log.close();
             auto contig = calculate_contigs(path, all_paths, cc);
-            if (contig.first.size() > 150)
+            if (contig.first.size() > filter_length_)
             {
                 std::ofstream c;
                 c.open(contigs, std::ofstream::out | std::ofstream::app);

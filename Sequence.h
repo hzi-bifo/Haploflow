@@ -1,3 +1,4 @@
+#include <string>
 #include <algorithm>
 #include "nthash.hpp"
 
