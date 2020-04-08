@@ -21,7 +21,7 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate, bool strict, unsigned int filter) : cc_(1), logfile_(log), filter_length_(filter)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate, unsigned int strict, unsigned int filter) : cc_(1), logfile_(log), filter_length_(filter)
 {
     std::ofstream l;
     l.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -95,7 +95,7 @@ UnitigGraph::~UnitigGraph()
     }
 }
 
-std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, bool strict)
+std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, unsigned int strict)
 {
     std::ofstream log;
     log.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -116,7 +116,7 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
     return get_thresholds(cov_distr, path, strict);
 }
 
-std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path, bool strict)
+std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path, unsigned int strict)
 {
     std::vector<float> thresholds;
     unsigned int i = 0;
@@ -145,7 +145,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             thresholds.push_back(std::numeric_limits<float>::max()); // skip graph in creation
             continue;
         }
-        if (!strict)
+        if (strict == 0)
         {
             auto diffs = finite_difference(sorted_coverage);
             float turning_point = diffs.first; 
@@ -162,7 +162,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
         }
         else
         {
-            if (false)
+            if (strict == 1)
             {
                 unsigned int pos = 0;
                 for (auto& j : sorted_coverage)

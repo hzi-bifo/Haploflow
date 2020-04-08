@@ -16,7 +16,7 @@ int main (int argc, char* argv[])
     float e;
     std::string create_dump;
     std::string from_dump;
-    bool strict;
+    unsigned int strict;
     bool two_strain;
     unsigned int filter;
     desc.add_options()
@@ -30,7 +30,7 @@ int main (int argc, char* argv[])
         ("create-dump", go::value<std::string>(&create_dump), "create dump of the deBruijn graph. WARNING: This file may be huge")
         ("from-dump", go::value<std::string>(&from_dump), "run from a Haploflow dump of the deBruijn graph.")
         ("two-strain, 2", go::value<bool>(&two_strain)->default_value(false), "mode for known two-strain mixtures")
-        ("strict, S", go::value<bool>(&strict)->default_value(true), "more strict error correction, should be set to true in first run on new data set to reduce run time. Set to false if low abundant strains are expected to be present")
+        ("strict, S", go::value<unsigned int>(&strict)->default_value(1), "more strict error correction, should be set to 5 in first run on new data set to reduce run time. Set to 0 if low abundant strains are expected to be present")
         ("filter, f", go::value<unsigned int>(&filter)->default_value(500), "filter contigs shorter than value")
     ;
     go::positional_options_description p;
@@ -44,8 +44,8 @@ int main (int argc, char* argv[])
         return 0;
     }
     std::string out = o;
-    std::string g = o + "/Coverages/";
-    std::string cov = o + "/Graphs/";
+    std::string cov = o + "/Coverages/";
+    std::string g = o + "/Graphs/";
     std::string contigs = o + "/contigs.fa";
     if (!boost::filesystem::exists(out))
         boost::filesystem::create_directory(o);
@@ -73,7 +73,7 @@ int main (int argc, char* argv[])
     logfile << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
     logfile.close();
     t = clock();
-    UnitigGraph ug = UnitigGraph(*dbg, g, log, e, strict, filter); //argv[2] is k
+    UnitigGraph ug = UnitigGraph(*dbg, cov, log, e, strict, filter); //argv[2] is k
     delete dbg;
     //t = clock();
     logfile.open(log, std::ofstream::out | std::ofstream::app);
