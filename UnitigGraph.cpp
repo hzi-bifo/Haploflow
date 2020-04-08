@@ -162,21 +162,43 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
         }
         else
         {
-            unsigned int pos = 0;
-            for (auto& j : sorted_coverage)
+            if (false)
             {
-                if (pos > 0 and sorted_coverage[pos - 1] < j)
+                unsigned int pos = 0;
+                for (auto& j : sorted_coverage)
                 {
-                    break;
+                    if (pos > 0 and sorted_coverage[pos - 1] < j)
+                    {
+                        break;
+                    }
+                    pos++;
                 }
-                pos++;
+                std::ofstream log;
+                log.open(logfile_, std::ofstream::out | std::ofstream::app);
+                log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
+                log.close();
+                thresholds.push_back(float(pos - 1));
+                i++;
             }
-            std::ofstream log;
-            log.open(logfile_, std::ofstream::out | std::ofstream::app);
-            log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
-            log.close();
-            thresholds.push_back(float(pos - 1));
-            i++;
+            else
+            {
+                auto&& window = rolling(sorted_coverage, 3);
+                int pos = 0;
+                for (auto& v : window)
+                {
+                    if (!isnan(v) and window[pos - 1] < v)
+                    {
+                        break;
+                    }
+                    pos++;
+                }
+                std::ofstream log;
+                log.open(logfile_, std::ofstream::out | std::ofstream::app);
+                log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
+                log.close();
+                thresholds.push_back(float(pos - 1));
+                i++;
+            }
         }
     }
     return thresholds;
