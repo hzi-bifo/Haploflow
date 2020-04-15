@@ -174,9 +174,12 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                     pos++;
                 }
                 std::ofstream log;
-                log.open(logfile_, std::ofstream::out | std::ofstream::app);
-                log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
-                log.close();
+                if (pos > 1)
+                {
+                    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+                    log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
+                    log.close();
+                }
                 thresholds.push_back(float(pos - 1));
                 i++;
             }
@@ -193,9 +196,12 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                     pos++;
                 }
                 std::ofstream log;
-                log.open(logfile_, std::ofstream::out | std::ofstream::app);
-                log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
-                log.close();
+                if (pos > 1)
+                {
+                    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+                    log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
+                    log.close();
+                }
                 thresholds.push_back(float(pos - 1));
                 i++;
             }
