@@ -21,7 +21,7 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate, unsigned int strict, unsigned int filter) : cc_(1), logfile_(log), filter_length_(filter)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate, unsigned int strict, unsigned int filter, int thresh) : cc_(1), logfile_(log), filter_length_(filter), thresh_(thresh)
 {
     std::ofstream l;
     l.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -113,7 +113,17 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
     log.open(logfile_, std::ofstream::out | std::ofstream::app);
     log << "Calculating coverage distribution took " << (clock() - t)/1000000. << " seconds" << std::endl;
     log.close();
-    return get_thresholds(cov_distr, path, strict);
+    if (thresh_ < 0)
+        return get_thresholds(cov_distr, path, strict);
+    else
+    {
+        std::vector<float> thresholds;
+        for (auto& cov : cov_distr)
+        {
+            thresholds.push_back(thresh_);
+        }
+        return thresholds;
+    }
 }
 
 std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path, unsigned int strict)

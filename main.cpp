@@ -19,6 +19,7 @@ int main (int argc, char* argv[])
     unsigned int strict;
     bool two_strain;
     unsigned int filter;
+    int thresh;
     desc.add_options()
         ("help", "Produce this help message")
         ("read-file, R", go::value<std::string>(&reads), "read file (fastq)")
@@ -32,6 +33,7 @@ int main (int argc, char* argv[])
         ("two-strain, 2", go::value<bool>(&two_strain)->default_value(false), "mode for known two-strain mixtures")
         ("strict, S", go::value<unsigned int>(&strict)->default_value(1), "more strict error correction, should be set to 5 in first run on new data set to reduce run time. Set to 0 if low abundant strains are expected to be present")
         ("filter, f", go::value<unsigned int>(&filter)->default_value(500), "filter contigs shorter than value")
+        ("thresh, t", go::value<int>(&thresh)->default_value(-1), "Provide a custom threshold for complex/bad data")
     ;
     go::positional_options_description p;
     p.add("read-file", -1);
@@ -73,7 +75,7 @@ int main (int argc, char* argv[])
     logfile << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
     logfile.close();
     t = clock();
-    UnitigGraph ug = UnitigGraph(*dbg, cov, log, e, strict, filter); //argv[2] is k
+    UnitigGraph ug = UnitigGraph(*dbg, cov, log, e, strict, filter, thresh); //argv[2] is k
     delete dbg;
     //t = clock();
     logfile.open(log, std::ofstream::out | std::ofstream::app);

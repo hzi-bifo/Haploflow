@@ -100,7 +100,7 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&, std::string, std::string, float, unsigned int, unsigned int); 
+	UnitigGraph(deBruijnGraph&, std::string, std::string, float, unsigned int, unsigned int, int); 
 	UnitigGraph(); // debug
     ~UnitigGraph();
 	void debug(); // debug information
@@ -159,6 +159,7 @@ private:
     std::vector<float> thresholds_; // TODO
     std::string logfile_;
     unsigned int filter_length_;
+    int thresh_;
 	
 };
 
