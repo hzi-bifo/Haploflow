@@ -195,7 +195,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             }
             else
             {
-                auto&& window = rolling(sorted_coverage, 3);
+                auto&& window = rolling(sorted_coverage, strict);
                 int pos = 0;
                 for (auto& v : window)
                 {
