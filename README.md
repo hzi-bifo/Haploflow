@@ -2,9 +2,10 @@
 Haploflow is a strain-aware viral genome assembler for short read sequence data. 
 It uses a flow algorithm on a deBruijn graph data structure to resolve viral strains. Haploflow is still actively under development and release 0.1 is freely available under the 
 _license_. It is written entirely in C++ and currently works on UNIX systems.\
-This README lists the requirements, installation information and a short tutorial on how to use Haploflow and its parameters. If using Haploflow, please cite
+This README lists the requirements, installation information and a short tutorial on how to use Haploflow and its parameters. 
 
-A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A. Dilthey, A.C. McHardy, "ploflow: strain-resolved viral genome assembly with applications to SARS-CoV-2 and HCMV", DOI to come 
+If using Haploflow, please cite:
+A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A. Dilthey, A.C. McHardy, "Haploflow: strain-resolved viral genome assembly with applications to SARS-CoV-2 and HCMV", DOI to come 
 
 ## Requirements
  - CMake >= 2.8
