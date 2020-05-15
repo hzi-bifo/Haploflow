@@ -11,7 +11,7 @@ A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A.
  - CMake >= 2.8
  - Boost >= 1.54
  
-## Installation
+## Build
 First, clone this repository using `git clone` _address_, then enter the directory which you cloned Haploflow to and create a build folder,
 e.g. `mkdir build`. Enter this new directory and run cmake with `cd build; cmake ..`. This will create a Makefile which you can then run
 to create the Haploflow executable: `make`. This should create a `haploflow` executable in your build directory.
