@@ -1,7 +1,6 @@
 ## About Haploflow
-Haploflow is a strain-aware viral genome assembler for clinical virus data. 
-It uses a flow algorithm on a deBruijn graph data structure to resolve all present viral strains which is particularily useful if
-a multi-strain infection is suspected. Haploflow is still actively under development and release 0.1 is freely available under the 
+Haploflow is a strain-aware viral genome assembler from short read sequence data. 
+It uses a flow algorithm on a deBruijn graph data structure to resolve viral strains. Haploflow is still actively under development and release 0.1 is freely available under the 
 _license_. It was written entirely in C++ and currently only works on UNIX systems.\
 This README lists the requirements, installation information and a short tutorial on how to use Haploflow and its parameters.
 
@@ -50,17 +49,16 @@ HaploFlow parameters:
 
 The input reads are given with the `--read-file` option and the output directory with `--out`, which are the only required options. 
 Haploflow will then run with default parameters.\
-The most important other parameters are `k`, the *k*-mer size of the deBruijn graph. This is 41 by default, inreasing this value might
-improve assembly but only for large read sizes or very deep sequencing runs.
-`error-rate` is the next parameter which determines a lower bound of coverage or detection limit of different strains and 
-is a percentage value. By default this value is `0.02` because Illumina data is expected to have less than 2% errors. 
-Setting this value too low can cause Haploflow to run far slower, setting it too high will prevent Haploflow from finding lower abundant
+The most important other parameters are `k`, the *k*-mer size of the deBruijn graph. This is 41 by default, increasing this value might
+improve assembly for large read lengths or very deep sequencing runs.
+`error-rate` is the next parameter, which determines a lower bound of coverage or detection limit of different strains and 
+is a percentage value. By default this value is set to `0.02`, because Illumina data is expected to have less than 2% errors. 
+Setting this value too low can cause Haploflow to run far slower; setting it too high will prevent Haploflow from finding lower abundant
 strains.\
-The `strict` parameter is complementary in the sense that it determines a overall lower bound for read coverage. Setting it to `-1` 
-imposes no constraints, `0` will use the inflection point of the coverage histogram and every value `≥1` will use a sliding window
-over the coverage histogram to determine the lower bound.\
-Finally, the last error correction parameter is `thresh`: It is mutually exclusive with the `strict` parameter and will overwrite its
+The `strict` parameter is complementary in the sense that it determines an overall lower bound for read coverage. Setting it to `-1` 
+imposes no constraints, `0` will use the inflection point of the coverage histogram and every value `≥1` will result in use of a sliding window over the coverage histogram to determine the lower bound.\
+Finally, the last error correction parameter is `thresh`: it is mutually exclusive with the `strict` parameter and will overwrite its
 value if set. This parameter sets a fixed threshold below which *k*-mers are ignored.
-Finally, Haploflow by default filters contigs shorter than 500bp, this value can be changed using the `filter` option. 
+Finally, Haploflow by default filters contigs shorter than 500 bp. This value can be changed using the `filter` option. 
 The parameters `create-dump`, `from-dump` and `dump-file` are just needed if the deBruijn graph is supposed to be written to a file to be
 reused in another run. This file is possibly huge (because uncompressed), so use with caution.
