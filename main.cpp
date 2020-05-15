@@ -40,7 +40,7 @@ int main (int argc, char* argv[])
     go::variables_map vm;
     go::store(go::parse_command_line(argc, argv, desc), vm);
     go::notify(vm);
-    if (vm.count("help"))
+    if (vm.count("help") || argc == 1)
     {
         std::cout << desc << std::endl;
         return 0;

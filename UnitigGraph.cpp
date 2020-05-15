@@ -934,9 +934,6 @@ float UnitigGraph::out_capacity(UVertex target, unsigned int cc)
 std::vector<UEdge> UnitigGraph::greedy(UEdge seed, bool init, bool local, unsigned int cc)
 {
     UGraph* g_ = graphs_.at(cc);
-    auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest fatness
-        return (*g_)[e1].fatness < (*g_)[e2].fatness;
-    };
     std::vector<UEdge> path = {seed};
     (*g_)[seed].visited = true;
     while (true)
@@ -1840,11 +1837,9 @@ void UnitigGraph::cleanPath(std::vector<UEdge>& path, std::vector<UEdge>& seeds,
             seeds.erase(std::remove(seeds.begin(), seeds.end(), e), seeds.end()); // dont use deleted edge as seed
         }
     }
-    UVertex last;
     for (auto&& e : toDelete)
     {
         auto source = boost::source(e, *g_);
-        last = boost::target(e, *g_);
         boost::remove_edge(e, *g_);
 		unsigned int indegree = boost::in_degree(source, *g_);
 		unsigned int outdegree = boost::out_degree(source,*g_);

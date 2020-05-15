@@ -1,4 +1,4 @@
-project(ADBA)
+project(Haploflow)
 
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
@@ -18,7 +18,7 @@ set(COMPILER_FLAGS
 	"-ggdb -Wall -L/usr/include -I/usr/include -std=c++0x -pipe -Wno-deprecated -pedantic"
 )
 
-add_executable(adba
+add_executable(haploflow
 	main.cpp
 	deBruijnGraph.h
 	deBruijnGraph.cpp
@@ -30,8 +30,8 @@ add_executable(adba
 	UnitigGraph.cpp
 )
 
-set_target_properties(adba PROPERTIES
+set_target_properties(haploflow PROPERTIES
 	COMPILE_FLAGS ${COMPILER_FLAGS}
 )
 
-target_link_libraries(adba ${Boost_LIBRARIES})
+target_link_libraries(haploflow ${Boost_LIBRARIES})
