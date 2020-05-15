@@ -7,15 +7,21 @@ This README lists the requirements, installation information and a short tutoria
 If using Haploflow, please cite:
 A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A. Dilthey, A.C. McHardy, "Haploflow: strain-resolved viral genome assembly with applications to SARS-CoV-2 and HCMV", DOI to come 
 
-## Requirements
+## Build requirements
  - CMake >= 2.8
- - Boost >= 1.55
+ - Boost >= 1.54
  
 ## Installation
 First, clone this repository using `git clone` _address_, then enter the directory which you cloned Haploflow to and create a build folder,
 e.g. `mkdir build`. Enter this new directory and run cmake with `cd build; cmake ..`. This will create a Makefile which you can then run
-to create the Haploflow executable: `make`
-This should create a `haploflow` executable in your build directory.
+to create the Haploflow executable: `make`. This should create a `haploflow` executable in your build directory.
+When building on Ubuntu >= 14.04, build.sh will perform these steps, build a manpage and produce a tar file as build/haploflow.tar.gz
+
+## Installation
+The haploflow executable can be directly executed. If using the haploflow.tar.gz file, it can be unpacked (with tar xvf haploflow.tar.gz) 
+to / as user root, which will install the executable and man page in locations which should already be in the path / manpath. The tar.gz 
+file can also be unpacked to any other location (eg. home dir) and the executable run from that location.
+
 
 ## Short tutorial
 Using the executable you can show the help and parameters using `./haploflow --help`. This lists the parameters as follows:
