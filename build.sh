@@ -14,6 +14,7 @@ make
 sudo cp haploflow /usr/local/bin
 
 cd ..
+ln -sf README.md haploflow.md
 ronn -r --pipe haploflow.md > haploflow.1
 mkdir -p /usr/local/man/man1
 sudo cp haploflow.1 /usr/local/man/man1
