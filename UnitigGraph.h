@@ -100,7 +100,7 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&, std::string, std::string, float); // TODO delete dBg after UnitigGraph creation?
+	UnitigGraph(deBruijnGraph&, std::string, std::string, float, unsigned int, unsigned int, int); 
 	UnitigGraph(); // debug
     ~UnitigGraph();
 	void debug(); // debug information
@@ -122,8 +122,8 @@ private:
     std::vector<UEdge> fixFlow(UEdge, unsigned int cc);
     
 	//UEdge getSeed() const;
-	std::vector<float> calculate_thresholds(deBruijnGraph&, std::string, float);
-    std::vector<float> get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string, float);
+	std::vector<float> calculate_thresholds(deBruijnGraph&, std::string, unsigned int);
+    std::vector<float> get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string, unsigned int);
     std::pair<float, float> finite_difference(std::vector<float>);
     std::vector<float> rolling(std::vector<float>& in, unsigned int len);
     std::vector<float> cummin(std::vector<float>& in, unsigned int pos);
@@ -153,12 +153,13 @@ private:
 
 	unsigned int cc_; // used to mark the CC's. Since some of them might be deleted later on, does not represent the number of cc's
     unsigned int k_;
-    unsigned int read_length_;
 	std::vector<UGraph*> graphs_;
 	std::vector<std::unordered_map<unsigned int, UVertex>> graph_map_;
 
     std::vector<float> thresholds_; // TODO
     std::string logfile_;
+    unsigned int filter_length_;
+    int thresh_;
 	
 };
 

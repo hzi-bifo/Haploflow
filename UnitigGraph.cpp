@@ -21,7 +21,7 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate) : cc_(1), logfile_(log)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate, unsigned int strict, unsigned int filter, int thresh) : cc_(1), logfile_(log), filter_length_(filter), thresh_(thresh)
 {
     std::ofstream l;
     l.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -34,7 +34,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, flo
 	unsigned int index = 1;
 	auto&& out_unbalanced = junc.first;
 	auto&& in_unbalanced = junc.second;
-    auto&& thresholds = calculate_thresholds(dbg, p, error_rate);
+    auto&& thresholds = calculate_thresholds(dbg, p, strict);
     thresholds_ = thresholds;
     graph_map_.resize(thresholds.size());
     graphs_.resize(thresholds.size());
@@ -95,7 +95,7 @@ UnitigGraph::~UnitigGraph()
     }
 }
 
-std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, float error_rate)
+std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, unsigned int strict)
 {
     std::ofstream log;
     log.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -113,10 +113,20 @@ std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::st
     log.open(logfile_, std::ofstream::out | std::ofstream::app);
     log << "Calculating coverage distribution took " << (clock() - t)/1000000. << " seconds" << std::endl;
     log.close();
-    return get_thresholds(cov_distr, path, error_rate);
+    if (thresh_ < 0)
+        return get_thresholds(cov_distr, path, strict);
+    else
+    {
+        std::vector<float> thresholds;
+        for (auto& cov : cov_distr)
+        {
+            thresholds.push_back(thresh_);
+        }
+        return thresholds;
+    }
 }
 
-std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path, float error_rate)
+std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int, unsigned int>>& cov_distr, std::string path, unsigned int strict)
 {
     std::vector<float> thresholds;
     unsigned int i = 0;
@@ -145,18 +155,67 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             thresholds.push_back(std::numeric_limits<float>::max()); // skip graph in creation
             continue;
         }
-        auto diffs = finite_difference(sorted_coverage);
-        float turning_point = diffs.first; 
-        float inflexion_point = diffs.second; 
-        if (inflexion_point > 1 and turning_point > 1)
+        if (strict == 0)
         {
-            std::ofstream log;
-            log.open(logfile_, std::ofstream::out | std::ofstream::app);
-            log << "Graph " << i << " threshold set to " << std::max(1.f, std::min(turning_point, inflexion_point)) << std::endl;
-            log.close();
+            auto diffs = finite_difference(sorted_coverage);
+            float turning_point = diffs.first; 
+            float inflexion_point = diffs.second; 
+            if (inflexion_point > 1 and turning_point > 1)
+            {
+                std::ofstream log;
+                log.open(logfile_, std::ofstream::out | std::ofstream::app);
+                log << "Graph " << i << " threshold set to " << std::max(1.f, std::min(turning_point, inflexion_point)) << std::endl;
+                log.close();
+            }
+            thresholds.push_back(std::max(1.f, std::min(turning_point, inflexion_point))); // the threshold should never be less than 1
+            i++;
         }
-        thresholds.push_back(std::max(1.f, std::min(turning_point, inflexion_point))); // the threshold should never be less than 1
-        i++;
+        else
+        {
+            if (strict == 1)
+            {
+                unsigned int pos = 0;
+                for (auto& j : sorted_coverage)
+                {
+                    if (pos > 0 and sorted_coverage[pos - 1] < j)
+                    {
+                        break;
+                    }
+                    pos++;
+                }
+                std::ofstream log;
+                if (pos > 1)
+                {
+                    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+                    log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
+                    log.close();
+                }
+                thresholds.push_back(float(pos - 1));
+                i++;
+            }
+            else
+            {
+                auto&& window = rolling(sorted_coverage, strict);
+                int pos = 0;
+                for (auto& v : window)
+                {
+                    if (!isnan(v) and window[pos - 1] < v)
+                    {
+                        break;
+                    }
+                    pos++;
+                }
+                std::ofstream log;
+                if (pos > 1)
+                {
+                    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+                    log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
+                    log.close();
+                }
+                thresholds.push_back(float(pos - 1));
+                i++;
+            }
+        }
     }
     return thresholds;
 }
@@ -1725,7 +1784,7 @@ void UnitigGraph::assemble(std::string fname, float error_rate, std::string cont
             log << "Calculating contig " << i << "..." << std::endl;
             log.close();
             auto contig = calculate_contigs(path, all_paths, cc);
-            if (contig.first.size() > 150)
+            if (contig.first.size() > filter_length_)
             {
                 std::ofstream c;
                 c.open(contigs, std::ofstream::out | std::ofstream::app);
