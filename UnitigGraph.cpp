@@ -155,7 +155,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             thresholds.push_back(std::numeric_limits<float>::max()); // skip graph in creation
             continue;
         }
-        if (strict == 0)
+        if (strict == 0) // get minimum of inflection and turning point of cov hist
         {
             auto diffs = finite_difference(sorted_coverage);
             float turning_point = diffs.first; 
@@ -172,7 +172,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
         }
         else
         {
-            if (strict == 1)
+            if (strict == 1) // first decreasing position in cov hist
             {
                 unsigned int pos = 0;
                 for (auto& j : sorted_coverage)
@@ -184,7 +184,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                     pos++;
                 }
                 std::ofstream log;
-                if (pos > 1)
+                if (pos > 2) // only log >1 
                 {
                     log.open(logfile_, std::ofstream::out | std::ofstream::app);
                     log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
@@ -193,7 +193,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                 thresholds.push_back(float(pos - 1));
                 i++;
             }
-            else
+            else // else decreasing rolling window of size "strict"
             {
                 auto&& window = rolling(sorted_coverage, strict);
                 int pos = 0;
@@ -206,7 +206,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                     pos++;
                 }
                 std::ofstream log;
-                if (pos > 1)
+                if (pos > 2)
                 {
                     log.open(logfile_, std::ofstream::out | std::ofstream::app);
                     log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
