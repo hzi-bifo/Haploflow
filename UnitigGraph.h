@@ -102,6 +102,7 @@ public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
 	UnitigGraph(deBruijnGraph&, std::string, std::string, float, unsigned int, unsigned int, int); 
 	UnitigGraph(); // debug
+	UnitigGraph(std::string filename, std::string log, unsigned int filter, int thresh); // debug
     ~UnitigGraph();
 	void debug(); // debug information
     void assemble(std::string, float err, std::string contigs, bool two_strain);

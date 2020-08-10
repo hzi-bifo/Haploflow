@@ -87,6 +87,50 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, flo
     l.close();
 }
 
+//create UnitigGraph from bcalm output
+UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int filter, int thresh) : cc_(1), logfile_(log), filter_length_(filter), thresh_(thresh)
+{
+    std::ofstream l;
+    l.open(logfile_, std::ofstream::out | std::ofstream::app);
+	l << "Building unitig graph from BCALM Unitig graph..." << std::endl;
+    l.close();
+    
+	clock_t t = clock();
+    
+    std::ifstream fasta(filename); // read bcalm fasta
+    std::string line;
+    std::vector<std::vector<std::string>> graph;
+    
+    unsigned int i = 0;
+    while (std::getline(fasta, line))
+    {
+        if (line.substr(0,1) == ">") // sequence & info
+        {
+            std::vector<std::string> split;
+            std::stringstream ss(line);
+            std::string token;
+            while(std::getline(ss, token, '\t')) // split at tab (?)
+            {
+                split.push_back(token);
+            }
+            graph.push_back(split);
+        }
+        else
+        {
+            graph[i].push_back(line);
+            i++;
+        }
+    }
+    l.open(logfile_, std::ofstream::out | std::ofstream::app);
+	l << "Unitig graph successfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
+    unsigned int total_size = 0;
+    for (unsigned int cc = 0; cc < graphs_.size(); cc++)
+    {
+        total_size += boost::num_vertices(*(graphs_.at(cc)));
+    }
+    l << "Unitig graph has " << total_size << " vertices" << std::endl;
+}
+
 UnitigGraph::~UnitigGraph()
 {
     for (auto&& g : graphs_)
