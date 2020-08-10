@@ -115,12 +115,21 @@ UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int fil
             }
             graph.push_back(split);
         }
-        else
+        else // append sequence to vertex
         {
             graph[i].push_back(line);
             i++;
         }
     }
+
+    bcalm_ccs(graph); // set ccs
+
+    unsigned int index = 0;
+    for (const auto& v : graph)
+    {
+        addVertex(&index, v[v.size() - 2], stoi(v[v.size() - 1])); // name/sequence is second last, cc is last in vector (length stored as int)
+    }
+
     l.open(logfile_, std::ofstream::out | std::ofstream::app);
 	l << "Unitig graph successfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
     unsigned int total_size = 0;
@@ -137,6 +146,10 @@ UnitigGraph::~UnitigGraph()
     {
         delete g;
     }
+}
+
+void UnitigGraph::bcalm_ccs(std::vector<std::vector<std::string>>& graph)
+{
 }
 
 std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, unsigned int strict)
