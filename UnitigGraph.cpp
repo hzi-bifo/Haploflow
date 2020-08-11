@@ -88,7 +88,7 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, flo
 }
 
 //create UnitigGraph from bcalm output
-UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int filter, int thresh) : cc_(1), logfile_(log), filter_length_(filter), thresh_(thresh)
+UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int filter, int thresh, unsigned int k) : cc_(1), k_(k), logfile_(log), filter_length_(filter), thresh_(thresh)
 {
     std::ofstream l;
     l.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -127,7 +127,24 @@ UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int fil
     unsigned int index = 0;
     for (const auto& v : graph)
     {
-        addVertex(&index, v[v.size() - 2], stoi(v[v.size() - 1])); // name/sequence is second last, cc is last in vector (length stored as int)
+        unsigned int cc = stoi(v[v.size() - 1]);
+        UGraph* g_ = graphs_.at(cc);
+        if (v[v.size() - 2].length() <= k_) // create only one vertex
+        {
+            auto name = v[v.size() - 2];
+            addVertex(&index, name, cc); // name/sequence is second last, cc is last in vector (length stored as int)
+        }
+        else // create two connected vertices
+        {
+            auto first_v = v[v.size() - 2].substr(0, k_);
+            auto last_v = v[v.size() -2].substr(v.size() - k_ - 1);
+            auto v1 = addVertex(&index, first_v, stoi(v[v.size() - 1])); // name/sequence is second last, cc is last in vector (length stored as int)
+            auto v2 = addVertex(&index, last_v, stoi(v[v.size() - 1])); // name/sequence is second last, cc is last in vector (length stored as int)
+            auto cov = stof(v[3].substr(5));
+            auto seq = v[v.size() - 2].substr(k_, v.size() - k_);
+            auto e = boost::add_edge(v1, v2, (*g_));
+            initialize_edge(e.first, cc, cov, cov, cov, cov, cov, cov);
+        }
     }
 
     l.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -140,6 +157,7 @@ UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int fil
     l << "Unitig graph has " << total_size << " vertices" << std::endl;
 }
 
+
 UnitigGraph::~UnitigGraph()
 {
     for (auto&& g : graphs_)
@@ -148,8 +166,39 @@ UnitigGraph::~UnitigGraph()
     }
 }
 
+void UnitigGraph::initialize_edge(UEdge& e, unsigned int cc, float cap, float first, float last, float avg, float min, float max)
+{
+    UGraph* g_ = graphs_.at(cc);
+    (*g_)[e].last_visit = 0;
+    (*g_)[e].capacity = cap;
+    (*g_)[e].residual_capacity = cap;
+    (*g_)[e].cap_info.avg = avg;
+    (*g_)[e].cap_info.max = max;
+    (*g_)[e].cap_info.min = min;
+    (*g_)[e].cap_info.first = first;
+    (*g_)[e].cap_info.last = last;
+    (*g_)[e].cap_info.length = (*g_)[e].name.length(); //?
+    (*g_)[e].residual_cap_info.avg = avg;
+    (*g_)[e].residual_cap_info.max = max;
+    (*g_)[e].residual_cap_info.min = min;
+    (*g_)[e].residual_cap_info.first = first;
+    (*g_)[e].residual_cap_info.last = last;
+    (*g_)[e].residual_cap_info.length = (*g_)[e].name.length();
+    (*g_)[e].visited = false;
+}
+
 void UnitigGraph::bcalm_ccs(std::vector<std::vector<std::string>>& graph)
 {
+    unsigned int ccs = 0;
+    for (auto& g : graph)
+    {
+        g.push_back(0); // placeholder
+    }
+    for (unsigned int i = 0; i < ccs; i++)
+    {
+        auto g = new UGraph;
+        graphs_.push_back(g);
+    }
 }
 
 std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, unsigned int strict)
