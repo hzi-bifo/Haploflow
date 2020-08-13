@@ -125,6 +125,10 @@ UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int fil
     bcalm_ccs(graph); // set ccs
 
     unsigned int index = 0;
+    unsigned int bcalm_index = 0; // to check which vertices have been added
+    std::map<unsigned int, std::pair<UVertex, UVertex>> indexmap;
+    // first create the vertices from bcalm
+    // unitigs are in the vertices here (Haploflow has them in the edges)
     for (const auto& v : graph)
     {
         unsigned int cc = stoi(v[v.size() - 1]);
@@ -132,7 +136,8 @@ UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int fil
         if (v[v.size() - 2].length() <= k_) // create only one vertex
         {
             auto name = v[v.size() - 2];
-            addVertex(&index, name, cc); // name/sequence is second last, cc is last in vector (length stored as int)
+            auto v = addVertex(&index, name, cc); // name/sequence is second last, cc is last in vector (length stored as int)
+            indexmap[bcalm_index] = std::make_pair(v,v);
         }
         else // create two connected vertices
         {
@@ -140,11 +145,29 @@ UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int fil
             auto last_v = v[v.size() -2].substr(v.size() - k_ - 1);
             auto v1 = addVertex(&index, first_v, stoi(v[v.size() - 1])); // name/sequence is second last, cc is last in vector (length stored as int)
             auto v2 = addVertex(&index, last_v, stoi(v[v.size() - 1])); // name/sequence is second last, cc is last in vector (length stored as int)
+            indexmap[bcalm_index] = std::make_pair(v1, v2);
             auto cov = stof(v[3].substr(5));
             auto seq = v[v.size() - 2].substr(k_, v.size() - k_);
             auto e = boost::add_edge(v1, v2, (*g_));
             initialize_edge(e.first, cc, cov, cov, cov, cov, cov, cov);
         }
+        //now add the other edges
+        auto beg = v.begin() + 4; // number/length/total cov/avg cov/neighbours
+        auto end = v.end() - 3;
+        std::vector<std::string> neighbours(beg, end);
+        for (const auto& n : neighbours)
+        {
+            auto num = stoi(n.substr(4,n.length() - 4 - 3)); // starting from 4 to 3 until the end
+            auto dir1 = n.substr(2,1);
+            auto dir2 = n.substr(n.length() - 1);
+            if (num > bcalm_index) // that isnt in the list yet
+                continue;
+            else
+            {
+                // add edges
+            }
+        }
+        bcalm_index++; // next vertex in bcalm file
     }
 
     l.open(logfile_, std::ofstream::out | std::ofstream::app);
