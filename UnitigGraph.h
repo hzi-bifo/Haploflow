@@ -71,6 +71,7 @@ struct Visits {
 struct EdgeProperties {
     std::string name;
     float capacity;
+    float to_remove;
     float residual_capacity;
     Capacity cap_info;
     Capacity residual_cap_info;

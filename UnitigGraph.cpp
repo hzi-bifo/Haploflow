@@ -164,6 +164,7 @@ UnitigGraph::UnitigGraph(std::string filename, std::string log, unsigned int fil
                 continue;
             else
             {
+                        
                 // add edges
             }
         }
@@ -194,6 +195,7 @@ void UnitigGraph::initialize_edge(UEdge& e, unsigned int cc, float cap, float fi
     UGraph* g_ = graphs_.at(cc);
     (*g_)[e].last_visit = 0;
     (*g_)[e].capacity = cap;
+    (*g_)[e].to_remove = 0;
     (*g_)[e].residual_capacity = cap;
     (*g_)[e].cap_info.avg = avg;
     (*g_)[e].cap_info.max = max;
@@ -701,6 +703,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdgeReverse(UVertex trg, Vertex
 		}
         (*g_)[e.first].last_visit = 0;
         (*g_)[e.first].capacity = avg;
+        (*g_)[e.first].to_remove = 0;
         (*g_)[e.first].residual_capacity = avg;
         (*g_)[e.first].cap_info.avg = avg;
         (*g_)[e.first].cap_info.max = max;
@@ -809,6 +812,7 @@ std::pair<Vertex*,std::string> UnitigGraph::buildEdge(UVertex src, Vertex* nextV
 		}
         (*g_)[e.first].last_visit = 0;
         (*g_)[e.first].capacity = avg;
+        (*g_)[e.first].to_remove = 0;
         (*g_)[e.first].residual_capacity = avg;
         (*g_)[e.first].cap_info.avg = avg;
         (*g_)[e.first].cap_info.max = max;
@@ -877,6 +881,7 @@ void UnitigGraph::contractPaths(unsigned int cc)
             (*g_)[new_e.first].last_visit = 0;
             (*g_)[new_e.first].name = seq;
             (*g_)[new_e.first].capacity = capacity;
+            (*g_)[new_e.first].to_remove = 0;
             (*g_)[new_e.first].residual_capacity = capacity;
             (*g_)[new_e.first].cap_info.avg = capacity;
             (*g_)[new_e.first].cap_info.max = max;
@@ -1346,6 +1351,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
 {
     UGraph* g_ = graphs_.at(cc);
     float removed_coverage = (*g_)[path.front()].capacity;
+    auto threshold = thresholds_.at(cc);
     float average = 0.f;
     unsigned int len = 0;
     for (auto e : path)
@@ -1379,30 +1385,30 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         float val = init ? (*g_)[e].residual_capacity : (*g_)[e].capacity;
         float val_last = init ? (*g_)[e].residual_cap_info.last : (*g_)[e].cap_info.last;
         float val_first = init ? (*g_)[e].residual_cap_info.first : (*g_)[e].cap_info.first;
-
-        auto threshold = thresholds_.at(cc);
         
         bool not_decreasing = val_first <= 1.1 * val_last or std::abs(val_first - val_last) < threshold; //test_hypothesis((*g_)[e].cap_info.first, (*g_)[e].cap_info.last, 1.2, threshold_); //not decreasing (first/last >= 1.2)
         bool not_increasing = val_last <= 1.1 * val_first or std::abs(val_first - val_last) < threshold; //test_hypothesis((*g_)[e].cap_info.last, (*g_)[e].cap_info.first, 1.2, threshold_); // not increasing (last/first >= 1.2)
         //cannot both be false, but both be true (if close to 1.2)
-        
+        float reduce;
         if (val > threshold and not_decreasing and not_increasing)
         {
             if (!init)
             {
                 if ((*g_)[e].visits.empty())
                 {
-                    (*g_)[e].capacity = 0;
-                    (*g_)[e].cap_info.first = 0;
-                    (*g_)[e].cap_info.last = 0;
+                    //(*g_)[e].capacity = 0;
+                    //(*g_)[e].cap_info.first = 0;
+                    //(*g_)[e].cap_info.last = 0;
+                    reduce = 0;
                 }
                 else
                 {
-                    (*g_)[e].capacity = std::max(threshold, (*g_)[e].capacity - removed_coverage); // there might be paths, so leave a small amount
-                    (*g_)[e].cap_info.first = std::max(threshold, (*g_)[e].cap_info.first - removed_coverage);
-                    (*g_)[e].cap_info.last = std::max(threshold, (*g_)[e].cap_info.last - removed_coverage);
+                    //(*g_)[e].capacity = std::max(threshold, (*g_)[e].capacity - removed_coverage); // there might be paths, so leave a small amount
+                    //(*g_)[e].cap_info.first = std::max(threshold, (*g_)[e].cap_info.first - removed_coverage);
+                    //(*g_)[e].cap_info.last = std::max(threshold, (*g_)[e].cap_info.last - removed_coverage);
+                    reduce = std::max(threshold, (*g_)[e].capacity - removed_coverage);
                 }
-                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
+                //(*g_)[e].cap_info.avg = (*g_)[e].capacity;
             }
             else
             {
@@ -1411,7 +1417,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
                 (*g_)[e].residual_cap_info.last = std::max(threshold, (*g_)[e].residual_cap_info.last - removed_coverage);
                 (*g_)[e].residual_cap_info.avg = (*g_)[e].residual_capacity;
             }
-            removed_coverage = val - (init ? (*g_)[e].residual_capacity : (*g_)[e].capacity);
+            removed_coverage = val - (init ? (*g_)[e].residual_capacity : reduce/*(*g_)[e].capacity*/);
         }
         else if (val > threshold and not_decreasing and !not_increasing)
         {
@@ -1419,17 +1425,19 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
             {
                 if ((*g_)[e].visits.empty())
                 {
-                    (*g_)[e].capacity = 0;
-                    (*g_)[e].cap_info.first = 0;
-                    (*g_)[e].cap_info.last = 0;
+                    //(*g_)[e].capacity = 0;
+                    //(*g_)[e].cap_info.first = 0;
+                    //(*g_)[e].cap_info.last = 0;
+                    reduce = 0;
                 }
                 else
                 {
-                    (*g_)[e].capacity = std::max(threshold, (*g_)[e].cap_info.first - removed_coverage);
-                    (*g_)[e].cap_info.last = std::max(threshold, (*g_)[e].cap_info.last - (val - (*g_)[e].capacity));
+                    //(*g_)[e].capacity = std::max(threshold, (*g_)[e].cap_info.first - removed_coverage);
+                    //(*g_)[e].cap_info.last = std::max(threshold, (*g_)[e].cap_info.last - (val - (*g_)[e].capacity));
+                    reduce = std::max(threshold, (*g_)[e].cap_info.first - removed_coverage);
                 }
-                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
-                (*g_)[e].cap_info.first = (*g_)[e].capacity;
+                //(*g_)[e].cap_info.avg = (*g_)[e].capacity;
+                //(*g_)[e].cap_info.first = (*g_)[e].capacity;
             }
             else
             {
@@ -1438,7 +1446,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
                 (*g_)[e].residual_cap_info.avg = (*g_)[e].residual_capacity;
                 (*g_)[e].residual_cap_info.first = (*g_)[e].residual_capacity;
             }
-            removed_coverage = val_last - (init ? (*g_)[e].residual_capacity : (*g_)[e].capacity);
+            removed_coverage = val_last - (init ? (*g_)[e].residual_capacity : reduce/*(*g_)[e].capacity*/);
         }
         else if (val > threshold and !not_decreasing and not_increasing)
         {
@@ -1446,17 +1454,19 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
             {
                 if ((*g_)[e].visits.empty())
                 {
-                    (*g_)[e].capacity = 0;
-                    (*g_)[e].cap_info.first = 0;
-                    (*g_)[e].cap_info.last = 0;
+                    //(*g_)[e].capacity = 0;
+                    //(*g_)[e].cap_info.first = 0;
+                    //(*g_)[e].cap_info.last = 0;
+                    reduce = 0;
                 }
                 else
                 {
-                    (*g_)[e].capacity = std::max(threshold, (*g_)[e].cap_info.last - removed_coverage);
-                    (*g_)[e].cap_info.first = std::max(threshold, (*g_)[e].cap_info.first - (val - (*g_)[e].capacity));
+                    //(*g_)[e].capacity = std::max(threshold, (*g_)[e].cap_info.last - removed_coverage);
+                    //(*g_)[e].cap_info.first = std::max(threshold, (*g_)[e].cap_info.first - (val - (*g_)[e].capacity));
+                    reduce = std::max(threshold, (*g_)[e].cap_info.last - removed_coverage);
                 }
-                (*g_)[e].cap_info.last = (*g_)[e].capacity;
-                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
+                //(*g_)[e].cap_info.last = (*g_)[e].capacity;
+                //(*g_)[e].cap_info.avg = (*g_)[e].capacity;
             }
             else
             {
@@ -1465,16 +1475,17 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
                 (*g_)[e].residual_cap_info.last = (*g_)[e].residual_capacity;
                 (*g_)[e].residual_cap_info.avg = (*g_)[e].residual_capacity;
             }
-            removed_coverage = val_first - (init ? (*g_)[e].residual_capacity : (*g_)[e].capacity);
+            removed_coverage = val_first - (init ? (*g_)[e].residual_capacity : reduce/*(*g_)[e].capacity*/);
         }
         else
         {
             if (!init)
             {
-                (*g_)[e].cap_info.first = 0;
-                (*g_)[e].cap_info.last = 0;
-                (*g_)[e].capacity = 0;
-                (*g_)[e].cap_info.avg = 0;
+                //(*g_)[e].cap_info.first = 0;
+                //(*g_)[e].cap_info.last = 0;
+                //(*g_)[e].capacity = 0;
+                //(*g_)[e].cap_info.avg = 0;
+                reduce = 0;
             }
             else
             {
@@ -1485,6 +1496,7 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
             }
             removed_coverage = val;
         }
+        (*g_)[e].to_remove = removed_coverage;
         average *= len;
         average += removed_coverage * (*g_)[e].name.size();
         len += (*g_)[e].name.size();
@@ -1492,6 +1504,33 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         if (init)
         {
             removed_coverage = std::max(removed_coverage, average);
+        }
+        std::ofstream log;
+        //auto src = boost::source(e, *g_);
+        //auto trg = boost::target(e, *g_);
+        //log.open(logfile_, std::ofstream::out | std::ofstream::app);
+        //log << (*g_)[src].index << " -> " << (*g_)[trg].index << " ( -" << removed_coverage << " to " << (*g_)[e].capacity << ")" << std::endl;
+        //log.close();
+    }
+    if (!init)
+    {
+        for (auto& e : path)
+        {
+            if ((*g_)[e].visits.empty())
+            {
+                (*g_)[e].capacity = 0;
+                (*g_)[e].cap_info.first = 0;
+                (*g_)[e].cap_info.last = 0;
+                (*g_)[e].cap_info.avg = 0;
+            }
+            else
+            {
+                float to_remove = std::max((*g_)[e].to_remove, average);
+                (*g_)[e].capacity = std::max(threshold, (*g_)[e].capacity - to_remove);
+                (*g_)[e].cap_info.first = std::max(threshold, (*g_)[e].cap_info.first - to_remove);
+                (*g_)[e].cap_info.last = std::max(threshold, (*g_)[e].cap_info.last - to_remove);
+                (*g_)[e].cap_info.avg = (*g_)[e].capacity;
+            }
         }
     }
     return average;
