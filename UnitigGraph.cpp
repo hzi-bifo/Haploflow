@@ -1163,6 +1163,15 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed, unsigned int cc)
     (*g_)[curr].last_visit++;
     while (curr != seed and (*g_)[curr].distance > 0 and (*g_)[curr].distance < std::numeric_limits<unsigned int>::max() and !(*g_)[curr].visited) // this means the distance has been set, i.e. the vertex has been reached
     {
+        auto source = boost::source(curr, *g_);
+        if ((*g_)[source].visiting_time != 0)
+        {
+            break;
+        }
+        else
+        {
+            (*g_)[source].visiting_time = 1; 
+        }
         (*g_)[curr].visited = true;
         curr = (*g_)[curr].prev;
         (*g_)[curr].last_visit++;
@@ -1175,6 +1184,10 @@ std::vector<UEdge> UnitigGraph::find_fattest_path(UEdge seed, unsigned int cc)
     
     for (auto e : path)
     {
+        auto source = boost::source(e, *g_);
+        auto target = boost::target(e, *g_);
+        (*g_)[source].visiting_time = 0; 
+        (*g_)[target].visiting_time = 0;
         seq_length += (*g_)[e].name.size();
         auto ct = 0;
         auto avg = 0.f;
@@ -1364,6 +1377,14 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         {
             removed_coverage = std::max(removed_coverage, average);
         }
+        auto source = boost::source(e, *g_);
+        auto target = boost::target(e, *g_);
+        std::ofstream log;
+        log.open(logfile_, std::ofstream::out | std::ofstream::app);
+        log << (*g_)[source].index << " -> " << (*g_)[target].index;
+        log << "(-" << removed_coverage << " to " << (*g_)[e].capacity << ")" << std::endl;
+        log << len << std::endl;
+        log.close();
     }
     return average;
 }
@@ -1867,10 +1888,10 @@ void UnitigGraph::printGraph(std::ostream& os, unsigned int cc)
         (*g_)[e].v.visits = (*g_)[e].visits;
     }
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,*g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,*g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::residual_capacity,*g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,*g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::fatness,*g_)), boost::default_writer(), propmapIndex);
 }
