@@ -1,3 +1,6 @@
+#ifndef SEQ
+#define SEQ
+
 #include <string>
 #include <algorithm>
 #include "nthash.hpp"
@@ -31,3 +34,5 @@ namespace std
 		}
 	};
 }
+
+#endif
