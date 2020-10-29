@@ -1377,14 +1377,14 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         {
             removed_coverage = std::max(removed_coverage, average);
         }
-        auto source = boost::source(e, *g_);
+        /*auto source = boost::source(e, *g_);
         auto target = boost::target(e, *g_);
         std::ofstream log;
         log.open(logfile_, std::ofstream::out | std::ofstream::app);
         log << (*g_)[source].index << " -> " << (*g_)[target].index;
         log << "(-" << removed_coverage << " to " << (*g_)[e].capacity << ")" << std::endl;
         log << len << std::endl;
-        log.close();
+        log.close();*/
     }
     return average;
 }
