@@ -5,7 +5,7 @@ _license_. It is written entirely in C++ and currently works on UNIX systems.\
 This README lists the requirements, installation information and a short tutorial on how to use Haploflow and its parameters. 
 
 If using Haploflow, please cite:
-A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A. Dilthey, A.C. McHardy, "Haploflow: strain-resolved viral genome assembly with applications to SARS-CoV-2 and HCMV", DOI to come 
+A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A. Dilthey, A.C. McHardy, "Haploflow: Strain-resolved de novo assembly of viral genomes", DOI to come 
 
 ## Build requirements
  - CMake >= 2.8
@@ -71,3 +71,8 @@ value if set. This parameter sets a fixed threshold below which *k*-mers are ign
 Finally, Haploflow by default filters contigs shorter than 500 bp. This value can be changed using the `filter` option. 
 The parameters `create-dump`, `from-dump` and `dump-file` are just needed if the deBruijn graph is supposed to be written to a file to be
 reused in another run. This file is possibly huge (because uncompressed), so use with caution.
+
+## Toy data set
+There is a small test data set of reads for three HIV strains added alongside Haploflow, `HIV_3_toy.fq`
+After compiling Haploflow, you can assemble this data set using the following simple command: `./haploflow --read-file ../HIV_3_toy.fq --out test --log test/log`
+If everything worked, the assembly of this data set should take about 1 minute and produce three contigs. You can then test different *k*-mer and error-correction settings for further testing or move on to your own data sets.
