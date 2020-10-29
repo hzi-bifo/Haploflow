@@ -73,6 +73,6 @@ The parameters `create-dump`, `from-dump` and `dump-file` are just needed if the
 reused in another run. This file is possibly huge (because uncompressed), so use with caution.
 
 ## Toy data set
-There is a small test data set of reads for three HIV strains added alongside Haploflow, `HIV_3_toy.fq`
-After compiling Haploflow, you can assemble this data set using the following simple command: `./haploflow --read-file ../HIV_3_toy.fq --out test --log test/log`
+There is a small test data set of reads for three HIV strains added alongside Haploflow, `HIV_3_toy.fq`  
+After compiling Haploflow, you can assemble this data set using the following simple command: `./haploflow --read-file ../HIV_3_toy.fq --out test --log test/log`  
 If everything worked, the assembly of this data set should take about 1 minute and produce three contigs. You can then test different *k*-mer and error-correction settings for further testing or move on to your own data sets.
