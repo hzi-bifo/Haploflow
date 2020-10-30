@@ -31,7 +31,7 @@ int main (int argc, char* argv[])
         ("create-dump", go::value<std::string>(&create_dump), "create dump of the deBruijn graph. WARNING: This file may be huge")
         ("from-dump", go::value<std::string>(&from_dump), "run from a Haploflow dump of the deBruijn graph.")
         ("two-strain, 2", go::value<bool>(&two_strain)->default_value(false), "mode for known two-strain mixtures")
-        ("strict, S", go::value<unsigned int>(&strict)->default_value(1), "more strict error correction, should be set to 5 in first run on new data set to reduce run time. Set to 0 if low abundant strains are expected to be present")
+        ("strict, S", go::value<unsigned int>(&strict)->default_value(5), "more strict error correction, should be set to 5 in first run on new data set to reduce run time. Set to 0 if low abundant strains are expected to be present")
         ("filter, f", go::value<unsigned int>(&filter)->default_value(500), "filter contigs shorter than value")
         ("thresh, t", go::value<int>(&thresh)->default_value(-1), "Provide a custom threshold for complex/bad data")
     ;
