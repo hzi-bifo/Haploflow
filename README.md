@@ -1,7 +1,7 @@
 ## About Haploflow
 Haploflow is a strain-aware viral genome assembler for short read sequence data. 
 It uses a flow algorithm on a deBruijn graph data structure to resolve viral strains. Haploflow is still actively under development and release 0.1 is freely available under the 
-_license_. It is written entirely in C++ and currently works on UNIX systems.\
+Apache 2.0 _license_. It is written entirely in C++ and currently works on UNIX systems.\
 This README lists the requirements, installation information and a short tutorial on how to use Haploflow and its parameters. 
 
 If using Haploflow, please cite:
@@ -9,7 +9,8 @@ A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A.
 
 ## Build requirements
  - CMake >= 2.8
- - Boost >= 1.54
+ - Boost >= 1.54  
+It is possible that later Boost and gcc versions are incompatible. If you encounter difficulties in building Haploflow, using gcc 4.9.2 and Boost 1.55.0 should ensure a correct build. We are working to resolve the other build conflicts. 
  
 ## Build
 First, clone this repository using `git clone` _address_, then enter the directory which you cloned Haploflow to and create a build folder,
