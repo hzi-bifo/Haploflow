@@ -1,7 +1,7 @@
 ## About Haploflow
 Haploflow is a strain-aware viral genome assembler for short read sequence data. 
 It uses a flow algorithm on a deBruijn graph data structure to resolve viral strains. Haploflow is still actively under development and release 0.1 is freely available under the 
-Apache 2.0 _license_. It is written entirely in C++ and currently works on UNIX systems.\
+GPLv3 _license_. It is written entirely in C++ and currently works on UNIX systems.\
 This README lists the requirements, installation information and a short tutorial on how to use Haploflow and its parameters. 
 
 If using Haploflow, please cite:
