@@ -62,7 +62,7 @@ int main (int argc, char* argv[])
     logfile.open(log);
     logfile << "Options used: " << std::endl;
     logfile << "strict " << strict << ", k " << k << ", error-rate " << e;
-    logfile << ", two-strain " << (two-strain ? "True" : "False");
+    logfile << ", two-strain " << (two_strain ? "True" : "False");
     logfile << ", filter " << filter << ", threshold " << thresh << std::endl;// add visitor pattern?
     logfile << "Building deBruijnGraph..." << std::endl;
     logfile.close();
