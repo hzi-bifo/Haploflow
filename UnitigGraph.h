@@ -117,7 +117,7 @@ private:
     std::vector<UEdge> get_sources(unsigned int cc);
 
     std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&, unsigned int cc);
-    float reduce_flow(std::vector<UEdge>&, std::set<unsigned int>&, unsigned int cc, bool init);
+    float reduce_flow(std::vector<UEdge>&, std::set<unsigned int>&, unsigned int cc, bool init, bool theoretical);
 	std::vector<UEdge> find_fattest_path(UEdge seed, unsigned int cc);
     std::vector<UEdge> fixFlow(UEdge, unsigned int cc);
     
