@@ -5,7 +5,7 @@ GPLv3 _license_. It is written entirely in C++ and currently works on UNIX syste
 This README lists the requirements, installation information and a short tutorial on how to use Haploflow and its parameters. 
 
 If using Haploflow, please cite:
-A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A. Dilthey, A.C. McHardy, "Haploflow: Strain-resolved de novo assembly of viral genomes", DOI to come 
+A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A. Dilthey, A.C. McHardy, "Haploflow: Strain-resolved de novo assembly of viral genomes", https://doi.org/10.1101/2021.01.25.428049
 
 ## Build requirements
  - CMake >= 2.8
