@@ -100,7 +100,7 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&, std::string, std::string, float, unsigned int, unsigned int, int); 
+	UnitigGraph(deBruijnGraph&, std::string, std::string, float, unsigned int, unsigned int, int, bool); 
 	UnitigGraph(); // debug
     ~UnitigGraph();
 	void debug(); // debug information
@@ -117,7 +117,7 @@ private:
     std::vector<UEdge> get_sources(unsigned int cc);
 
     std::pair<std::string, float> calculate_contigs(std::vector<UEdge>&, std::vector<float>&, unsigned int cc);
-    float reduce_flow(std::vector<UEdge>&, std::set<unsigned int>&, unsigned int cc, bool init);
+    float reduce_flow(std::vector<UEdge>&, std::set<unsigned int>&, unsigned int cc, bool init, bool theoretical);
 	std::vector<UEdge> find_fattest_path(UEdge seed, unsigned int cc);
     std::vector<UEdge> fixFlow(UEdge, unsigned int cc);
     
@@ -160,6 +160,7 @@ private:
     std::string logfile_;
     unsigned int filter_length_;
     int thresh_;
+    bool long_;
 	
 };
 
