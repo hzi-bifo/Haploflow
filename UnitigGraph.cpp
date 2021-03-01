@@ -21,13 +21,13 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, float error_rate, unsigned int strict, unsigned int filter, int thresh) : cc_(1), logfile_(log), filter_length_(filter), thresh_(thresh)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string logf, float error_rate, unsigned int strict, unsigned int filter, int thresh, bool l=false) : cc_(1), logfile_(logf), filter_length_(filter), thresh_(thresh), long_(l)
 {
-    std::ofstream l;
-    l.open(logfile_, std::ofstream::out | std::ofstream::app);
-	l << "deBruijnGraph has " << dbg.getSize() << " vertices" << std::endl;
-	l << "Building unitig graph from deBruijn graph..." << std::endl;
-    l.close();
+    std::ofstream log;
+    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+	log << "deBruijnGraph has " << dbg.getSize() << " vertices" << std::endl;
+	log << "Building unitig graph from deBruijn graph..." << std::endl;
+    log.close();
 
 	clock_t t = clock();
 	auto&& junc = dbg.getJunctions();
@@ -76,15 +76,15 @@ UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string log, flo
             source->flag();
         }
 	}
-    l.open(logfile_, std::ofstream::out | std::ofstream::app);
-	l << "Unitig graph successfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
+    log.open(logfile_, std::ofstream::out | std::ofstream::app);
+	log << "Unitig graph successfully build in " << (clock() - t)/1000000. << " seconds." << std::endl;
     unsigned int total_size = 0;
     for (unsigned int cc = 0; cc < graphs_.size(); cc++)
     {
         total_size += boost::num_vertices(*(graphs_.at(cc)));
     }
-    l << "Unitig graph has " << total_size << " vertices" << std::endl;
-    l.close();
+    log << "Unitig graph has " << total_size << " vertices" << std::endl;
+    log.close();
 }
 
 UnitigGraph::~UnitigGraph()
@@ -1079,7 +1079,7 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient, unsign
             last = curr;
             max_dist = (*g_)[curr].distance;
         }*/
-        if ((*g_)[curr].distance > running_distance and (*g_)[curr].distance != std::numeric_limits<unsigned int>::max() and same_visit)
+        if ((*g_)[curr].distance > running_distance and (*g_)[curr].distance != std::numeric_limits<unsigned int>::max() and (same_visit or long_))
         {
             running_distance = (*g_)[curr].distance;
             last = curr;

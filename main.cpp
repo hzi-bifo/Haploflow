@@ -20,20 +20,22 @@ int main (int argc, char* argv[])
     bool two_strain;
     unsigned int filter;
     int thresh;
+    bool l;
     desc.add_options()
         ("help", "Produce this help message")
-        ("read-file, R", go::value<std::string>(&reads), "read file (fastq)")
-        ("dump-file, D", go::value<std::string>(&d), "deBruijn graph dump file produced by HaploFlow")
+        ("read-file, r", go::value<std::string>(&reads), "read file (fastq)")
+        ("dump-file, d", go::value<std::string>(&d), "deBruijn graph dump file produced by HaploFlow")
         ("log", go::value<std::string>(&log), "log file (default: standard out)")
-        ("k, K", go::value<unsigned int>(&k)->default_value(41), "k-mer size, default 41, please use an odd number")
+        ("k", go::value<unsigned int>(&k)->default_value(41), "k-mer size, default 41, please use an odd number")
         ("out, o", go::value<std::string>(&o), "folder for output, will be created if not present. WARNING: Old results will get overwritten")
-        ("error-rate, E", go::value<float>(&e)->default_value(0.02), "percentage filter for erroneous kmers - kmers appearing less than relatively e% will be ignored")
+        ("error-rate, e", go::value<float>(&e)->default_value(0.02), "percentage filter for erroneous kmers - kmers appearing less than relatively e% will be ignored")
         ("create-dump", go::value<std::string>(&create_dump), "create dump of the deBruijn graph. WARNING: This file may be huge")
         ("from-dump", go::value<std::string>(&from_dump), "run from a Haploflow dump of the deBruijn graph.")
         ("two-strain, 2", go::value<bool>(&two_strain)->default_value(false), "mode for known two-strain mixtures")
-        ("strict, S", go::value<unsigned int>(&strict)->default_value(5), "more strict error correction, should be set to 5 in first run on new data set to reduce run time. Set to 0 if low abundant strains are expected to be present")
+        ("strict, s", go::value<unsigned int>(&strict)->default_value(5), "more strict error correction, should be set to 5 in first run on new data set to reduce run time. Set to 0 if low abundant strains are expected to be present")
         ("filter, f", go::value<unsigned int>(&filter)->default_value(500), "filter contigs shorter than value")
         ("thresh, t", go::value<int>(&thresh)->default_value(-1), "Provide a custom threshold for complex/bad data")
+        ("long, l", go::value<bool>(&l)->default_value(false), "Try to maximise contig lengths (might introduce errors)")
     ;
     go::positional_options_description p;
     p.add("read-file", -1);
@@ -62,7 +64,7 @@ int main (int argc, char* argv[])
     logfile.open(log);
     logfile << "Options used: " << std::endl;
     logfile << "strict " << strict << ", k " << k << ", error-rate " << e;
-    logfile << ", two-strain " << (two_strain ? "True" : "False");
+    logfile << ", two-strain " << (two_strain ? "True" : "False") << ", long contigs: " << (l ? "True" : "False");
     logfile << ", filter " << filter << ", threshold " << thresh << std::endl;// add visitor pattern?
     logfile << "Building deBruijnGraph..." << std::endl;
     logfile.close();
@@ -79,7 +81,7 @@ int main (int argc, char* argv[])
     logfile << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
     logfile.close();
     t = clock();
-    UnitigGraph ug = UnitigGraph(*dbg, cov, log, e, strict, filter, thresh); //argv[2] is k
+    UnitigGraph ug = UnitigGraph(*dbg, cov, log, e, strict, filter, thresh, l); //argv[2] is k
     delete dbg;
     //t = clock();
     logfile.open(log, std::ofstream::out | std::ofstream::app);
