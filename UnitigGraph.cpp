@@ -21,7 +21,7 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string logf, float error_rate, unsigned int strict, unsigned int filter, int thresh, bool l=false) : cc_(1), logfile_(logf), filter_length_(filter), thresh_(thresh), long_(l)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string logf, float error_rate, unsigned int strict, unsigned int filter, int thresh, bool l=false) : cc_(1), logfile_(logf), filter_length_(filter), thresh_(thresh), long_(l), true_(false)
 {
     std::ofstream log;
     log.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -93,6 +93,11 @@ UnitigGraph::~UnitigGraph()
     {
         delete g;
     }
+}
+
+void UnitigGraph::set_debug()
+{
+    true_ = true;
 }
 
 std::vector<float> UnitigGraph::calculate_thresholds(deBruijnGraph& dbg, std::string path, unsigned int strict)
@@ -1474,7 +1479,7 @@ std::pair<std::string, float> UnitigGraph::calculate_contigs(std::vector<UEdge>&
         if (path.size() > 0)
             flow /= path.size();
     }
-    reduce_flow(path, paths, cc, false, false); // last bool: theoretical mode
+    reduce_flow(path, paths, cc, false, true_); // last bool: theoretical mode
     return std::make_pair(contig, flow);
 }
 

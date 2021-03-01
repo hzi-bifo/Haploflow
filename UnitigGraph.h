@@ -103,6 +103,7 @@ public:
 	UnitigGraph(deBruijnGraph&, std::string, std::string, float, unsigned int, unsigned int, int, bool); 
 	UnitigGraph(); // debug
     ~UnitigGraph();
+    void set_debug();
 	void debug(); // debug information
     void assemble(std::string, float err, std::string contigs, bool two_strain);
     void printGraph(std::ostream&, unsigned int cc);
@@ -161,6 +162,7 @@ private:
     unsigned int filter_length_;
     int thresh_;
     bool long_;
+    bool true_;
 	
 };
 

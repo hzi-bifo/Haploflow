@@ -21,6 +21,7 @@ int main (int argc, char* argv[])
     unsigned int filter;
     int thresh;
     bool l;
+    bool true_flow;
     desc.add_options()
         ("help", "Produce this help message")
         ("read-file, r", go::value<std::string>(&reads), "read file (fastq)")
@@ -36,6 +37,7 @@ int main (int argc, char* argv[])
         ("filter, f", go::value<unsigned int>(&filter)->default_value(500), "filter contigs shorter than value")
         ("thresh, t", go::value<int>(&thresh)->default_value(-1), "Provide a custom threshold for complex/bad data")
         ("long, l", go::value<bool>(&l)->default_value(false), "Try to maximise contig lengths (might introduce errors)")
+        ("true-flow, tf", go::value<bool>(&true_flow)->default_value(false), "Do not perform flow correction, assume perfect flows")
     ;
     go::positional_options_description p;
     p.add("read-file", -1);
@@ -83,6 +85,10 @@ int main (int argc, char* argv[])
     t = clock();
     UnitigGraph ug = UnitigGraph(*dbg, cov, log, e, strict, filter, thresh, l); //argv[2] is k
     delete dbg;
+    if (true_flow)
+    {
+        ug.set_debug(); // remove flow correction
+    }
     //t = clock();
     logfile.open(log, std::ofstream::out | std::ofstream::app);
     logfile << "Assembling..." << std::endl;
