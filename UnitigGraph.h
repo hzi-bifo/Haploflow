@@ -109,6 +109,7 @@ public:
     void printGraph(std::ostream&, unsigned int cc);
     void dijkstra(UEdge seed, bool residual, bool local, unsigned int cc);
     std::vector<UEdge> greedy(UEdge seed, bool residual, bool local, unsigned int cc);
+    bool debug_;
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float, float threshold);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&, float threshold, float error);

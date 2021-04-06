@@ -135,6 +135,8 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
 {
     std::vector<float> thresholds;
     unsigned int i = 0;
+    unsigned int max_pos = 0;
+    unsigned int max_members = 0;
     for (auto& covs : cov_distr)
     {
         if (covs.empty())
@@ -145,14 +147,32 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
         std::vector<float> sorted_coverage;
         sorted_coverage.resize(covs.rbegin()->first, 0.f); // get last (= biggest) element of map
         std::string filename = path + "Cov" + std::to_string(i) + ".tsv";
-        std::ofstream outfile (filename);
-        for (auto&& cov : covs)
+        if (debug_)
         {
-            auto pos = cov.first - 1;
-            auto val = cov.second;
-            members += val;
-            sorted_coverage[pos] = val;
-            outfile << pos << '\t' << val << std::endl;
+            std::ofstream outfile (filename);
+            for (auto&& cov : covs)
+            {
+                auto pos = cov.first - 1;
+                auto val = cov.second;
+                members += val;
+                sorted_coverage[pos] = val;
+                outfile << pos << '\t' << val << std::endl;
+            }
+        }
+        else
+        {
+            for (auto&& cov : covs)
+            {
+                auto pos = cov.first - 1;
+                auto val = cov.second;
+                members += val;
+                sorted_coverage[pos] = val;
+            }
+        }
+        if (members > max_members)
+        {
+            max_members = members;
+            max_pos = i;
         }
         if (members < 150) //less than 500 kmers
         {
@@ -165,7 +185,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
             auto diffs = finite_difference(sorted_coverage);
             float turning_point = diffs.first; 
             float inflexion_point = diffs.second; 
-            if (inflexion_point > 1 and turning_point > 1)
+            if (inflexion_point > 1 and turning_point > 1 and debug_)
             {
                 std::ofstream log;
                 log.open(logfile_, std::ofstream::out | std::ofstream::app);
@@ -189,7 +209,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                     pos++;
                 }
                 std::ofstream log;
-                if (pos > 1)
+                if (pos > 1 and debug_)
                 {
                     log.open(logfile_, std::ofstream::out | std::ofstream::app);
                     log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
@@ -211,7 +231,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                     pos++;
                 }
                 std::ofstream log;
-                if (pos > 1)
+                if (pos > 1 and debug_)
                 {
                     log.open(logfile_, std::ofstream::out | std::ofstream::app);
                     log << "Graph " << i << " threshold set to " << pos - 1 << std::endl;
@@ -221,6 +241,22 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                 i++;
             }
         }
+    }
+    if (!debug_)
+    {
+        std::ofstream log;
+        log.open(logfile_, std::ofstream::out | std::ofstream::app);
+        log << "Printing the biggest graph with " << max_members << " k-mers" << std::endl;
+        log.close();
+        std::string filename = path + "/Cov.tsv";
+        std::ofstream outfile (filename);
+        for (auto&& cov : cov_distr.at(max_pos))
+        {
+            auto pos = cov.first - 1;
+            auto val = cov.second;
+            outfile << pos << '\t' << val << std::endl;
+        }
+        
     }
     return thresholds;
 }
@@ -1774,10 +1810,13 @@ void UnitigGraph::assemble(std::string fname, float error_rate, std::string cont
     for (unsigned int cc = 0; cc < graphs_.size(); cc++)
     {
         UGraph* g_ = graphs_.at(cc);
-        std::string filename = fname + "Graph.dot";
-        std::ofstream outfile (filename);
-        //contractPaths(cc); // TODO only for debug reasons
-        printGraph(outfile, cc);
+        if (debug_)
+        {
+            std::string filename = fname + "Graph.dot";
+            std::ofstream outfile (filename);
+            //contractPaths(cc); // TODO only for debug reasons
+            printGraph(outfile, cc);
+        }
         cleanGraph(cc, error_rate);
         log.open(logfile_, std::ofstream::out | std::ofstream::app);
         log << "Graph " << cc << ": " << boost::num_vertices(*g_) << " vertices remaining" << std::endl;
@@ -1810,9 +1849,12 @@ void UnitigGraph::assemble(std::string fname, float error_rate, std::string cont
             log.open(logfile_, std::ofstream::out | std::ofstream::app);
             log << "Fixing flow and finding fattest path" << std::endl;
             log.close();
-            std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
-            std::ofstream outfile (filename);
-            printGraph(outfile, cc);
+            if (debug_)
+            {
+                std::string filename = fname + "Graph" + std::to_string(i) + ".dot";
+                std::ofstream outfile (filename);
+                printGraph(outfile, cc);
+            }
             std::vector<UEdge> path;
             if (!two_strain)
             {

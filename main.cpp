@@ -22,6 +22,7 @@ int main (int argc, char* argv[])
     int thresh;
     bool l;
     bool true_flow;
+    bool debug;
     desc.add_options()
         ("help", "Produce this help message")
         ("read-file, r", go::value<std::string>(&reads), "read file (fastq)")
@@ -38,6 +39,7 @@ int main (int argc, char* argv[])
         ("thresh, t", go::value<int>(&thresh)->default_value(-1), "Provide a custom threshold for complex/bad data")
         ("long, l", go::value<bool>(&l)->default_value(false), "Try to maximise contig lengths (might introduce errors)")
         ("true-flow, tf", go::value<bool>(&true_flow)->default_value(false), "Do not perform flow correction, assume perfect flows")
+        ("debug, d", go::value<bool>(&debug)->default_value(false), "Report all temporary graphs and coverage histograms")
     ;
     go::positional_options_description p;
     p.add("read-file", -1);
@@ -55,10 +57,12 @@ int main (int argc, char* argv[])
     std::string contigs = o + "/contigs.fa";
     if (!boost::filesystem::exists(out))
         boost::filesystem::create_directory(o);
-    if (!boost::filesystem::exists(g))
+    if (!boost::filesystem::exists(g) and debug)
         boost::filesystem::create_directory(g);
-    if (!boost::filesystem::exists(cov))
+    if (!boost::filesystem::exists(cov) and debug)
         boost::filesystem::create_directory(cov);
+    else
+        cov = o;
 
 	clock_t t = clock();
 	clock_t t_start = clock();
@@ -84,6 +88,7 @@ int main (int argc, char* argv[])
     logfile.close();
     t = clock();
     UnitigGraph ug = UnitigGraph(*dbg, cov, log, e, strict, filter, thresh, l); //argv[2] is k
+    ug.debug_ = debug;
     delete dbg;
     if (true_flow)
     {
