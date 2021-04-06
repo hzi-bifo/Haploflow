@@ -61,7 +61,7 @@ int main (int argc, char* argv[])
         boost::filesystem::create_directory(g);
     if (!boost::filesystem::exists(cov) and debug)
         boost::filesystem::create_directory(cov);
-    else
+    if (!debug)
         cov = o;
 
 	clock_t t = clock();
