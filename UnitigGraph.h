@@ -100,7 +100,7 @@ typedef std::vector<UVertex> Connected_Component; // to distinguish from regular
 class UnitigGraph {
 public:
 	// create a UnitigGraph from a dBg and its unbalanced vertices
-	UnitigGraph(deBruijnGraph&, std::string, std::string, float, unsigned int, unsigned int, int, bool); 
+	UnitigGraph(deBruijnGraph&, std::string, std::string, float, unsigned int, unsigned int, int, bool, bool); 
 	UnitigGraph(); // debug
     ~UnitigGraph();
     void set_debug();
@@ -109,7 +109,6 @@ public:
     void printGraph(std::ostream&, unsigned int cc);
     void dijkstra(UEdge seed, bool residual, bool local, unsigned int cc);
     std::vector<UEdge> greedy(UEdge seed, bool residual, bool local, unsigned int cc);
-    bool debug_;
 private:
 	void connectUnbalanced(Vertex*, unsigned int*, std::string, deBruijnGraph&, float, float threshold);
 	std::vector<std::pair<Vertex*,std::string> > addNeighbours(std::string& curr, const std::vector<char>&, const std::vector<char>&, deBruijnGraph&, unsigned int*, UVertex&, float threshold, float error);
@@ -164,6 +163,7 @@ private:
     int thresh_;
     bool long_;
     bool true_;
+    bool debug_;
 	
 };
 

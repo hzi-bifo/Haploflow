@@ -87,8 +87,7 @@ int main (int argc, char* argv[])
     logfile << "Building deBruijnGraph took " << (clock() - t)/1000000. << " seconds." << std::endl;
     logfile.close();
     t = clock();
-    UnitigGraph ug = UnitigGraph(*dbg, cov, log, e, strict, filter, thresh, l); //argv[2] is k
-    ug.debug_ = debug;
+    UnitigGraph ug = UnitigGraph(*dbg, cov, log, e, strict, filter, thresh, l, debug); //argv[2] is k
     delete dbg;
     if (true_flow)
     {

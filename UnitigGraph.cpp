@@ -21,7 +21,7 @@ UnitigGraph::UnitigGraph() : cc_(1)
 // constructor of the so-called UnitigGraph
 // unifies all simple paths in the deBruijnGraph to a single source->sink path
 // all remaining nodes have either indegree != outdegree or indegree == outdegree > 1
-UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string logf, float error_rate, unsigned int strict, unsigned int filter, int thresh, bool l=false) : cc_(1), logfile_(logf), filter_length_(filter), thresh_(thresh), long_(l), true_(false)
+UnitigGraph::UnitigGraph(deBruijnGraph& dbg, std::string p, std::string logf, float error_rate, unsigned int strict, unsigned int filter, int thresh, bool l, bool debug) : cc_(1), logfile_(logf), filter_length_(filter), thresh_(thresh), long_(l), true_(false), debug_(debug)
 {
     std::ofstream log;
     log.open(logfile_, std::ofstream::out | std::ofstream::app);
