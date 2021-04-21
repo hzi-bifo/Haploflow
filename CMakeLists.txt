@@ -2,7 +2,7 @@ project(Haploflow)
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 if(NOT DEFINED Boost_USE_STATIC_LIBS)
 	set(Boost_USE_STATIC_LIBS=ON)
-endif
+endif()
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
