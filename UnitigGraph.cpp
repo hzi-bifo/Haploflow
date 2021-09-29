@@ -224,7 +224,7 @@ std::vector<float> UnitigGraph::get_thresholds(std::vector<std::map<unsigned int
                 int pos = 0;
                 for (auto& v : window)
                 {
-                    if (!isnan(v) and window[pos - 1] < v)
+                    if (!std::isnan(v) and window[pos - 1] < v)
                     {
                         break;
                     }
@@ -1283,7 +1283,6 @@ float UnitigGraph::reduce_flow(std::vector<UEdge>& path, std::set<unsigned int>&
         {
             (*g_)[e].capacity -= min;
         }
-        std::cout << min << std::endl;
         return min;
     }
     UGraph* g_ = graphs_.at(cc);
