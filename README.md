@@ -4,7 +4,7 @@ It uses a flow algorithm on a deBruijn graph data structure to resolve viral str
 GPLv3 _license_. It is written entirely in C++ and currently works on UNIX systems.\
 This README lists the requirements, installation information and a short tutorial on how to use Haploflow and its parameters. 
 
-If using Haploflow, please cite:
+If you are using Haploflow, please cite:
 Fritz, A., Bremges, A., Deng, ZL. et al. Haploflow: strain-resolved de novo assembly of viral genomes. Genome Biol 22, 212 (2021), https://doi.org/10.1186/s13059-021-02426-8
 
 ## Installation
