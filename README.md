@@ -5,7 +5,11 @@ GPLv3 _license_. It is written entirely in C++ and currently works on UNIX syste
 This README lists the requirements, installation information and a short tutorial on how to use Haploflow and its parameters. 
 
 If using Haploflow, please cite:
-A. Fritz, A. Bremges, Z.-L. Deng, T.-R. Lesker, T. Ganzenmüller, F. Klawonn, A. Dilthey, A.C. McHardy, "Haploflow: Strain-resolved de novo assembly of viral genomes", https://doi.org/10.1101/2021.01.25.428049
+Fritz, A., Bremges, A., Deng, ZL. et al. Haploflow: strain-resolved de novo assembly of viral genomes. Genome Biol 22, 212 (2021), https://doi.org/10.1186/s13059-021-02426-8
+
+## Installation
+The easiest way to install haploflow is using bioconda and `conda install -c haploflow`  
+If this does not work, you can build haploflow from source:
 
 ## Build requirements
  - CMake >= 2.8
@@ -18,7 +22,7 @@ e.g. `mkdir build`. Enter this new directory and run cmake with `cd build; cmake
 to create the Haploflow executable: `make`. This should create a `haploflow` executable in your build directory.
 When building on Ubuntu >= 14.04, build.sh will perform these steps, build a manpage and produce a tar file as build/haploflow.tar.gz
 
-## Installation
+## Haploflow executable
 The haploflow executable can be directly executed. If using the haploflow.tar.gz file, it can be unpacked (with tar xvf haploflow.tar.gz) 
 to / as user root, which will install the executable and man page in locations which should already be in the path / manpath. The tar.gz 
 file can also be unpacked to any other location (eg. home dir) and the executable run from that location.
