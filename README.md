@@ -8,7 +8,7 @@ If you are using Haploflow, please cite:
 Fritz, A., Bremges, A., Deng, ZL. et al. Haploflow: strain-resolved de novo assembly of viral genomes. Genome Biol 22, 212 (2021), https://doi.org/10.1186/s13059-021-02426-8
 
 ## Installation
-The easiest way to install haploflow is using bioconda and `conda install -c haploflow`  
+The easiest way to install haploflow is using bioconda and `conda install -c bioconda haploflow`  
 If this does not work, you can build haploflow from source:
 
 ## Build requirements
