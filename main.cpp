@@ -52,6 +52,7 @@ int main (int argc, char* argv[])
         return 0;
     }
     std::string out = o;
+    // UNIX only
     std::string cov = o + "/Coverages/";
     std::string g = o + "/Graphs/";
     std::string contigs = o + "/contigs.fa";
@@ -68,10 +69,13 @@ int main (int argc, char* argv[])
 	clock_t t_start = clock();
 	std::ofstream logfile;
     logfile.open(log);
-    logfile << "Options used: " << std::endl;
-    logfile << "strict " << strict << ", k " << k << ", error-rate " << e;
-    logfile << ", two-strain " << (two_strain ? "True" : "False") << ", long contigs: " << (l ? "True" : "False");
-    logfile << ", filter " << filter << ", threshold " << thresh << std::endl;// add visitor pattern?
+    if (debug)
+    {
+        logfile << "Options used: " << std::endl;
+        logfile << "strict " << strict << ", k " << k << ", error-rate " << e;
+        logfile << ", two-strain " << (two_strain ? "True" : "False") << ", long contigs: " << (l ? "True" : "False");
+        logfile << ", filter " << filter << ", threshold " << thresh << std::endl;
+    }
     logfile << "Building deBruijnGraph..." << std::endl;
     logfile.close();
     deBruijnGraph* dbg;
