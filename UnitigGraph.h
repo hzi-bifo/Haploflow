@@ -135,6 +135,7 @@ private:
     std::pair<UEdge, bool> getUnvisitedEdge(const std::vector<UEdge>&, unsigned int cc);
     float remove_non_unique_paths(std::vector<std::vector<UEdge>>&, std::vector<UEdge>&, unsigned int, unsigned int, unsigned int cc);
     std::pair<UEdge, float> get_target(UEdge, bool, unsigned int cc);
+    std::pair<UEdge, float> get_furthest_target(UEdge, unsigned int cc);
     UEdge get_next_source(unsigned int cc);
     
     void cleanPath(std::vector<UEdge>&, std::vector<UEdge>&, unsigned int cc);

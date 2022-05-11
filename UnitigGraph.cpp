@@ -1104,6 +1104,7 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient, unsign
         
         bool same_visit = false;
         
+
         for (auto v : (*g_)[curr].visits)
         {
             same_visit = (std::find(visits.begin(), visits.end(), v) != visits.end());
@@ -1113,13 +1114,6 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient, unsign
 
         (*g_)[curr].visited = true;
         auto target = boost::target(curr, *g_);
-        /*if (same_visit and num_visits == 1 and (*g_)[curr].distance < std::numeric_limits<unsigned int>::max() and (running_distance == 0 or ((*g_)[curr].fatness > 0 and running_fatness/(*g_)[curr].fatness < (*g_)[curr].distance/running_distance)))
-        {
-            running_fatness = (*g_)[curr].fatness;
-            running_distance = (*g_)[curr].distance;
-            last = curr;
-            max_dist = (*g_)[curr].distance;
-        }*/
         if ((*g_)[curr].distance > running_distance and (*g_)[curr].distance != std::numeric_limits<unsigned int>::max() and (same_visit or long_))
         {
             running_distance = (*g_)[curr].distance;
@@ -1139,6 +1133,51 @@ std::pair<UEdge, float> UnitigGraph::get_target(UEdge seed, bool lenient, unsign
         last = seed; // so we don't return nothing
     }
     unvisit(cc);
+    return std::make_pair(last, max_dist);
+}
+
+std::pair<UEdge, float> UnitigGraph::get_furthest_target(UEdge seed, unsigned int cc)
+{
+    UGraph* g_ = graphs_.at(cc);
+    UEdge last;
+    std::vector<UEdge> q;
+    for (auto e : boost::edges(*g_)) //initialise distances and fatness
+    {
+        (*g_)[e].distance = std::numeric_limits<unsigned int>::max();
+        if (e == seed)
+        {
+            (*g_)[e].distance = (*g_)[e].name.size();
+        }
+    }
+    q.push_back(seed);
+    while (!q.empty())
+    {
+        auto curr = q.back();
+        q.pop_back();
+
+        auto target = boost::target(curr, *g_);
+        for (auto oe : boost::out_edges(target, *g_))
+        {
+            float dist = (*g_)[oe].distance;
+            if (dist == std::numeric_limits<unsigned int>::max() or (*g_)[curr].distance + (*g_)[oe].name.size() < dist){
+                (*g_)[oe].distance = (*g_)[curr].distance + (*g_)[oe].name.size();
+                q.push_back(oe);
+            }
+        }
+    }
+    float max_dist = 0;
+    for (auto e : boost::edges(*g_))
+    {
+        if ((*g_)[e].distance < std::numeric_limits<unsigned int>::max() and (*g_)[e].distance > max_dist)
+        {
+            last = e;
+            max_dist = (*g_)[e].distance;
+        }
+    }
+    if (max_dist == 0)
+    {
+        last = seed;
+    }
     return std::make_pair(last, max_dist);
 }
 
@@ -1185,6 +1224,7 @@ std::vector<UEdge> UnitigGraph::fixFlow(UEdge seed, unsigned int cc)
     }
     unvisit(cc);
     std::vector<UEdge> return_path = find_fattest_path(seed, cc);
+
     return return_path;
 }
 
@@ -1649,6 +1689,7 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
     UGraph* g_ = graphs_.at(cc);
     UEdge curr;
     bool unblocked = false;
+    unsigned int last_dist = 0;
     if (sources.size() == 0) // there is no source -> we are complete cycle -> pick highest capacity edge
     {
         float max = -1;
@@ -1670,10 +1711,22 @@ std::pair<UEdge, bool> UnitigGraph::getUnvisitedEdge(const std::vector<UEdge>& s
         {
             auto nextUnvisited = checkUnvisitedEdges(e, cc);
             auto potential_source = nextUnvisited.first;
-            if (nextUnvisited.second and ((*g_)[potential_source].residual_capacity > (*g_)[curr].residual_capacity or !unblocked))
-            { // and check the highest capacity one
-                unblocked = true;
-                curr = potential_source;
+            if (!long_){
+                if (nextUnvisited.second and ((*g_)[potential_source].residual_capacity > (*g_)[curr].residual_capacity or !unblocked))
+                { // and check the highest capacity one
+                    unblocked = true;
+                    curr = potential_source;
+                }
+            }
+            else // search for longest possible path instead of highest source
+            {
+                auto target = get_furthest_target(potential_source,cc);
+                if (nextUnvisited.second and (target.second > last_dist or !unblocked))
+                {
+                    unblocked = true;
+                    curr = potential_source;
+                    last_dist = target.second;
+                }
             }
         }
     }
@@ -1718,7 +1771,10 @@ std::pair<std::vector<UEdge>, std::vector<float>> UnitigGraph::find_paths(unsign
     auto edge_compare = [&](UEdge e1, UEdge e2){ //sort by biggest capacity
         return (*g_)[e1].capacity > (*g_)[e2].capacity;
     };
-    std::sort(sources.begin(), sources.end(), edge_compare); // so that we search the highest source first
+    if (!long_)
+    {
+        std::sort(sources.begin(), sources.end(), edge_compare); // so that we search the highest source first
+    } // if longest contigs to be found, we will search for longest paths not highest sources
     unsigned int visits = 1;
     std::vector<std::vector<UEdge>> unique;
     std::vector<UEdge> started_from;
@@ -1772,7 +1828,7 @@ float UnitigGraph::remove_non_unique_paths(std::vector<std::vector<UEdge>>& uniq
     UGraph* g_ = graphs_.at(cc);
     auto size = unique[visits].size();
     float median = 0.f;
-    if (size < 0.02 * boost::num_edges(*g_) and size < 15 and length < 500) //TODO parameters
+    if (size < 0.02 * boost::num_edges(*g_) and size < 15 and length < filter_length_) //TODO parameters
     {
         for (auto e : blockedPath)
         {
@@ -1953,8 +2009,8 @@ void UnitigGraph::printGraph(std::ostream& os, unsigned int cc)
         (*g_)[e].v.visits = (*g_)[e].visits;
     }
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::name,*g_)), boost::default_writer(), propmapIndex);
-    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,*g_)), boost::default_writer(), propmapIndex);
-    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,*g_)), boost::default_writer(), propmapIndex);
+    boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::cap_info,*g_)), boost::default_writer(), propmapIndex);
+    //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::capacity,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::residual_capacity,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::v,*g_)), boost::default_writer(), propmapIndex);
     //boost::write_graphviz(os, *g_, boost::make_label_writer(boost::get(&VertexProperties::index,*g_)), boost::make_label_writer(boost::get(&EdgeProperties::distance,*g_)), boost::default_writer(), propmapIndex);
