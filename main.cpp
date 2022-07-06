@@ -39,7 +39,7 @@ int main (int argc, char* argv[])
         ("thresh, t", go::value<int>(&thresh)->default_value(-1), "Provide a custom threshold for complex/bad data")
         ("long, l", go::value<bool>(&l)->default_value(false), "Try to maximise contig lengths (might introduce errors)")
         ("true-flow, tf", go::value<bool>(&true_flow)->default_value(false), "Do not perform flow correction, assume perfect flows")
-        ("debug, d", go::value<bool>(&debug)->default_value(false), "Report all temporary graphs and coverage histograms")
+        ("debug, d", go::bool_switch(&debug)->default_value(false), "Report all temporary graphs and coverage histograms")
     ;
     go::positional_options_description p;
     p.add("read-file", -1);
@@ -68,13 +68,24 @@ int main (int argc, char* argv[])
 	clock_t t = clock();
 	clock_t t_start = clock();
 	std::ofstream logfile;
-    logfile.open(log);
+    if (!log.empty())
+        logfile.open(log);
     if (debug)
     {
-        logfile << "Options used: " << std::endl;
-        logfile << "strict " << strict << ", k " << k << ", error-rate " << e;
-        logfile << ", two-strain " << (two_strain ? "True" : "False") << ", long contigs: " << (l ? "True" : "False");
-        logfile << ", filter " << filter << ", threshold " << thresh << std::endl;
+        if (!log.empty())
+        {
+            logfile << "Options used: " << std::endl;
+            logfile << "strict " << strict << ", k " << k << ", error-rate " << e;
+            logfile << ", two-strain " << (two_strain ? "True" : "False") << ", long contigs: " << (l ? "True" : "False");
+            logfile << ", filter " << filter << ", threshold " << thresh << std::endl;
+        }
+        else
+        {
+            std::cout << "Options used: " << std::endl;
+            std::cout << "strict " << strict << ", k " << k << ", error-rate " << e;
+            std::cout << ", two-strain " << (two_strain ? "True" : "False") << ", long contigs: " << (l ? "True" : "False");
+            std::cout << ", filter " << filter << ", threshold " << thresh << std::endl;
+        }
     }
     logfile << "Building deBruijnGraph..." << std::endl;
     logfile.close();
