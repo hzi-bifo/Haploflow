@@ -27,6 +27,7 @@ public:
 	inline static char complement(const char& c){switch (c){case 'A' : return 'T'; case 'C' : return 'G'; case 'G' : return 'C'; case 'T' : return 'A'; default: return 'N';};}
     friend std::ostream& operator<<(std::ostream& os, const deBruijnGraph& dbg);
     friend class UnitigGraph;
+    void addToGraph(std::string filename);
 
 	void markCycles();
     unsigned int split_ccs();

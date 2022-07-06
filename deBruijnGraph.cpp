@@ -88,6 +88,10 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 	}
 }
 
+void deBruijnGraph::addToGraph(std::string filename)
+{
+}
+
 std::ostream& operator<<(std::ostream& os, const deBruijnGraph& dbg)
 {
     os << dbg.k_ << '\t' << dbg.read_length_ << std::endl;
