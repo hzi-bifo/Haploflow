@@ -451,7 +451,7 @@ Vertex* deBruijnGraph::getVertex(const std::string& kmer)
 			auto&& v = graph_.at(seq);
 			return &v;
 		}
-		catch (std::out_of_range e)
+		catch (std::out_of_range const& e)
 		{
 			return 0;
 		}
