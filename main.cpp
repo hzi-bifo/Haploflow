@@ -12,6 +12,7 @@ int main (int argc, char* argv[])
     std::string d;
     std::string log;
     unsigned int k;
+    std::vector<unsigned int> k_list;
     std::string o;
     float e;
     std::string create_dump;
@@ -28,7 +29,8 @@ int main (int argc, char* argv[])
         ("read-file, r", go::value<std::string>(&reads)->required(), "read file (fastq)")
         ("dump-file, d", go::value<std::string>(&d), "deBruijn graph dump file produced by HaploFlow")
         ("log", go::value<std::string>(&log), "log file (default: standard out)")
-        ("k", go::value<unsigned int>(&k)->default_value(41), "k-mer size, default 41, please use an odd number")
+        ("k", go::value<unsigned int>(&k), "Single k-mer mode value, please use an odd number")
+        ("k-list, K", go::value<std::vector<unsigned int> >(&k_list)->multitoken()->default_value(std::vector<unsigned int>{41,61,81,101},"41 61 81 101"), "List of values for k, default 41 61 81 101")
         ("out, o", go::value<std::string>(&o)->required(), "folder for output, will be created if not present. WARNING: Old results will get overwritten")
         ("error-rate, e", go::value<float>(&e)->default_value(0.02), "percentage filter for erroneous kmers - kmers appearing less than relatively e% will be ignored")
         ("create-dump", go::value<std::string>(&create_dump), "create dump of the deBruijn graph. WARNING: This file may be huge")
@@ -68,23 +70,49 @@ int main (int argc, char* argv[])
 	clock_t t = clock();
 	clock_t t_start = clock();
 	std::ofstream logfile;
-    if (!log.empty())
+    if (vm.count("log"))
         logfile.open(log);
     if (debug)
     {
-        if (!log.empty())
+        if (vm.count("log"))
         {
             logfile << "Options used: " << std::endl;
-            logfile << "strict " << strict << ", k " << k << ", error-rate " << e;
+            logfile << "strict " << strict << ", error-rate " << e;
             logfile << ", two-strain " << (two_strain ? "True" : "False") << ", long contigs: " << (l ? "True" : "False");
             logfile << ", filter " << filter << ", threshold " << thresh << std::endl;
+            if (vm.count("k"))
+            {
+                logfile << "Using single value for k: " << k << std::endl;
+            }
+            else
+            {
+                logfile << "Using the following values for k: ";
+                for (const auto& elem : k_list)
+                {
+                    logfile << elem << " ";
+                }
+                logfile << std::endl;
+            }
         }
         else
         {
             std::cout << "Options used: " << std::endl;
-            std::cout << "strict " << strict << ", k " << k << ", error-rate " << e;
+            std::cout << "strict " << strict << ", error-rate " << e;
             std::cout << ", two-strain " << (two_strain ? "True" : "False") << ", long contigs: " << (l ? "True" : "False");
             std::cout << ", filter " << filter << ", threshold " << thresh << std::endl;
+            if (vm.count("k"))
+            {
+                std::cout << "Using single value for k: " << k << std::endl;
+            }
+            else
+            {
+                std::cout << "Using the following values for k: ";
+                for (const auto& elem : k_list)
+                {
+                    std::cout << elem << " ";
+                }
+                std::cout << std::endl;
+            }
         }
     }
     logfile << "Building deBruijnGraph..." << std::endl;
