@@ -6,7 +6,7 @@ endif()
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-find_package(Boost 1.54 COMPONENTS system filesystem program_options REQUIRED)
+find_package(Boost 1.54 COMPONENTS system filesystem program_options iostreams REQUIRED)
 
 include_directories(
 	${Boost_INCLUDE_DIRS}

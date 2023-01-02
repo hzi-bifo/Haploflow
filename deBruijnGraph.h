@@ -15,6 +15,9 @@
 #include <functional>
 #include <cstring>
 #include <ctime> //debug
+#include <boost/iostreams/device/file.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
 #include "Vertex.h"
 #include "Sequence.h"
 

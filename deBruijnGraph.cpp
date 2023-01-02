@@ -2,7 +2,9 @@
 
 deBruijnGraph::deBruijnGraph(std::string filename)
 {
-    std::ifstream graph_file(filename);
+    boost::iostreams::filtering_istream in;
+    in.push(boost::iostreams::gzip_decompressor());
+    in.push(boost::iostreams::file_source(filename));
     short counter = -2;
     std::string line;
         
@@ -11,7 +13,7 @@ deBruijnGraph::deBruijnGraph(std::string filename)
     int a_out; int c_out; int g_out; int t_out;
     unsigned int starts_with; unsigned int ends_with;
 
-    while (std::getline(graph_file, line))
+    while (std::getline(in, line, '\n'))
     {    
         if (counter < 0) // read header
         {
@@ -66,10 +68,12 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 {
 	unsigned int i = 0;
 	// create dBg from FASTA/Q file. Currently expects one-lined sequences 
-	std::ifstream infile(filename);
+    boost::iostreams::filtering_istream infile;
+    infile.push(boost::iostreams::gzip_decompressor());
+    infile.push(boost::iostreams::file_source(filename));
 	std::string line;
 	bool next_read = false;
-	while (std::getline(infile,line))
+	while (std::getline(infile,line,'\n'))
 	{
 		const auto& start = line.front();
 		if (start == '@' or start == '>') // read name. Next line will be the sequence. If quality starts with @, then the next line will as well
