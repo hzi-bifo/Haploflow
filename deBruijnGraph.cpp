@@ -2,9 +2,12 @@
 
 deBruijnGraph::deBruijnGraph(std::string filename)
 {
-    boost::iostreams::filtering_istream in;
-    in.push(boost::iostreams::gzip_decompressor());
-    in.push(boost::iostreams::file_source(filename));
+    boost::iostreams::filtering_istream infile;
+    if (filename.substr(filename.length() - 2) == "gz")
+    {
+        infile.push(boost::iostreams::gzip_decompressor());
+    }
+    infile.push(boost::iostreams::file_source(filename));
     short counter = -2;
     std::string line;
         
@@ -13,7 +16,7 @@ deBruijnGraph::deBruijnGraph(std::string filename)
     int a_out; int c_out; int g_out; int t_out;
     unsigned int starts_with; unsigned int ends_with;
 
-    while (std::getline(in, line, '\n'))
+    while (std::getline(infile, line, '\n'))
     {    
         if (counter < 0) // read header
         {
@@ -69,9 +72,12 @@ deBruijnGraph::deBruijnGraph(std::string filename, unsigned int k) : k_ (k)
 	unsigned int i = 0;
 	// create dBg from FASTA/Q file. Currently expects one-lined sequences 
     boost::iostreams::filtering_istream infile;
-    infile.push(boost::iostreams::gzip_decompressor());
+    if (filename.substr(filename.length() - 2) == "gz")
+    {
+        infile.push(boost::iostreams::gzip_decompressor());
+    }
     infile.push(boost::iostreams::file_source(filename));
-	std::string line;
+    std::string line;
 	bool next_read = false;
 	while (std::getline(infile,line,'\n'))
 	{
