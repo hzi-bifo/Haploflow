@@ -59,6 +59,7 @@ HaploFlow parameters:
   -  [ --filter ] arg (=500)            filter contigs shorter than value
   -  [ --thresh ] arg (=-1)             Provide a custom threshold for 
                                         complex/bad data 
+  -  [ --debug ] arg (=0)               Report all temporary graphs and coverage histograms                       
 ~~~~
 
 The input reads are given with the `--read-file` option and the output directory with `--out`, which are the only required options. 
