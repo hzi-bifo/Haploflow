@@ -2,7 +2,7 @@
 
 echo "Build assumes Ubuntu >= 14.04"
 
-sudo apt install cmake libboost-all-dev ruby-ronn git build-essential
+sudo apt install cmake libboost-all-dev ruby-ronn ronn git build-essential
 
 DIR=`pwd`
 
